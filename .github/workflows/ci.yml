@@ -30,6 +30,7 @@ jobs:
         run: |
           Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108.0.5359.215"
           Write-Output $PWD
+          Get-ChildItem -Path "$PWD"
 
       - name: E2E Test for Electron 🧪
         run: yarn wdio
