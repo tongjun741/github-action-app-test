@@ -17,6 +17,21 @@ jobs:
           Invoke-WebRequest -Uri "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_8.2.540_zh_setup.exe" -OutFile "$env:TEMP\your_software_installer.exe"
           Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait
 
+      - name: List files in your_software
+        run: |
+          Get-ChildItem -Path "$env:APPDATA\Local\Programs"
+
+      - name: Install webdriver
+        run: |
+          Invoke-WebRequest -Uri "https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip" -OutFile "$env:TEMP\chromedriver_win32.zip"
+          
+      - name: Unzip webdriver
+        run: Expand-Archive -Path "$env:TEMP\chromedriver_win32.zip" -DestinationPath "$env:TEMP\chromedriver\win64-108.0.5359.215\chromedriver-win64"
+
+      - name: List files in directory
+        run: |
+          Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108.0.5359.215"
+
       - name: Check installation success
         run: |
           Test-Path "$env:APPDATA\Local\Programs\HuaYoung\花漾客户端.exe"  # 检查安装目录是否存在
