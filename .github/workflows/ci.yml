@@ -3,12 +3,6 @@ name: CI
 on: [push]
 
 jobs:
-  linux:
-    runs-on: ubuntu-latest
-    steps:
-      - run: sudo apt-get install ninja-build
-      - run: ninja --version
-
   windows:
     runs-on: windows-latest
     steps:
@@ -39,11 +33,3 @@ jobs:
 
       - name: E2E Test for Electron 🧪
         run: yarn wdio
-
-
-  mac:
-    runs-on: macos-latest
-    steps:
-      - run: brew install ninja 
-      - run: ninja --version
-      
