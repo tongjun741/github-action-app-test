@@ -19,7 +19,11 @@ jobs:
 
       - name: List files in your_software
         run: |
-          Get-ChildItem -Path "$env:APPDATA\Local\Programs"
+          Get-ChildItem -Path "$env:LOCALAPPDATA\Programs"
+
+      - name: Check installation success
+        run: |
+          Test-Path "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"  # 检查安装目录是否存在
 
       - name: Install webdriver
         run: |
@@ -31,10 +35,6 @@ jobs:
       - name: List files in directory
         run: |
           Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108.0.5359.215"
-
-      - name: Check installation success
-        run: |
-          Test-Path "$env:APPDATA\Local\Programs\HuaYoung\花漾客户端.exe"  # 检查安装目录是否存在
 
       - name: E2E Test for Electron 🧪
         run: yarn wdio
