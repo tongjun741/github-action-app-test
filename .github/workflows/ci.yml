@@ -6,6 +6,12 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
+
+      - name: List files in directory1
+        run: |
+          Write-Output $PWD
+          Get-ChildItem -Path "$PWD"
+
       - name: Install your_software
         run: |
           Invoke-WebRequest -Uri "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_8.2.540_zh_setup.exe" -OutFile "$env:TEMP\your_software_installer.exe"
@@ -26,9 +32,12 @@ jobs:
       - name: Unzip webdriver
         run: Expand-Archive -Path "$env:TEMP\chromedriver_win32.zip" -DestinationPath "$env:TEMP\chromedriver\win64-108.0.5359.215\chromedriver-win64"
 
-      - name: List files in directory
+      - name: List files in directory2
         run: |
           Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108.0.5359.215"
+
+      - name: List files in directory3
+        run: |
           Write-Output $PWD
           Get-ChildItem -Path "$PWD"
 
