@@ -8,34 +8,34 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Call Windows10 steps
-        uses: ./.github/workflows/Windows10.yml
+        uses: ./.github/actions/Windows10
         
       - name: 准备NodeJs环境
-        uses: ./.github/workflows/base.yml
+        uses: ./.github/actions/base
         
       - name: 执行测试
-        uses: ./.github/workflows/doTest.yml
+        uses: ./.github/actions/doTest
 
   Ubuntu:
     runs-on: ubuntu-latest
     steps:
       - name: Call Ubuntu steps
-        uses: ./.github/workflows/Ubuntu22.yml
+        uses: ./.github/actions/Ubuntu
         
       - name: 准备NodeJs环境
-        uses: ./.github/workflows/base.yml
+        uses: ./.github/actions/base
         
       - name: 执行测试
-        uses: ./.github/workflows/doTest.yml
+        uses: ./.github/actions/doTest
 
   macOS:
     runs-on: macos-latest
     steps:
       - name: Call macOS steps
-        uses: ./.github/workflows/macOS.yml
+        uses: ./.github/actions/macOS
         
       - name: 准备NodeJs环境
-        uses: ./.github/workflows/base.yml
+        uses: ./.github/actions/base
         
       - name: 执行测试
-        uses: ./.github/workflows/doTest.yml
+        uses: ./.github/actions/doTest
