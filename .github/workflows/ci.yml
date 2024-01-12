@@ -4,13 +4,13 @@ on: [push]
 
 jobs:
   vagrant-up:
-    runs-on: macos-13
+    runs-on: macos-11
 
     steps:
       - uses: actions/checkout@v2
       
-      - name: Install Vagrant
-        run: brew install vagrant --cask
+      # - name: Install Vagrant
+      #   run: brew install vagrant --cask
 
 
       # - name: Cache Vagrant boxes
