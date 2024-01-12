@@ -72,6 +72,9 @@ jobs:
       - name: Installation
         run: sudo dpkg -i /tmp/HuaYoungApp_Ubuntu_setup.deb
 
+      - name: Start software
+        run: /opt/花漾客户端/huayoung
+
       - name: Use Node.js 20
         uses: actions/setup-node@v2
         with:
@@ -85,7 +88,8 @@ jobs:
         run: yarn wdio
 
   macOS:
-    runs-on: macos-latest
+    runs-on:
+      labels: macos-20240105.3
     steps:
       - uses: actions/checkout@v2
       
@@ -96,9 +100,12 @@ jobs:
         run: |
           hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
           ls -l /Volumes/
-          ls -l /Volumes/Software
-          sudo cp -R /Volumes/Software/花漾客户端.app /Applications/
-          hdiutil detach /Volumes/Software/
+          sudo cp -R '/Volumes/花漾客户端 8.2.445/花漾客户端.app' /Applications/
+          hdiutil detach '/Volumes/花漾客户端 8.2.445/'
+
+      - name: Start software
+        run: |
+          open /Applications/花漾客户端.app
 
       - name: Use Node.js 20
         uses: actions/setup-node@v2
