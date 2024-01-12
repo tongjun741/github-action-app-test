@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v2
       
       - name: Install Vagrant
-        run: brew cask install vagrant
+        run: brew install vagrant --cask
 
 
       # - name: Cache Vagrant boxes
