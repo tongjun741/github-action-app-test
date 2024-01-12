@@ -5,4 +5,9 @@ Vagrant.configure("2") do |config|
 
   # Prevent SharedFoldersEnableSymlinksCreate errors
   config.vm.synced_folder ".", "/vagrant", disabled: true
+  
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 1024
+    v.cpus = 1
+  end
 end
