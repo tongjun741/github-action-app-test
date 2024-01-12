@@ -60,6 +60,7 @@ jobs:
 
   Ubuntu:
     runs-on: ubuntu-latest
+    
     steps:
       - uses: actions/checkout@v2
       
@@ -88,8 +89,8 @@ jobs:
         run: yarn wdio
 
   macOS:
-    runs-on:
-      labels: macos-20240105.3
+    runs-on: macos-latest
+
     steps:
       - uses: actions/checkout@v2
       
