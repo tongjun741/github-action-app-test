@@ -1,0 +1,5 @@
+name: 执行测试
+
+steps:
+  - name: E2E Test for Electron 🧪
+    run: yarn wdio

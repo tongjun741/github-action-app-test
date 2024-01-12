@@ -1,43 +1,24 @@
-name: CI
+name: macOS
 
-on: [push]
+steps:
+  - name: Download file with curl
+    run: curl -o /tmp/HuaYoungApp_Mac_setup.dmg https://dl.szdamai.com/downloads/mac_app_zh/HuaYoungApp_Mac_8.2.445_zh_setup.dmg
 
-jobs:
-  macOS:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v2
+  - name: Install software
+    run: |
+      hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
+      ls -l /Volumes/
+      ls -l /Volumes/Software
+      sudo cp -R /Volumes/Software/花漾客户端.app /Applications/
+      hdiutil detach /Volumes/Software/
+
+  # - name: Install webdriver
+  #   run: |
+  #     Invoke-WebRequest -Uri "https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip" -OutFile "$env:TEMP\chromedriver_win32.zip"
       
-      - name: Use Node.js 20
-        uses: actions/setup-node@v2
-        with:
-          node-version: 20
-          #cache: 'yarn'
-          
-      - name: Install dependencies 👨🏻‍💻
-        run: yarn
+  # - name: Unzip webdriver
+  #   run: Expand-Archive -Path "$env:TEMP\chromedriver_win32.zip" -DestinationPath "$env:TEMP\chromedriver\win64-108.0.5359.215\chromedriver-win64"
 
-      - name: Download file with curl
-        run: curl -o /tmp/HuaYoungApp_Mac_setup.dmg https://dl.szdamai.com/downloads/mac_app_zh/HuaYoungApp_Mac_8.2.445_zh_setup.dmg
-
-      - name: Install software
-        run: |
-          hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
-          ls -l /Volumes/
-          ls -l /Volumes/Software
-          sudo cp -R /Volumes/Software/花漾客户端.app /Applications/
-          hdiutil detach /Volumes/Software/
-
-      # - name: Install webdriver
-      #   run: |
-      #     Invoke-WebRequest -Uri "https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip" -OutFile "$env:TEMP\chromedriver_win32.zip"
-          
-      # - name: Unzip webdriver
-      #   run: Expand-Archive -Path "$env:TEMP\chromedriver_win32.zip" -DestinationPath "$env:TEMP\chromedriver\win64-108.0.5359.215\chromedriver-win64"
-
-      # - name: List files in directory2
-      #   run: |
-      #     Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108.0.5359.215"
-
-      - name: E2E Test for Electron 🧪
-        run: yarn wdio
+  # - name: List files in directory2
+  #   run: |
+  #     Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108.0.5359.215"

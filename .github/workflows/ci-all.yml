@@ -1,0 +1,41 @@
+name: CI
+
+on: [push]
+
+jobs:
+
+  Windows10:
+    runs-on: windows-latest
+    steps:
+      - name: Call Windows10 steps
+        uses: ./.github/workflows/Windows10.yml
+        
+      - name: 准备NodeJs环境
+        uses: ./.github/workflows/base.yml
+        
+      - name: 执行测试
+        uses: ./.github/workflows/doTest.yml
+
+  Ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Ubuntu steps
+        uses: ./.github/workflows/Ubuntu22.yml
+        
+      - name: 准备NodeJs环境
+        uses: ./.github/workflows/base.yml
+        
+      - name: 执行测试
+        uses: ./.github/workflows/doTest.yml
+
+  macOS:
+    runs-on: macos-latest
+    steps:
+      - name: Call macOS steps
+        uses: ./.github/workflows/macOS.yml
+        
+      - name: 准备NodeJs环境
+        uses: ./.github/workflows/base.yml
+        
+      - name: 执行测试
+        uses: ./.github/workflows/doTest.yml

@@ -1,0 +1,12 @@
+name: Ubuntu22
+
+steps:
+  - name: Install libnotify4
+    run: sudo apt-get update && sudo apt-get install -y libnotify4
+
+  - name: Download file with curl
+    run: curl -o /tmp/HuaYoungApp_Ubuntu_setup.deb https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_8.2.445_zh_setup.deb
+
+  - name: Installation
+    run: sudo dpkg -i /tmp/HuaYoungApp_Ubuntu_setup.deb
+    
