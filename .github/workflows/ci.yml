@@ -8,6 +8,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      
+      - name: Install Vagrant
+        run: brew cask install vagrant
+
 
       # - name: Cache Vagrant boxes
       #   uses: actions/cache@v2
