@@ -60,12 +60,18 @@ jobs:
 
   Ubuntu:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v2
       
       - name: Install libnotify4
-        run: sudo apt-get update && sudo apt-get install -y libnotify4
+        run: sudo apt-get update && sudo apt-get install -y libnotify4 xvfb
+              
+      - name: Start Xvfb
+        run: Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+
+      - name: Set display variable
+        run: export DISPLAY=:99
 
       - name: Download file with curl
         run: curl -o /tmp/HuaYoungApp_Ubuntu_setup.deb https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_8.2.445_zh_setup.deb
