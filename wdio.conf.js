@@ -1,4 +1,12 @@
 const path = require('path');
+const os = require('os');
+
+let exePath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', '花漾客户端.exe');
+if (os.platform() === 'darwin') {
+    exePath = "/Applications/花漾客户端.app/Contents/MacOS/花漾客户端";
+} else if (os.platform() === 'linux') {
+    exePath = "/opt/花漾客户端/huayoung";
+}
 
 exports.config = {    //
     // ====================
