@@ -9,39 +9,42 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Call Windows10 steps
-        uses: ./.github/actions/Windows10
-        
-      - name: 准备NodeJs环境
-        uses: ./.github/actions/base
-        
-      - name: 执行测试
-        uses: ./.github/actions/doTest
+      call-workflow-2-in-local-repo:
+        uses: ./.github/workflows/Windows10.yml
 
-  Ubuntu:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      
-      - name: Call Ubuntu steps
-        uses: ./.github/actions/Ubuntu
+      # - name: Call Windows10 steps
+      #   uses: ./.github/actions/Windows10
         
-      - name: 准备NodeJs环境
-        uses: ./.github/actions/base
+  #     - name: 准备NodeJs环境
+  #       uses: ./.github/actions/base
         
-      - name: 执行测试
-        uses: ./.github/actions/doTest
+  #     - name: 执行测试
+  #       uses: ./.github/actions/doTest
 
-  macOS:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v2
+  # Ubuntu:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
       
-      - name: Call macOS steps
-        uses: ./.github/actions/macOS
+  #     - name: Call Ubuntu steps
+  #       uses: ./.github/actions/Ubuntu
         
-      - name: 准备NodeJs环境
-        uses: ./.github/actions/base
+  #     - name: 准备NodeJs环境
+  #       uses: ./.github/actions/base
         
-      - name: 执行测试
-        uses: ./.github/actions/doTest
+  #     - name: 执行测试
+  #       uses: ./.github/actions/doTest
+
+  # macOS:
+  #   runs-on: macos-latest
+  #   steps:
+  #     - uses: actions/checkout@v2
+      
+  #     - name: Call macOS steps
+  #       uses: ./.github/actions/macOS
+        
+  #     - name: 准备NodeJs环境
+  #       uses: ./.github/actions/base
+        
+  #     - name: 执行测试
+  #       uses: ./.github/actions/doTest
