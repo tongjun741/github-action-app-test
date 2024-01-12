@@ -17,17 +17,8 @@ jobs:
       - name: Install dependencies 👨🏻‍💻
         run: yarn
 
-      - name: List files in directory1
-        run: |
-          Write-Output $PWD
-          Get-ChildItem -Path "$PWD"
-
       - name: Download file with curl
         run: curl -o /tmp/HuaYoungApp_Ubuntu_setup.deb https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_8.2.445_zh_setup.deb
-
-      - name: List files in your_software
-        run: |
-          Get-ChildItem -Path "$env:LOCALAPPDATA\Programs"
 
       - name: Installation
         run: sudo dpkg -i /tmp/HuaYoungApp_Ubuntu_setup.deb

@@ -17,11 +17,6 @@ jobs:
       - name: Install dependencies 👨🏻‍💻
         run: yarn
 
-      - name: List files in directory1
-        run: |
-          Write-Output $PWD
-          Get-ChildItem -Path "$PWD"
-
       - name: Download file with curl
         run: curl -o /tmp/HuaYoungApp_Mac_setup.dmg https://dl.szdamai.com/downloads/mac_app_zh/HuaYoungApp_Mac_8.2.445_zh_setup.dmg
 
