@@ -1,8 +1,6 @@
 name: 准备NodeJs环境
 
 steps:
-  - uses: actions/checkout@v2
-  
   - name: Use Node.js 20
     uses: actions/setup-node@v2
     with:

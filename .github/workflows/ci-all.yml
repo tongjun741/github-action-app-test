@@ -7,6 +7,8 @@ jobs:
   Windows10:
     runs-on: windows-latest
     steps:
+      - uses: actions/checkout@v2
+
       - name: Call Windows10 steps
         uses: ./.github/actions/Windows10
         
@@ -19,6 +21,8 @@ jobs:
   Ubuntu:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
+      
       - name: Call Ubuntu steps
         uses: ./.github/actions/Ubuntu
         
@@ -31,6 +35,8 @@ jobs:
   macOS:
     runs-on: macos-latest
     steps:
+      - uses: actions/checkout@v2
+      
       - name: Call macOS steps
         uses: ./.github/actions/macOS
         
