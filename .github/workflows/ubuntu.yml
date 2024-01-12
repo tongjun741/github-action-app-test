@@ -6,6 +6,15 @@ jobs:
   Ubuntu:
     runs-on: ubuntu-latest
     steps:
+      - name: Install libnotify4
+        run: sudo apt-get update && sudo apt-get install -y libnotify4
+
+      - name: Download file with curl
+        run: curl -o /tmp/HuaYoungApp_Ubuntu_setup.deb https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_8.2.445_zh_setup.deb
+
+      - name: Installation
+        run: sudo dpkg -i /tmp/HuaYoungApp_Ubuntu_setup.deb
+        
       - uses: actions/checkout@v2
       
       - name: Use Node.js 20
@@ -16,12 +25,6 @@ jobs:
           
       - name: Install dependencies 👨🏻‍💻
         run: yarn
-
-      - name: Download file with curl
-        run: curl -o /tmp/HuaYoungApp_Ubuntu_setup.deb https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_8.2.445_zh_setup.deb
-
-      - name: Installation
-        run: sudo dpkg -i /tmp/HuaYoungApp_Ubuntu_setup.deb
 
       # - name: Install webdriver
       #   run: |
