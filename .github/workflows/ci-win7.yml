@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       
-      - name: Setup tmate session
+      - name: Setup tmate session2
         uses: mxschmitt/action-tmate@v3
       
       # - name: Install Vagrant
