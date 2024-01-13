@@ -49,11 +49,11 @@ jobs:
           Invoke-WebRequest -Uri "https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip" -OutFile "$env:TEMP\chromedriver_win32.zip"
           
       - name: Unzip webdriver
-        run: Expand-Archive -Path "$env:TEMP\chromedriver_win32.zip" -DestinationPath "$env:TEMP\chromedriver\win64-108.0.5359.215\chromedriver-win64"
+        run: Expand-Archive -Path "$env:TEMP\chromedriver_win32.zip" -DestinationPath "$env:TEMP\chromedriver\win64-108\chromedriver-win64"
 
       - name: List files in directory2
         run: |
-          Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108.0.5359.215"
+          Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108"
 
       - name: List files in directory3
         run: |
@@ -80,7 +80,8 @@ jobs:
 
       - name: Start X DISPLAY
         run: |
-          export DISPLAY=:99 && sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
+          export DISPLAY=:99
+          sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
 
       - name: Use Node.js 20
         uses: actions/setup-node@v2
@@ -90,6 +91,14 @@ jobs:
           
       - name: Install dependencies 👨🏻‍💻
         run: yarn
+
+      - name: 准备chromedriver
+        run: |
+          mkdir -p /tmp/chromedriver/linux-108/chromedriver-linux64
+          cd /tmp/chromedriver/linux-108/chromedriver-linux64
+          wget https://chromedriver.storage.googleapis.com/108.0.5359.22/chromedriver_linux64.zip
+          unzip chromedriver_linux64.zip
+          cd -
       
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3

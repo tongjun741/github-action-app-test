@@ -63,7 +63,7 @@ exports.config = {    //
     capabilities: [{
         maxInstances: 1,
         browserName: 'chrome',
-        browserVersion: '108.0.5359.215',
+        browserVersion: '108',
         'goog:chromeOptions': {
             // C:\Users\tongjun\AppData\Local\Temp\electron-fiddle-63636-4fM8uPJnP5Qg\out\nutritious-cactus-suspect-ocuz1-win32-x64
             // binary: path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Temp', 'electron-fiddle-63636-4fM8uPJnP5Qg', 'out', 'nutritious-cactus-suspect-ocuz1-win32-x64', 'nutritious-cactus-suspect-ocuz1.exe')
