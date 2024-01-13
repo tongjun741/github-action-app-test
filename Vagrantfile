@@ -1,13 +1,4 @@
 Vagrant.configure("2") do |config|
-  config.vm.box = "generic/ubuntu1804"
-
-  config.vm.define 'ubuntu'
-
-  # Prevent SharedFoldersEnableSymlinksCreate errors
-  config.vm.synced_folder ".", "/vagrant", disabled: true
-  
-  config.vm.provider "virtualbox" do |v|
-    v.memory = 1024
-    v.cpus = 1
-  end
+  config.vm.box = "opensky/windows-7-professional-sp1-x64"
+  config.vm.box_version = "0.1.0"
 end
