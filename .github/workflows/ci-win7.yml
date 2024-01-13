@@ -10,6 +10,7 @@ on:
     paths:
       - .github/workflows/ci-win7.yml
       - Vagrantfile
+      - win7.bat
 
 
 jobs:
