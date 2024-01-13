@@ -37,3 +37,12 @@ jobs:
 
       - name: ifconfig
         run: vagrant powershell -c ipconfig
+
+      - name: ifconfig
+        run: vagrant powershell -c "pwd"
+
+      - name: ifconfig
+        run: vagrant powershell -c "dir"
+
+      - name: ifconfig
+        run: vagrant powershell -c "dir ../"
