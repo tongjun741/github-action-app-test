@@ -18,6 +18,14 @@ jobs:
     runs-on: macos-12
 
     steps:
+      - name: Check PHP Version
+        run: |
+          php_version=$(php -r "echo PHP_VERSION;")
+          if [ "$php_version" != "8.3.1" ]; then
+            echo "Invalid PHP version: $php_version"
+            exit 1
+          fi
+
       - uses: actions/checkout@v2
       
       - name: Setup tmate session2
