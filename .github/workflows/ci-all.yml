@@ -4,8 +4,8 @@ on:
   push:
     paths:
       - .github/workflows/ci-all.yml
-      - **.js
-      - **.json
+      - '**.js'
+      - '**.json'
 
 jobs:
 
