@@ -20,8 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       
-      # - name: Setup tmate session
-      #   uses: mxschmitt/action-tmate@v3
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       
       # - name: Install Vagrant
       #   run: brew install vagrant --cask
