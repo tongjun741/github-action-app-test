@@ -5,7 +5,12 @@ name: CI
 # https://github.com/actions/runner-images/releases/tag/macOS-12%2F20240105.3
 # 更新进度: https://github.com/actions/runner-images
 
-on: [push]
+on:
+  push:
+    paths:
+      - .github/workflows/ci-win7.yml
+      - Vagrantfile
+
 
 jobs:
   vagrant-up:
@@ -38,11 +43,14 @@ jobs:
       - name: ifconfig
         run: vagrant powershell -c ipconfig
 
-      - name: ifconfig
+      - name: 当前所在位置
         run: vagrant powershell -c "pwd"
 
-      - name: ifconfig
+      - name: 当前目录文件列表
         run: vagrant powershell -c "dir"
 
-      - name: ifconfig
+      - name: 上级目录文件列表
         run: vagrant powershell -c "dir ../"
+
+      - name: ifconfig
+        run: vagrant powershell -c '& ".\win7.bat"'
