@@ -124,17 +124,13 @@ jobs:
       # - name: Start software
       #   run: |
       #     open /Applications/花漾客户端.app
-      
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
 
       - name: 准备chromedriver
         run: |
-          mkdir -p /tmp/chromedriver/mac-108/chromedriver-mac64
-          cd /tmp/chromedriver/mac-108/chromedriver-mac64
           wget https://chromedriver.storage.googleapis.com/108.0.5359.22/chromedriver_mac64.zip
           unzip chromedriver_mac64.zip
-          cd -
+          mkdir -p /tmp/chromedriver/mac-108/chromedriver-mac-x64/
+          mv chromedriver /tmp/chromedriver/mac-108/chromedriver-mac-x64/
 
       - name: Use Node.js 20
         uses: actions/setup-node@v2
@@ -144,6 +140,9 @@ jobs:
           
       - name: Install dependencies 👨🏻‍💻
         run: yarn
+      
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
 
       - name: E2E Test for Electron 🧪
         run: yarn wdio

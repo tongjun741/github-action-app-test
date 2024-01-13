@@ -2,8 +2,14 @@ const path = require('path');
 const os = require('os');
 
 let exePath;
+let extCapabilities = {};
 if (os.platform() === 'darwin') {
     exePath = "/Applications/花漾客户端.app/Contents/MacOS/花漾客户端";
+    extCapabilities = {
+        'wdio:chromedriverOptions': {
+            cacheDir: '/tmp'
+        }
+    }
 } else if (os.platform() === 'linux') {
     exePath = "/opt/花漾客户端/huayoung";
 }else{
@@ -68,7 +74,8 @@ exports.config = {    //
             // C:\Users\tongjun\AppData\Local\Temp\electron-fiddle-63636-4fM8uPJnP5Qg\out\nutritious-cactus-suspect-ocuz1-win32-x64
             // binary: path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Temp', 'electron-fiddle-63636-4fM8uPJnP5Qg', 'out', 'nutritious-cactus-suspect-ocuz1-win32-x64', 'nutritious-cactus-suspect-ocuz1.exe')
             binary: exePath
-        }
+        },
+        ...extCapabilities
     }],
 
     //
