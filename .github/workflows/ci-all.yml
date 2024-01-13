@@ -118,13 +118,23 @@ jobs:
       - name: Install software
         run: |
           hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
-          ls -l /Volumes/
           sudo cp -R '/Volumes/花漾客户端 8.2.445/花漾客户端.app' /Applications/
           hdiutil detach '/Volumes/花漾客户端 8.2.445/'
 
       # - name: Start software
       #   run: |
       #     open /Applications/花漾客户端.app
+      
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
+      - name: 准备chromedriver
+        run: |
+          mkdir -p /tmp/chromedriver/mac-108/chromedriver-mac64
+          cd /tmp/chromedriver/mac-108/chromedriver-mac64
+          wget https://chromedriver.storage.googleapis.com/108.0.5359.22/chromedriver_mac64.zip
+          unzip chromedriver_mac64.zip
+          cd -
 
       - name: Use Node.js 20
         uses: actions/setup-node@v2
