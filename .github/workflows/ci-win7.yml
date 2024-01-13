@@ -1,7 +1,7 @@
 name: CI
 
 # https://github.com/actions/runner-images/issues/8730
-# macos-12 20240105 才能正常跑
+# macos-12 20240105.3 才能正常跑
 # https://github.com/actions/runner-images/releases/tag/macOS-12%2F20240105.3
 # 更新进度: https://github.com/actions/runner-images
 
@@ -28,7 +28,7 @@ jobs:
 
       - uses: actions/checkout@v2
       
-      - name: Setup tmate session2
+      - name: Setup tmate session3
         uses: mxschmitt/action-tmate@v3
       
       # - name: Install Vagrant
