@@ -5,10 +5,7 @@ name: CI
 # https://github.com/actions/runner-images/releases/tag/macOS-12%2F20240105.3
 # 更新进度: https://github.com/actions/runner-images
 
-on:
-  push:
-    branches:
-      - win7
+on: [push]
 
 jobs:
   vagrant-up:
