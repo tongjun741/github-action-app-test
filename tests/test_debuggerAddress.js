@@ -1,3 +1,9 @@
+/**
+ * 需要将main.js的
+ * this.remoteDebugPort&&t.push
+ * 替换成：
+this.remoteDebugPort=9221;t.push
+ */
 const { remote } = require('webdriverio');
 
 async function runTest() {
@@ -6,7 +12,7 @@ async function runTest() {
             browserName: 'chrome',
             browserVersion: '120.0.6099.109',
             'goog:chromeOptions': {
-                debuggerAddress: 'localhost:9222',
+                debuggerAddress: 'localhost:9221',
             }
         }
     });
