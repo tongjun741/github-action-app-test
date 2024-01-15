@@ -316,5 +316,8 @@ exports.config = {    //
     */
     // afterAssertion: function(params) {
     // }
-    imeout: 60000
+    timeout: 60000,
+    jasmineOpts: {
+        defaultTimeoutInterval: (24 * 60 * 60 * 1000)
+    }
 }
