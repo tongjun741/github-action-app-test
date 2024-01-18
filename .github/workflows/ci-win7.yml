@@ -22,7 +22,9 @@ jobs:
         run: |
           grep "Image Version" ~/systeminfo.md
           if grep -q "20240105.3" ~/systeminfo.md; then
-            echo "Invalid Image Version"
+            echo "Image Version 正确"
+          else
+            echo "Image Version 不是20240105.3，退出工作流。"
             exit 1
           fi
       
