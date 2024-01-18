@@ -18,16 +18,16 @@ jobs:
     runs-on: macos-12
 
     steps:
-      # - name: Check PHP Version
-      #   run: |
-      #     php_version=$(php -r "echo PHP_VERSION;")
-      #     if [ "$php_version" != "8.3.1" ]; then
-      #       echo "Invalid PHP version: $php_version"
-      #       exit 1
-      #     fi
+      - name: Check Image Version
+        run: |
+          if grep -q "20240105.3" ~/systeminfo.md; then
+            echo "Invalid Image Version"
+            grep "Image Version" ~/systeminfo.md
+            exit 1
+          fi
       
-      - name: Setup tmate session5
-        uses: mxschmitt/action-tmate@v3
+      # - name: Setup tmate session5
+      #   uses: mxschmitt/action-tmate@v3
 
       - uses: actions/checkout@v2
       
