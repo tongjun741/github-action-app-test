@@ -18,21 +18,24 @@ jobs:
     runs-on: macos-12
 
     steps:
-      - name: Check PHP Version
-        run: |
-          php_version=$(php -r "echo PHP_VERSION;")
-          if [ "$php_version" != "8.3.1" ]; then
-            echo "Invalid PHP version: $php_version"
-            exit 1
-          fi
+      # - name: Check PHP Version
+      #   run: |
+      #     php_version=$(php -r "echo PHP_VERSION;")
+      #     if [ "$php_version" != "8.3.1" ]; then
+      #       echo "Invalid PHP version: $php_version"
+      #       exit 1
+      #     fi
 
       - uses: actions/checkout@v2
       
-      - name: Setup tmate session5
-        uses: mxschmitt/action-tmate@v3
-      
-      # - name: Install Vagrant
-      #   run: brew install vagrant --cask
+      - name: Install Vagrant 2.3.6
+        run: |
+        brew uninstall vagrant
+        wget https://releases.hashicorp.com/vagrant/2.3.6/vagrant_2.3.6_darwin_amd64.dmg
+        hdiutil attach vagrant_2.3.6_darwin_amd64.dmg
+        sudo installer -pkg /Volumes/Vagrant/vagrant.pkg -target /
+        hdiutil detach /Volumes/Vagrant/
+        vagrant --version
 
 
       # - name: Cache Vagrant boxes
@@ -51,6 +54,9 @@ jobs:
 
       - name: ifconfig
         run: vagrant powershell -c ipconfig
+      
+      - name: Setup tmate session5
+        uses: mxschmitt/action-tmate@v3
 
       - name: 当前所在位置
         run: vagrant powershell -c "pwd"
