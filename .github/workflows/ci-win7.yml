@@ -30,12 +30,12 @@ jobs:
       
       - name: Install Vagrant 2.3.6
         run: |
-        brew uninstall vagrant
-        wget https://releases.hashicorp.com/vagrant/2.3.6/vagrant_2.3.6_darwin_amd64.dmg
-        hdiutil attach vagrant_2.3.6_darwin_amd64.dmg
-        sudo installer -pkg /Volumes/Vagrant/vagrant.pkg -target /
-        hdiutil detach /Volumes/Vagrant/
-        vagrant --version
+          brew uninstall vagrant
+          wget https://releases.hashicorp.com/vagrant/2.3.6/vagrant_2.3.6_darwin_amd64.dmg
+          hdiutil attach vagrant_2.3.6_darwin_amd64.dmg
+          sudo installer -pkg /Volumes/Vagrant/vagrant.pkg -target /
+          hdiutil detach /Volumes/Vagrant/
+          vagrant --version
 
 
       # - name: Cache Vagrant boxes
