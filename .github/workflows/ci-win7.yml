@@ -20,9 +20,9 @@ jobs:
     steps:
       - name: Check Image Version
         run: |
+          grep "Image Version" ~/systeminfo.md
           if grep -q "20240105.3" ~/systeminfo.md; then
             echo "Invalid Image Version"
-            grep "Image Version" ~/systeminfo.md
             exit 1
           fi
       
