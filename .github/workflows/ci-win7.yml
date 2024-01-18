@@ -25,6 +25,9 @@ jobs:
       #       echo "Invalid PHP version: $php_version"
       #       exit 1
       #     fi
+      
+      - name: Setup tmate session5
+        uses: mxschmitt/action-tmate@v3
 
       - uses: actions/checkout@v2
       
