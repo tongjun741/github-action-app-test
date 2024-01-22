@@ -69,8 +69,11 @@ jobs:
       - name: ifconfig
         run: vagrant powershell -c ipconfig
       
-      - name: Setup tmate session5
-        uses: mxschmitt/action-tmate@v3
+      # - name: Setup tmate session5
+      #   uses: mxschmitt/action-tmate@v3
+      
+      - name: action-debug
+      - uses: fawazahmed0/action-debug@main
 
       - name: 当前所在位置
         run: vagrant powershell -c "pwd"
