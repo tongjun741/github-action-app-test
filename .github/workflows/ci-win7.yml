@@ -68,6 +68,15 @@ jobs:
 
       - name: ifconfig
         run: vagrant powershell -c ipconfig
+
+      - name: 安装补丁
+        run: vagrant powershell -c "C:\vagrant\installKB3080149.ps1"
+
+      - name: 重启Box
+        run: vagrant reload
+
+      - name: 安装NodeJs 18
+        run: vagrant powershell -c "C:\vagrant\installNode.ps1"
       
       # - name: Setup tmate session5
       #   uses: mxschmitt/action-tmate@v3
