@@ -20,6 +20,10 @@ $newPathValue = "$env:Path;$nodePath"
 Write-Host "Setting NODE_SKIP_PLATFORM_CHECK environment variable..."
 [Environment]::SetEnvironmentVariable("NODE_SKIP_PLATFORM_CHECK", "1", "Machine")
 
+# 重新加载环境变量
+$env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine")
+$env:NODE_SKIP_PLATFORM_CHECK = [Environment]::GetEnvironmentVariable("NODE_SKIP_PLATFORM_CHECK", "Machine")
+
 # 验证 Node.js 版本
 Write-Host "Node.js version information:"
 node --version
