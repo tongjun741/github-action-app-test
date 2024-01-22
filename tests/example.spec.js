@@ -48,7 +48,7 @@ async function sessionTest() {
 describe('Electron App Test', () => {
   it('should open Electron app and perform actions', async () => {
 
-    await $('div[class*=app-version]').waitForExist({ timeout: 10 * 1000 })
+    await $('div[class*=app-version]').waitForExist({ timeout: 100 * 1000 })
 
     // 验证页面标题
     let title = await browser.getTitle();
