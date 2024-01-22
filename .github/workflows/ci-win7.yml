@@ -41,7 +41,7 @@ jobs:
       # - name: Setup tmate session5
       #   uses: mxschmitt/action-tmate@v3
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       
       - name: Install Vagrant 2.3.6
         run: |
