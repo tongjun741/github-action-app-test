@@ -43,6 +43,14 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      - name: 下载安装包
+      - run: |
+          wget https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_8.2.456_zh_setup.exe -O win7/your_software_installer.exe
+
+      - name: 下载chromedriver
+      - run: |
+          wget https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip -O win7/chromedriver_win32.zip
+
       - name: Copy files to Win7
         run: |
           mkdir win7
@@ -82,12 +90,12 @@ jobs:
 
       - name: 安装NodeJs 18
         run: vagrant powershell -c "C:\vagrant\installNode.ps1"
-      
+
       # - name: Setup tmate session5
       #   uses: mxschmitt/action-tmate@v3
       
-      - name: action-debug
-        uses: fawazahmed0/action-debug@main
+      # - name: action-debug
+      #   uses: fawazahmed0/action-debug@main
 
       - name: 当前所在位置
         run: vagrant powershell -c "pwd"
@@ -98,5 +106,5 @@ jobs:
       - name: 上级目录文件列表
         run: vagrant powershell -c "dir ../"
 
-      - name: ifconfig
-        run: vagrant powershell -c '& ".\win7.bat"'
+      - name: 执行测试
+        run: vagrant powershell -c 'C:\vagrant\doTest.ps1'
