@@ -1,4 +1,4 @@
-name: CI
+name: Win7自动测试
 
 # https://github.com/actions/runner-images/issues/8730
 # macos-12 20240105.3 才能正常跑
@@ -55,7 +55,7 @@ jobs:
         run: |
           mkdir win7
           find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec cp --parents {} ./win7 \;
-      
+
       - name: Install Vagrant 2.3.6
         run: |
           brew uninstall vagrant

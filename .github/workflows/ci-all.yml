@@ -1,4 +1,4 @@
-name: CI
+name: 普通平台
 
 on:
   push:
