@@ -7,9 +7,8 @@ Vagrant.configure("2") do |config|
   # config.winrm.username = "vagrant"
   # config.winrm.password = "vagrant"
 
-  # config.winrm.max_tries = 300 # default is 20
-  # config.winrm.retry_delay = 2 #seconds. This is the defaul value and just here for documentation.
+  config.winrm.max_tries = 300 # default is 20
+  config.winrm.retry_delay = 2 #seconds. This is the defaul value and just here for documentation.
   
-  config.vm.synced_folder ".", "/vagrant", type: "rsync",
-    rsync__exclude: ".*/"
+  config.vm.synced_folder "./win7", "/vagrant"
 end
