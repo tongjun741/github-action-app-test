@@ -34,7 +34,6 @@ jobs:
         if: failure()
         uses: peter-evans/repository-dispatch@v1
         with:
-          token: ${{ secrets.PAT }}
           repository: ${{ github.repository }}
           event-type: retry-workflow
       
