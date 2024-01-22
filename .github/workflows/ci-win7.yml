@@ -42,6 +42,11 @@ jobs:
       #   uses: mxschmitt/action-tmate@v3
 
       - uses: actions/checkout@v4
+
+      - name: Copy files to Win7
+        run: |
+          mkdir win7
+          find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec cp --parents {} ./win7 \;
       
       - name: Install Vagrant 2.3.6
         run: |
