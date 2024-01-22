@@ -1,11 +1,15 @@
 Vagrant.configure("2") do |config|
-  config.vm.box = "anzz1/win7x64"
-  config.vm.box_version = "2023.11.05.0"
-  config.ssh.username = "vagrant"
-  config.ssh.password = "vagrant"
+  config.vm.box = "datacastle/windows7"
+  config.vm.box_version = "1.0"
+  # config.ssh.username = "vagrant"
+  # config.ssh.password = "vagrant"
 
-  config.winrm.username = "vagrant"
-  config.winrm.password = "vagrant"
+  # config.winrm.username = "vagrant"
+  # config.winrm.password = "vagrant"
+
+  # config.winrm.max_tries = 300 # default is 20
+  # config.winrm.retry_delay = 2 #seconds. This is the defaul value and just here for documentation.
   
-  config.vm.provision "file", source: "./win7", destination: "git"
+  config.vm.synced_folder ".", "/vagrant", type: "rsync",
+    rsync__exclude: ".*/"
 end
