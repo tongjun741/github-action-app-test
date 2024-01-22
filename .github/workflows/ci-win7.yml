@@ -44,11 +44,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 下载安装包
-      - run: |
+        run: |
           wget https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_8.2.456_zh_setup.exe -O win7/your_software_installer.exe
 
       - name: 下载chromedriver
-      - run: |
+        run: |
           wget https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip -O win7/chromedriver_win32.zip
 
       - name: Copy files to Win7
