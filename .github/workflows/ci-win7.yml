@@ -73,7 +73,7 @@ jobs:
       #   uses: mxschmitt/action-tmate@v3
       
       - name: action-debug
-      - uses: fawazahmed0/action-debug@main
+        uses: fawazahmed0/action-debug@main
 
       - name: 当前所在位置
         run: vagrant powershell -c "pwd"
