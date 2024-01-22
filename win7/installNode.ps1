@@ -2,9 +2,6 @@
 $output = "c:\vagrant\node-v18.19.0-win-x64.zip"
 $destination = "C:\nodejs"
 
-Write-Host "Downloading Node.js package..."
-$webClient.DownloadFile($url, $output)
-
 Write-Host "Extracting Node.js package to $destination..."
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::ExtractToDirectory($output, $destination)
