@@ -12,29 +12,29 @@ on:
       - Vagrantfile
       - win7.bat
 
-  # repository_dispatch:
-  #   types: [retry-workflow]
+  repository_dispatch:
+    types: [retry-workflow]
 
 jobs:
   vagrant-up:
     runs-on: macos-12
 
     steps:
-      # - name: Check Image Version
-      #   if: failure()
-      #   uses: peter-evans/repository-dispatch@v1
-      #   with:
-      #     token: ${{ secrets.PAT }}
-      #     repository: ${{ github.repository }}
-      #     event-type: retry-workflow
-      #   run: |
-      #     grep "Image Version" ~/systeminfo.md
-      #     if grep -q "20240105.3" ~/systeminfo.md; then
-      #       echo "Image Version 正确"
-      #     else
-      #       echo "Image Version 不是20240105.3，退出工作流。"
-      #       exit 1
-      #     fi
+      - name: Check Image Version
+        if: failure()
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.PAT }}
+          repository: ${{ github.repository }}
+          event-type: retry-workflow
+        run: |
+          grep "Image Version" ~/systeminfo.md
+          if grep -q "20240105.3" ~/systeminfo.md; then
+            echo "Image Version 正确"
+          else
+            echo "Image Version 不是20240105.3，退出工作流。"
+            exit 1
+          fi
       
       # - name: Setup tmate session5
       #   uses: mxschmitt/action-tmate@v3
