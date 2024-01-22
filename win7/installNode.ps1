@@ -1,6 +1,5 @@
-# 下载并解压缩 Node.js 包
-$url = "https://nodejs.org/dist/latest-v18.x/node-v18.19.0-win-x64.zip"
-$output = "$env:TEMP\nodejs.zip"
+# 解压缩 Node.js 包
+$output = "c:\vagrant\node-v18.19.0-win-x64.zip"
 $destination = "C:\nodejs"
 
 Write-Host "Downloading Node.js package..."
