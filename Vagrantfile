@@ -1,4 +1,5 @@
 Vagrant.configure("2") do |config|
+  # 这个版本在github action上可以使用rdp
   config.vm.box = "datacastle/windows7"
   config.vm.box_version = "1.0"
   # config.ssh.username = "vagrant"
