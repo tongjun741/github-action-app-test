@@ -1,4 +1,4 @@
-name: Win7自动测试
+name: Win7-2
 
 # https://github.com/actions/runner-images/issues/8730
 # macos-12 20240105.3 才能正常跑
@@ -52,12 +52,12 @@ jobs:
 
       - name: Show Vagrant version@2
         run: vagrant --version
+      
+      - name: action-debug
+        uses: fawazahmed0/action-debug@main
 
       - name: Run vagrant up
         run: vagrant up
 
       - name: ifconfig
         run: vagrant powershell -c "node -v"
-      
-      - name: action-debug
-        uses: fawazahmed0/action-debug@main
