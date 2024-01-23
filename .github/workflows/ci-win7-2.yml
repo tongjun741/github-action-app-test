@@ -12,7 +12,7 @@ on:
       - .github/workflows/ci-win7-2.yml
 
   repository_dispatch:
-    types: [retry-workflow]
+    types: [retry-workflow-2]
 
 jobs:
   vagrant-up:
@@ -34,7 +34,7 @@ jobs:
         uses: peter-evans/repository-dispatch@v2
         with:
           repository: ${{ github.repository }}
-          event-type: retry-workflow
+          event-type: retry-workflow-2
       
       - uses: actions/checkout@v4
 
