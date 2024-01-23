@@ -1,0 +1,62 @@
+name: Win7自动测试
+
+# https://github.com/actions/runner-images/issues/8730
+# macos-12 20240105.3 才能正常跑
+# macos-12 20240105.1   也启动不了win7
+# https://github.com/actions/runner-images/releases/tag/macOS-12%2F20240105.3
+# 更新进度: https://github.com/actions/runner-images
+
+on:
+  push:
+    paths:
+      - .github/workflows/ci-win7-2.yml
+
+  repository_dispatch:
+    types: [retry-workflow]
+
+jobs:
+  vagrant-up:
+    runs-on: macos-12
+
+    steps:
+      - name: Check Image Version
+        run: |
+          grep "Image Version" ~/systeminfo.md
+          if grep -q "20240105.3" ~/systeminfo.md; then
+            echo "Image Version 正确"
+          else
+            echo "Image Version 不是20240105.3，退出工作流。"
+            exit 1
+          fi
+
+      - name: Rerun workflow
+        if: failure()
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          repository: ${{ github.repository }}
+          event-type: retry-workflow
+      
+      - uses: actions/checkout@v4
+
+      - name: Install Vagrant 2.3.6
+        run: |
+          brew uninstall vagrant
+          wget https://releases.hashicorp.com/vagrant/2.3.6/vagrant_2.3.6_darwin_amd64.dmg
+          hdiutil attach vagrant_2.3.6_darwin_amd64.dmg
+          sudo installer -pkg /Volumes/Vagrant/vagrant.pkg -target /
+          hdiutil detach /Volumes/Vagrant/
+          vagrant --version
+          rm -rf Vagrantfile
+          cp Vagrantfile2 Vagrantfile
+
+      - name: Show Vagrant version
+        run: vagrant --version
+
+      - name: Run vagrant up
+        run: vagrant up
+
+      - name: ifconfig
+        run: vagrant powershell -c "node -v"
+      
+      - name: action-debug
+        uses: fawazahmed0/action-debug@main
