@@ -49,7 +49,7 @@ jobs:
           rm -rf Vagrantfile
           cp Vagrantfile2 Vagrantfile
 
-      - name: Show Vagrant version
+      - name: Show Vagrant version@2
         run: vagrant --version
 
       - name: Run vagrant up
