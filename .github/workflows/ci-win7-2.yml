@@ -10,6 +10,7 @@ on:
   push:
     paths:
       - .github/workflows/ci-win7-2.yml
+      - Vagrantfile2
 
   repository_dispatch:
     types: [retry-workflow-2]
