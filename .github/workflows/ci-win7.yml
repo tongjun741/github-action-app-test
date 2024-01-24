@@ -82,6 +82,9 @@ jobs:
 
       - name: Show Vagrant version
         run: vagrant --version
+        
+      - name: action-debug
+        uses: fawazahmed0/action-debug@main
 
       - name: Run vagrant up
         run: vagrant up
