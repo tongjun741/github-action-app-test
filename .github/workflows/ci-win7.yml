@@ -63,14 +63,14 @@ jobs:
         run: |
           find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec cp {} ./win7/{} \;
 
-      - name: Install Vagrant 2.3.6
-        run: |
-          brew uninstall vagrant
-          wget https://releases.hashicorp.com/vagrant/2.3.6/vagrant_2.3.6_darwin_amd64.dmg
-          hdiutil attach vagrant_2.3.6_darwin_amd64.dmg
-          sudo installer -pkg /Volumes/Vagrant/vagrant.pkg -target /
-          hdiutil detach /Volumes/Vagrant/
-          vagrant --version
+      # - name: Install Vagrant 2.3.6
+      #   run: |
+      #     brew uninstall vagrant
+      #     wget https://releases.hashicorp.com/vagrant/2.3.6/vagrant_2.3.6_darwin_amd64.dmg
+      #     hdiutil attach vagrant_2.3.6_darwin_amd64.dmg
+      #     sudo installer -pkg /Volumes/Vagrant/vagrant.pkg -target /
+      #     hdiutil detach /Volumes/Vagrant/
+      #     vagrant --version
 
       # - name: Cache Vagrant boxes
       #   uses: actions/cache@v2
@@ -82,21 +82,41 @@ jobs:
 
       - name: Show Vagrant version
         run: vagrant --version
-        
-      - name: action-debug
-        uses: fawazahmed0/action-debug@main
 
       - name: Run vagrant up
         run: vagrant up
 
+        
+        
+      - name: action-debug
+        uses: fawazahmed0/action-debug@main
+
       - name: ifconfig
         run: vagrant powershell -c ipconfig
+
+      - name: 检查是否安装了补丁
+        run: vagrant powershell -c 'if (Get-HotFix | Where-Object {$_.HotFixID -eq "KB3080149"}) { Write-Host "已安装 KB3080149" } else { Write-Host "未安装 KB3080149" }'
+
+      - name: 激活
+        run: vagrant powershell -c "C:\vagrant\activeWindows7.ps1"
 
       - name: 安装补丁
         run: vagrant powershell -c "C:\vagrant\installKB3080149.ps1"
 
+      - name: 等待补丁安装完成
+        run: vagrant powershell -c 'while (-not (Get-Process -Name "TrustedInstaller" -ErrorAction SilentlyContinue)) { Start-Sleep -Milliseconds 500 }; while ((Get-Process -Name "TrustedInstaller" -ErrorAction SilentlyContinue)) { Start-Sleep -Milliseconds 500 }'
+
+      - name: 检查安装补丁进程
+        run: vagrant powershell -c 'if ($processes = Get-Process | Where-Object {$_.ProcessName -like "*install*"}) { Write-Host "已发现以下进程：" ; $processes | Format-Table -AutoSize } else { Write-Host "未发现任何带有 'install' 子字符串的进程。" }'
+
       - name: 重启Box
         run: vagrant reload
+
+      - name: 重启Box
+        run: vagrant powershell -c "Restart-Computer"
+
+      - name: 检查是否安装了补丁
+        run: vagrant powershell -c 'if (Get-HotFix | Where-Object {$_.HotFixID -eq "KB3080149"}) { Write-Host "已安装 KB3080149" } else { Write-Host "未安装 KB3080149" }'
 
       - name: 安装NodeJs 18
         run: vagrant powershell -c "C:\vagrant\installNode.ps1"
@@ -109,6 +129,9 @@ jobs:
 
       - name: 当前所在位置
         run: vagrant powershell -c "pwd"
+
+      - name: Node版本
+        run: vagrant powershell -c "node -v"
 
       - name: 当前目录文件列表
         run: vagrant powershell -c "dir"
