@@ -10,11 +10,11 @@ slmgr /ato
 do {
   $activationInfo = Get-CimInstance SoftwareLicensingProduct -Filter "Name like 'Windows%'" | Where-Object { $_.PartialProductKey } | Select-Object Description, LicenseStatus
 
-  if ($activationInfo.LicenseStatus -eq 1) {
-    Write-Host "Windows 已激活。"
+ if ($activationInfo.LicenseStatus -eq 1) {
+    Write-Host "Windows is activated."
     break
   } else {
-    Write-Host "等待系统激活完成..."
+    Write-Host "Waiting for system activation to complete..."
     Start-Sleep -Seconds 10
   }
 } while ($true)
