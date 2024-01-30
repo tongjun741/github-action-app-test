@@ -1,9 +1,9 @@
 Vagrant.configure("2") do |config|
   config.vm.box = "tongjun741/win7-node18"
-  config.vm.box_version = "20240123"
-  config.vm.communicator = "winrm"
-  config.winrm.username = "vagrant"
-  config.winrm.password = "vagrant"
+  config.vm.box_version = "20240130"
+  # config.vm.communicator = "winrm"
+  # config.winrm.username = "vagrant"
+  # config.winrm.password = "vagrant"
 
   
   # 禁用USB控制器
