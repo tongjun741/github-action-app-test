@@ -1,24 +1,24 @@
-const { exec } = require('child_process');
+const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
 try {
   // 定义要下载和安装的 EXE 文件 URL 和文件名
   const exeUrl = 'https://dev.thinkoncloud.cn/downloads/win7_app_zh/HuaYoungApp_Win7_dev_zh_setup.exe';
-  const exeName = 'example.exe';
+  const exeName = 'installer.exe';
 
   // 定义要下载和安装文件的保存目录
   const downloadPath = 'C:\\downloads';
 
-  // 下载和安装 EXE 文件
-  exec(`powershell -Command "(New-Object System.Net.WebClient).DownloadFile('${exeUrl}', '${downloadPath}\\${exeName}'); Start-Process -FilePath '${downloadPath}\\${exeName}' -ArgumentList '/S' -Wait"`, (err, stdout, stderr) => {
-    if (err) {
-      console.error('安装失败：', err);
-      return;
-    }
-    console.log('安装成功');
-  });
+  // 下载.exe文件
+  console.log('开始下载.exe文件...');
+  execSync(`powershell -Command "(New-Object Net.WebClient).DownloadFile(\'${exeUrl}\', \'${exeName}\')"`);
+  console.log('.exe文件下载完成！');
 
+  // 安装.exe文件
+  console.log('开始安装.exe文件...');
+  execSync(`powershell -Command "Start-Process -FilePath \'${exeName}\' -ArgumentList \'/S\' -Wait"`);
+  console.log('.exe文件安装完成！');
 } catch (e) {
   console.error(e);
 } finally {
