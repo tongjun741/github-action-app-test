@@ -20,6 +20,23 @@ jobs:
     runs-on: macos-12
 
     steps:
+      - name: Check Image Version
+        run: |
+          grep "Image Version" ~/systeminfo.md
+          if grep -q "20240119.1" ~/systeminfo.md; then
+            echo "Image Version 正确"
+          else
+            echo "Image Version 不是20240119.1，退出工作流。"
+            exit 1
+          fi
+
+      - name: Rerun workflow
+        if: failure()
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          repository: ${{ github.repository }}
+          event-type: retry-workflow-2
+
       - uses: actions/checkout@v4
 
       - name: Install Vagrant 2.3.6
