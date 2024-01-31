@@ -1,7 +1,7 @@
 name: Win7-2
 
 # https://github.com/actions/runner-images/issues/8730
-# macos-12 20240105.3 才能正常跑
+# macos-12 20240105.3、20240119.1 才能正常跑
 # macos-12 20240105.1   也启动不了win7
 # https://github.com/actions/runner-images/releases/tag/macOS-12%2F20240105.3
 # 更新进度: https://github.com/actions/runner-images
@@ -22,11 +22,13 @@ jobs:
     steps:
       - name: Check Image Version
         run: |
-          grep "Image Version" ~/systeminfo.md
-          if grep -q "20240119.1" ~/systeminfo.md; then
-            echo "Image Version 正确"
+          version=$(grep -oE 'Image Version: ([0-9]{8}\.[0-9])' ~/systeminfo.md | awk '{print $3}')
+          required_version="20240119.1"
+
+          if [[ $version == $required_version || $version > $required_version ]]; then
+            echo "Image Version 大于等于 ${required_version}，可以正常工作"
           else
-            echo "Image Version 不是20240119.1，退出工作流。"
+            echo "Image Version 小于 ${required_version}，退出工作流，发出retry-workflow事件重试。"
             exit 1
           fi
 
