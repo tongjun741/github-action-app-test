@@ -49,8 +49,6 @@ jobs:
           sudo installer -pkg /Volumes/Vagrant/vagrant.pkg -target /
           hdiutil detach /Volumes/Vagrant/
           vagrant --version
-          rm -rf Vagrantfile
-          cp Vagrantfile2 Vagrantfile
 
       - name: Show Vagrant version@2
         run: vagrant --version

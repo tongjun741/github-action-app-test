@@ -1,15 +1,16 @@
 Vagrant.configure("2") do |config|
-  # 这个版本在github action上可以使用rdp
-  config.vm.box = "datacastle/windows7"
-  config.vm.box_version = "1.0"
-  # config.ssh.username = "vagrant"
-  # config.ssh.password = "vagrant"
-
+  config.vm.box = "tongjun741/win7-node18"
+  config.vm.box_version = "20240130"
+  # config.vm.communicator = "winrm"
   # config.winrm.username = "vagrant"
   # config.winrm.password = "vagrant"
-
-  config.winrm.max_tries = 300 # default is 20
-  config.winrm.retry_delay = 2 #seconds. This is the defaul value and just here for documentation.
+  config.vm.boot_timeout = 60
+  
+  # 禁用USB控制器
+  config.vm.provider "virtualbox" do |vb|
+    vb.customize ["modifyvm", :id, "--usb", "off"]
+  end
   
   config.vm.synced_folder "./win7", "/vagrant"
+
 end
