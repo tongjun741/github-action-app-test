@@ -1,27 +1,13 @@
-const http = require('http');
+const path = require('path');
+const fs = require('fs');
 
-// http://ds.0728123.xyz:65080/log_channel2
-const options = {
-  hostname: 'ds.0728123.xyz',
-  port: '65080',
-  path: '/log_channel2?text=newline212',
-  method: 'GET'
-};
+// 文件输出到了z:\\out.log
+const logFilePath = path.join(__dirname, 'out.log');
+const currentTime = new Date().toString() + '\n';
 
-const req = http.request(options, (res) => {
-  let responseData = '';
-
-  res.on('data', (chunk) => {
-    responseData += chunk;
-  });
-
-  res.on('end', () => {
-    console.log(responseData);
-  });
-});
-
-req.on('error', (error) => {
-  console.error(error);
-});
-
-req.end();
+try {
+  fs.appendFileSync(logFilePath, currentTime);
+  console.log(`Current time appended to ${logFilePath}`);
+} catch (err) {
+  console.error(err);
+}
