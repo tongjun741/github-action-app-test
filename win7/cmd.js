@@ -7,9 +7,6 @@ try {
   const exeUrl = 'https://dev.thinkoncloud.cn/downloads/win7_app_zh/HuaYoungApp_Win7_dev_zh_setup.exe';
   const exeName = 'installer.exe';
 
-  // 定义要下载和安装文件的保存目录
-  const downloadPath = 'C:\\downloads';
-
   // 下载.exe文件
   console.log('开始下载.exe文件...');
   execSync(`powershell -Command "(New-Object Net.WebClient).DownloadFile(\'${exeUrl}\', \'${exeName}\')"`);
