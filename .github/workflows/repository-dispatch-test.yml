@@ -15,7 +15,7 @@ jobs:
 
       - name: Check file for string
         run: |
-          echo "win10" > a.txt
+          echo "wi2n10" > a.txt
           if grep -q "win10" a.txt; then
             echo "File contains 'win10'. Dispatching event..."
             echo "WIN10_MODIFIED=true" >> $GITHUB_ENV
