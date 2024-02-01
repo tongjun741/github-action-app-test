@@ -10,10 +10,18 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+
+      - run: echo "ok" > empty.txt
+
+      - name: 确保能下载artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: win10_last-modified
+          path: empty.txt
 
       - name: Download artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: win10_last-modified
           path: downloaded_artifact
@@ -35,7 +43,7 @@ jobs:
 
       - name: Save last-modified date to artifact
         if: steps.compare-modified-1.outputs.modified == 'true'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: win10_last-modified
           path: win10_last_modified.txt
