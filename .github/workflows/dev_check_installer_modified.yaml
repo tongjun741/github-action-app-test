@@ -34,23 +34,30 @@ jobs:
             current_date=$(curl -sI https://dev.thinkoncloud.cn/downloads/win10_app_zh/HuaYoungApp_Win10_dev_zh_setup.exe | grep Last-Modified | awk -F': ' '{print $2}')
             
             if [ "$stored_date" != "$current_date" ]; then
-              echo "::set-output name=modified::true"
+              echo "WIN10_MODIFIED=true" >> $GITHUB_ENV
               echo current_date > win10_last_modified.txt
             else
-              echo "::set-output name=modified::false"
+              echo "WIN10_MODIFIED=false" >> $GITHUB_ENV
             fi
           fi
 
       - name: Save last-modified date to artifact
-        if: steps.compare-modified-1.outputs.modified == 'true'
+        if: env.WIN10_MODIFIED == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: win10_last-modified
           path: win10_last_modified.txt
 
       - name: Run task if modified
-        if: steps.win10-compare-modified.outputs.modified == 'true' && needs.win10-task-execution.result != 'failure'
+        if: env.WIN10_MODIFIED == 'true' && needs.win10-task-execution.result != 'failure'
         id: win10-task-execution
         run: |
           # 执行您的任务
           echo "执行任务"
+          
+      - name: Send repository_dispatch event
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          repository: ${{ github.repository }}
+          event-type: win10-start
+          client-payload: '{"ss": "value1", "url": "https://dev.thinkoncloud.cn/downloads/win10_app_zh/HuaYoungApp_Win10_dev_zh_setup.exe"}'
