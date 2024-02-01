@@ -2,8 +2,8 @@ name: Check File for String
 
 on:
   push:
-    branches:
-      - main
+    paths:
+      - .github/workflows/repository-dispatch-test.yml
 
 jobs:
   check-file:
