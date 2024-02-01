@@ -59,16 +59,18 @@ jobs:
         run: |
           wget https://dev.thinkoncloud.cn/downloads/win7_app_zh/HuaYoungApp_Win7_dev_zh_setup.exe -O installer.exe
 
-      - name: action-debug
-        uses: fawazahmed0/action-debug@main
+      # - name: action-debug
+      #   uses: fawazahmed0/action-debug@main
 
       - name: Copy files to Win7
         run: |
-          find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec cp {} ./win7/{} \;
+          find . -maxdepth 1 -type f -not -name ".*" -not -name "win7" -exec cp {} win7/ \;
+          find . -maxdepth 1 -type d -not -name ".*" -not -name "win7" -exec cp -r {} win7/ \;
           rm -rf win7/cmd.js
           cp win7/cmd_verify.js win7/cmd.js
           rm -rf win7/tests/*
           cp win7/min_verify.spec.js win7/tests
+          tree win7
 
       - name: Run vagrant up
         run: vagrant up || true
@@ -86,8 +88,4 @@ jobs:
           cat win7/done.log
           cat win7/start.log
           echo "测试结束"
-
-
-      # - name: action-debug
-      #   uses: fawazahmed0/action-debug@main
 
