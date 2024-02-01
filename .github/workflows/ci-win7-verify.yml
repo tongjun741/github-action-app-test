@@ -33,7 +33,7 @@ jobs:
 
       - name: Rerun workflow
         if: failure()
-        uses: peter-evans/repository-dispatch@v2
+        uses: peter-evans/repository-dispatch@v4
         with:
           repository: ${{ github.repository }}
           event-type: retry-workflow-win7-verify
