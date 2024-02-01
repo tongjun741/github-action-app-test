@@ -1,4 +1,4 @@
-name: Win7-2
+name: 验证Win7能否启动
 
 # https://github.com/actions/runner-images/issues/8730
 # macos-12 20240105.3、20240119.1 才能正常跑
@@ -9,11 +9,10 @@ name: Win7-2
 on:
   push:
     paths:
-      - .github/workflows/ci-win7-2.yml
-      - Vagrantfile2
+      - .github/workflows/ci-win7-verify.yml
 
   repository_dispatch:
-    types: [retry-workflow-2]
+    types: [retry-workflow-win7-verify]
 
 jobs:
   vagrant-up:
@@ -37,7 +36,10 @@ jobs:
         uses: peter-evans/repository-dispatch@v2
         with:
           repository: ${{ github.repository }}
-          event-type: retry-workflow-2
+          event-type: retry-workflow-win7-verify
+      
+      # - name: Setup tmate session5
+      #   uses: mxschmitt/action-tmate@v3
 
       - uses: actions/checkout@v4
 
@@ -50,15 +52,27 @@ jobs:
           hdiutil detach /Volumes/Vagrant/
           vagrant --version
 
-      - name: Show Vagrant version@2
+      - name: Show Vagrant version
         run: vagrant --version
 
-      - name: Run vagrant up
+      - name: 下载安装包
         run: |
-          vagrant up || true
-      
-      - name: action-debug
-        uses: fawazahmed0/action-debug@main
+          wget https://dev.thinkoncloud.cn/downloads/win7_app_zh/HuaYoungApp_Win7_dev_zh_setup.exe -O installer.exe
 
-      - name: ifconfig
-        run: vagrant powershell -c "node -v"
+      - name: Copy files to Win7
+        run: |
+          find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec cp {} ./win7/{} \;
+          rm -rf win7/cmd.js
+          cp win7/cmd_verify.js win7/cmd.js
+
+      - name: Run vagrant up
+        run: vagrant up
+
+      - name: 等待测试完成
+        run: |
+          while ! inotifywait -e create win7/done.log; do echo "等待文件 win7/done.log 出现..."; done; echo "文件 win7/done.log 已经出现"
+          echo "测试结束"
+
+      # - name: action-debug
+      #   uses: fawazahmed0/action-debug@main
+
