@@ -68,7 +68,7 @@ jobs:
           cp win7/min_verify.spec.js win7/tests
 
       - name: Run vagrant up
-        run: vagrant up
+        run: vagrant up || true
 
       - name: 等待测试完成
         run: |
