@@ -45,10 +45,6 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      - name: Copy files to Win7
-        run: |
-          find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec cp {} ./win7/{} \;
-
       - name: Install Vagrant 2.3.6
         run: |
           brew uninstall vagrant
@@ -68,6 +64,14 @@ jobs:
 
       - name: Show Vagrant version
         run: vagrant --version
+
+      - name: 下载安装包
+        run: |
+          wget https://dev.thinkoncloud.cn/downloads/win7_app_zh/HuaYoungApp_Win7_dev_zh_setup.exe -O installer.exe
+
+      - name: Copy files to Win7
+        run: |
+          find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec cp {} ./win7/{} \;
 
       - name: Run vagrant up
         run: vagrant up

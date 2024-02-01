@@ -3,19 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 try {
-  // 定义要下载和安装的 EXE 文件 URL 和文件名
-  const exeUrl = 'https://dev.thinkoncloud.cn/downloads/win7_app_zh/HuaYoungApp_Win7_dev_zh_setup.exe';
   const exeName = 'installer.exe';
-
-  // 下载.exe文件
-  console.log('开始下载.exe文件...');
-  try {
-    const stdout = execSync(`powershell -Command "(New-Object Net.WebClient).DownloadFile(\'${exeUrl}\', \'${exeName}\')"`);
-    console.log('.exe文件下载完成！');
-    console.log('标准输出:', stdout.toString());
-  } catch (error) {
-    console.error('下载文件时发生错误:', error.stderr.toString());
-  }
 
   // 安装.exe文件
   console.log('开始安装.exe文件...');
@@ -30,7 +18,7 @@ try {
   // 开始测试
   console.log('开始测试');
   try {
-    const stdout = execSync(`nmp install yarn -g && yarn && yarn wdio`);
+    const stdout = execSync(`npm install yarn -g && yarn && yarn wdio`);
     console.log('测试完成！');
     console.log('标准输出:', stdout.toString());
   } catch (error) {

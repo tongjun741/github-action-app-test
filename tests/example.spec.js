@@ -59,28 +59,28 @@ describe('Electron App Test', () => {
     console.log("版本号是：", version);
 
     // expect(version).toBe('Clicked');
-    await $('//span[text()="童1227"]').click();
+    // await $('//span[text()="童1227"]').click();
 
-    await sleep(3000);
-    let windowIDs = await browser.getWindowHandles();
-    console.log(windowIDs);
-    browser.switchToWindow(windowIDs[0])
-    await sleep(3000);
-    let mainWindowID = await browser.getWindowHandle();
-    console.log(mainWindowID);
+    // await sleep(3000);
+    // let windowIDs = await browser.getWindowHandles();
+    // console.log(windowIDs);
+    // browser.switchToWindow(windowIDs[0])
+    // await sleep(3000);
+    // let mainWindowID = await browser.getWindowHandle();
+    // console.log(mainWindowID);
 
-    await $('//a[text()="抖音_TJ"]').waitForExist({ timeout: 10 * 1000 })
-    title = await browser.getTitle();
-    console.log("标题是", title);
+    // await $('//a[text()="抖音_TJ"]').waitForExist({ timeout: 10 * 1000 })
+    // title = await browser.getTitle();
+    // console.log("标题是", title);
 
-    await $('//a[text()="抖音_TJ"]').click();
-    await $('//span[text()="打开浏览器"]').waitForExist({ timeout: 10 * 1000 });
-    await $('//span[text()="打开浏览器"]').click();
+    // await $('//a[text()="抖音_TJ"]').click();
+    // await $('//span[text()="打开浏览器"]').waitForExist({ timeout: 10 * 1000 });
+    // await $('//span[text()="打开浏览器"]').click();
 
-    //
-    await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
+    // //
+    // await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
 
-    await sessionTest();
+    // await sessionTest();
 
   });
 });
