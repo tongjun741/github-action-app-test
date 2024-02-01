@@ -2,7 +2,7 @@ name: 检查测试环境是否有新的安装包
 
 on:
   schedule:
-    - cron: '* * * * *'
+    - cron: '*/5 * * * *'
 
 jobs:
   check-file-modified:
