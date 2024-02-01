@@ -71,7 +71,10 @@ jobs:
       - name: 等待测试完成
         run: |
           while ! inotifywait -e create win7/done.log; do echo "等待文件 win7/done.log 出现..."; done; echo "文件 win7/done.log 已经出现"
+          cat win7/done.log
+          cat win7/start.log
           echo "测试结束"
+
 
       # - name: action-debug
       #   uses: fawazahmed0/action-debug@main
