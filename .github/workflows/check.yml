@@ -1,0 +1,31 @@
+name: Check File for String
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-file:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Check file for string
+        run: |
+          echo "win10" > a.txt
+          if grep -q "win10" a.txt; then
+            echo "File contains 'win10'. Dispatching event..."
+            echo "::set-output name=dispatch_event::windows10-dispatch"
+          else
+            echo "File does not contain 'win10'."
+          fi
+          
+      - name: Dispatch event
+        if: steps.check-file.outputs.dispatch_event == 'windows10-dispatch'
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: windows10-dispatch
