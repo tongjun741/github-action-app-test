@@ -11,21 +11,22 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Check file for string
         run: |
           echo "win10" > a.txt
           if grep -q "win10" a.txt; then
             echo "File contains 'win10'. Dispatching event..."
-            echo "::set-output name=dispatch_event::windows10-dispatch"
+            echo "WIN10_MODIFIED=true" >> $GITHUB_ENV
           else
             echo "File does not contain 'win10'."
+            echo "WIN10_MODIFIED=false" >> $GITHUB_ENV
           fi
           
       - name: Dispatch event
-        if: steps.check-file.outputs.dispatch_event == 'windows10-dispatch'
-        uses: peter-evans/repository-dispatch@v1
+        if: env.WIN10_MODIFIED == 'true'
+        uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           event-type: windows10-dispatch
