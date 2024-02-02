@@ -73,7 +73,7 @@ jobs:
       - name: Run vagrant up
         run: vagrant up || true
 
-      - name: action-debug
+      - name: action-debug1
         uses: fawazahmed0/action-debug@main
 
       - name: 等待测试完成
