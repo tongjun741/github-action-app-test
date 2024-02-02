@@ -75,7 +75,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: last-modified
-          path: **/*.json
+          path: |
+            last_modified_product.json
+            last_modified_dev.json
 
       - name: Run task if Windows 10 modified
         if: env.WIN10_MODIFIED == 'true' && needs.win10-task-execution.result != 'failure'
