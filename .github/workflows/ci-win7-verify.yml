@@ -77,7 +77,7 @@ jobs:
 
       - run: VBoxManage list vms
 
-      - name: action-debug1
+      - name: action-debug2
         uses: fawazahmed0/action-debug@main
 
       - name: 等待测试完成
