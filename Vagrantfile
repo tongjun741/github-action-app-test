@@ -8,11 +8,11 @@ Vagrant.configure("2") do |config|
     vb.customize ["modifyvm", :id, "--usb", "off"]
   end
   
-  # # 配置为4核8G
-  # config.vm.provider "virtualbox" do |v|
-  #   v.memory = 8192
-  #   v.cpus = 4
-  # end
+  # 配置为4核8G
+  config.vm.provider "virtualbox" do |v|
+    v.memory = 8192
+    v.cpus = 2
+  end
   
   config.vm.synced_folder "./win7", "/vagrant"
 
