@@ -11,7 +11,7 @@ Vagrant.configure("2") do |config|
   # 配置为4核8G
   config.vm.provider "virtualbox" do |v|
     v.memory = 4092
-    v.cpus = 2
+    v.cpus = 1
   end
   
   config.vm.synced_folder "./win7", "/vagrant"
