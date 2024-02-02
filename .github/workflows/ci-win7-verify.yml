@@ -59,9 +59,6 @@ jobs:
         run: |
           wget https://dev.thinkoncloud.cn/downloads/win7_app_zh/HuaYoungApp_Win7_dev_zh_setup.exe -O installer.exe
 
-      # - name: action-debug
-      #   uses: fawazahmed0/action-debug@main
-
       - name: Copy files to Win7
         run: |
           find . -maxdepth 1 -type f -not -name ".*" -not -name "win7" -exec cp {} win7/ \;
@@ -75,6 +72,9 @@ jobs:
 
       - name: Run vagrant up
         run: vagrant up || true
+
+      - name: action-debug
+        uses: fawazahmed0/action-debug@main
 
       - name: 等待测试完成
         run: |
