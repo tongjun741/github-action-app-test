@@ -10,16 +10,16 @@ function checkFile() {
     if (content !== lastContent) {
       // 文件内容已变化，执行命令
       lastContent = content;
-      console.log(`${filePath} has been modified, executing...`);
+      console.log(new Date().toLocaleString(), `${filePath} has been modified, executing...`);
       try {
         const result = execSync(`node ${filePath}`);
-        console.log(result.toString());
+        console.log(new Date().toLocaleString(), result.toString());
       } catch (error) {
-        console.error(`Error executing ${filePath}: ${error.message}`);
+        console.error(new Date().toLocaleString(), `Error executing ${filePath}: ${error.message}`);
       }
     }
   } catch (error) {
-    console.error(error);
+    console.error(new Date().toLocaleString(), error);
   }
 
   // 模拟定时器

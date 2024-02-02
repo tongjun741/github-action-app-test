@@ -4,6 +4,7 @@ const fs = require('fs');
 
 // 异步执行命令并输出标准输出内容
 const executeCommand = (command, args) => {
+  console.log(new Date().toLocaleString(), `开始执行命令：${command} ${args}`);
   return new Promise((resolve, reject) => {
     const childProcess = spawn(command, args);
     let stdout = '';
@@ -35,8 +36,8 @@ async function main() {
   const exeName = 'installer.exe';
 
   // 安装.exe文件
-  console.log('开始安装.exe文件...');
-  await executeCommand(`powershell -Command "Start-Process -FilePath \'${exeName}\' -ArgumentList \'/S\' -Wait"`)
+  console.log(new Date().toLocaleString(), '开始安装.exe文件...');
+  await executeCommand('powershell', [`-Command "Start-Process -FilePath \'${exeName}\' -ArgumentList \'/S\' -Wait"`])
     .then((output) => {
       console.log('安装命令执行结果：', output);
     })
@@ -45,8 +46,8 @@ async function main() {
     });
 
   // npm install
-  console.log('开始npm install...');
-  await executeCommand(`npm install yarn -g && yarn`)
+  console.log(new Date().toLocaleString(), '开始npm install...');
+  await executeCommand('npm', ['install yarn -g && yarn'])
     .then((output) => {
       console.log('npm install命令执行结果：', output);
     })
@@ -55,7 +56,7 @@ async function main() {
     });
 
   // 开始测试
-  console.log('开始测试...');
+  console.log(new Date().toLocaleString(), '开始测试...');
   await executeCommand(`yarn`, ['wdio'])
     .then((output) => {
       console.log('测试执行结果：', output);
