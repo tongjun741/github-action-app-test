@@ -1,0 +1,59 @@
+name: Windows10
+
+on:
+  repository_dispatch:
+    types: [win10-start]
+
+jobs:
+
+  Windows10:
+    runs-on: windows-latest
+    
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v2
+        with:
+          node-version: 20
+          #cache: 'yarn'
+          
+      - name: Install dependencies 👨🏻‍💻
+        run: yarn
+
+      - name: List files in directory1
+        run: |
+          Write-Output $PWD
+          Get-ChildItem -Path "$PWD"
+
+      - name: Install your_software
+        run: |
+          Invoke-WebRequest -Uri "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_8.2.540_zh_setup.exe" -OutFile "$env:TEMP\your_software_installer.exe"
+          Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait
+
+      - name: List files in your_software
+        run: |
+          Get-ChildItem -Path "$env:LOCALAPPDATA\Programs"
+
+      - name: Check installation success
+        run: |
+          Test-Path "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"  # 检查安装目录是否存在
+
+      - name: Install webdriver
+        run: |
+          Invoke-WebRequest -Uri "https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip" -OutFile "$env:TEMP\chromedriver_win32.zip"
+          
+      - name: Unzip webdriver
+        run: Expand-Archive -Path "$env:TEMP\chromedriver_win32.zip" -DestinationPath "$env:TEMP\chromedriver\win64-108\chromedriver-win64"
+
+      - name: List files in directory2
+        run: |
+          Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108"
+
+      - name: List files in directory3
+        run: |
+          Write-Output $PWD
+          Get-ChildItem -Path "$PWD"
+
+      - name: E2E Test for Electron 🧪
+        run: yarn wdio

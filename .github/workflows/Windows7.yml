@@ -1,23 +1,11 @@
-name: Win7自动测试
-
-# https://github.com/actions/runner-images/issues/8730
-# macos-12 20240105.3、20240119.1 才能正常跑
-# macos-12 20240105.1   也启动不了win7
-# https://github.com/actions/runner-images/releases/tag/macOS-12%2F20240105.3
-# 更新进度: https://github.com/actions/runner-images
+name: Windows7
 
 on:
-  push:
-    paths:
-      - .github/workflows/ci-win7.yml
-      - Vagrantfile
-      - win7.bat
-
   repository_dispatch:
-    types: [retry-workflow]
+    types: [win7-start, retry-win7-start]
 
 jobs:
-  vagrant-up:
+  Windows7:
     runs-on: macos-12
 
     steps:
@@ -38,7 +26,7 @@ jobs:
         uses: peter-evans/repository-dispatch@v2
         with:
           repository: ${{ github.repository }}
-          event-type: retry-workflow
+          event-type: retry-win7-start
       
       # - name: Setup tmate session5
       #   uses: mxschmitt/action-tmate@v3

@@ -17,47 +17,98 @@ jobs:
       - name: 确保能下载artifact
         uses: actions/upload-artifact@v4
         with:
-          name: win10_last-modified
+          name: last-modified
           path: empty.txt
 
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          name: win10_last-modified
+          name: last-modified
           path: downloaded_artifact
 
-      - name: 对比Win10 last-modified
-        id: win10-compare-modified
+      - name: 对比last-modified
         run: |
-          if [ -f downloaded_artifact/win10_last_modified.txt ]; then
-            stored_date=$(cat downloaded_artifact/last_modified.txt)
-            current_date=$(curl -sI https://dev.thinkoncloud.cn/downloads/win10_app_zh/HuaYoungApp_Win10_dev_zh_setup.exe | grep Last-Modified | awk -F': ' '{print $2}')
-            
-            if [ "$stored_date" != "$current_date" ]; then
-              echo "WIN10_MODIFIED=true" >> $GITHUB_ENV
-              echo current_date > win10_last_modified.txt
-            else
-              echo "WIN10_MODIFIED=false" >> $GITHUB_ENV
-            fi
+          npm install
+          node checkModified.js
+
+      - name: 检查modified标记
+        run: |
+          if grep -q "win10" checkModified.result; then
+            echo "File contains 'win10'. Dispatching event..."
+            echo "WIN10_MODIFIED=true" >> $GITHUB_ENV
+            echo "WIN10_PARAMETERS=$(grep -oP 'win10=\K.*' checkModified.result)" >> $GITHUB_ENV
+            echo "ANY_MODIFIED=true" >> $GITHUB_ENV
+          else
+            echo "File does not contain 'win10'."
+            echo "WIN10_MODIFIED=false" >> $GITHUB_ENV
+          fi
+          if grep -q "win7" checkModified.result; then
+            echo "File contains 'win7'. Dispatching event..."
+            echo "WIN7_MODIFIED=true" >> $GITHUB_ENV
+            echo "WIN7_PARAMETERS=$(grep -oP 'win7=\K.*' checkModified.result)" >> $GITHUB_ENV
+            echo "ANY_MODIFIED=true" >> $GITHUB_ENV
+          else
+            echo "File does not contain 'win7'."
+            echo "WIN7_MODIFIED=false" >> $GITHUB_ENV
+          fi
+          if grep -q "macOS" checkModified.result; then
+            echo "File contains 'macOS'. Dispatching event..."
+            echo "MACOS_MODIFIED=true" >> $GITHUB_ENV
+            echo "MACOS_PARAMETERS=$(grep -oP 'macOS=\K.*' checkModified.result)" >> $GITHUB_ENV
+            echo "ANY_MODIFIED=true" >> $GITHUB_ENV
+          else
+            echo "File does not contain 'macOS'."
+            echo "MACOS_MODIFIED=false" >> $GITHUB_ENV
+          fi
+          if grep -q "linux" checkModified.result; then
+            echo "File contains 'linux'. Dispatching event..."
+            echo "LINUX_MODIFIED=true" >> $GITHUB_ENV
+            echo "LINUX_PARAMETERS=$(grep -oP 'linux=\K.*' checkModified.result)" >> $GITHUB_ENV
+            echo "ANY_MODIFIED=true" >> $GITHUB_ENV
+          else
+            echo "File does not contain 'linux'."
+            echo "LINUX_MODIFIED=false" >> $GITHUB_ENV
           fi
 
       - name: Save last-modified date to artifact
-        if: env.WIN10_MODIFIED == 'true'
+        if: env.ANY_MODIFIED == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: win10_last-modified
-          path: win10_last_modified.txt
+          name: last-modified
+          path: *.json
 
-      - name: Run task if modified
+      - name: Run task if Windows 10 modified
         if: env.WIN10_MODIFIED == 'true' && needs.win10-task-execution.result != 'failure'
         id: win10-task-execution
-        run: |
-          # 执行您的任务
-          echo "执行任务"
-          
-      - name: Send repository_dispatch event
         uses: peter-evans/repository-dispatch@v3
         with:
           repository: ${{ github.repository }}
           event-type: win10-start
-          client-payload: '{"ss": "value1", "url": "https://dev.thinkoncloud.cn/downloads/win10_app_zh/HuaYoungApp_Win10_dev_zh_setup.exe"}'
+          client-payload: ${{ env.WIN10_PARAMETERS }}
+
+      - name: Run task if Windows 7 modified
+        if: env.WIN7_MODIFIED == 'true' && needs.win7-task-execution.result != 'failure'
+        id: win7-task-execution
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          repository: ${{ github.repository }}
+          event-type: win7-start
+          client-payload: ${{ env.WIN7_PARAMETERS }}
+
+      - name: Run task if macOS modified
+        if: env.MACOS_MODIFIED == 'true' && needs.macOS-task-execution.result != 'failure'
+        id: macOS-task-execution
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          repository: ${{ github.repository }}
+          event-type: macOS-start
+          client-payload: ${{ env.MACOS_PARAMETERS }}
+
+      - name: Run task if Linux modified
+        if: env.LINUX_MODIFIED == 'true' && needs.linux-task-execution.result != 'failure'
+        id: linux-task-execution
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          repository: ${{ github.repository }}
+          event-type: linux-start
+          client-payload: ${{ env.LINUX_PARAMETERS }}

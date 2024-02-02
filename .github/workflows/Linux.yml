@@ -1,0 +1,50 @@
+name: Ubuntu
+
+on:
+  repository_dispatch:
+    types: [linux-start]
+
+jobs:
+
+  Ubuntu:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Install libnotify4
+        run: sudo apt-get update && sudo apt-get install -y libnotify4 xvfb desktop-file-utils
+
+      - name: Download file with curl
+        run: curl -o /tmp/HuaYoungApp_Ubuntu_setup.deb https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_8.2.445_zh_setup.deb
+
+      - name: Installation
+        run: sudo dpkg -i /tmp/HuaYoungApp_Ubuntu_setup.deb
+
+      - name: Start X DISPLAY
+        run: |
+          sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v2
+        with:
+          node-version: 20
+          #cache: 'yarn'
+          
+      - name: Install dependencies 👨🏻‍💻
+        run: yarn
+
+      - name: 准备chromedriver
+        run: |
+          mkdir -p /tmp/chromedriver/linux-108/chromedriver-linux64
+          cd /tmp/chromedriver/linux-108/chromedriver-linux64
+          wget https://chromedriver.storage.googleapis.com/108.0.5359.22/chromedriver_linux64.zip
+          unzip chromedriver_linux64.zip
+          cd -
+      
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
+
+      - name: E2E Test for Electron 🧪
+        run: |
+          DISPLAY=:99 yarn wdio
