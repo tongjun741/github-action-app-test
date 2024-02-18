@@ -1,8 +1,11 @@
 name: 检查测试环境是否有新的安装包
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
+  push:
+    paths:
+      - .disabled.yml
+  # schedule:
+    # - cron: '*/5 * * * *'
 
 jobs:
   check-file-modified:
