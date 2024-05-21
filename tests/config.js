@@ -11,3 +11,5 @@ let productConfig = {
     teamName: '用户8606的团队',
     shopName: 'demo-1',
 };
+
+module.exports = productConfig;

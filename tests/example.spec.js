@@ -1,4 +1,12 @@
+/**
+ * 需要将main.js的
+ * this.remoteDebugPort&&t.push
+ * 替换成：
+this.remoteDebugPort=9221;t.push
+ */
+
 const { remote } = require('webdriverio');
+const config = require('./config');
 
 const sleep = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
@@ -7,23 +15,25 @@ async function sessionTest() {
   const browser = await remote({
     capabilities: {
       browserName: 'chrome',
-      browserVersion: '120.0.6099.109',
+      browserVersion: '120',
       'goog:chromeOptions': {
         debuggerAddress: 'localhost:9221',
       }
     }
   });
 
+  // while(true){
   await sleep(3000);
   // 验证页面标题
   let title = await browser.getTitle();
-  console.log("标题是", title);
+  console.log("分身标题是", title);
+  // }
 
-  await browser.$('//a[text()="定制浏览器首页"]').waitForExist({ timeout: 10 * 1000 })
+  // await browser.$('//a[text()="定制浏览器首页"]').waitForExist({ timeout: 10 * 1000 })
 
   // 验证页面标题
   title = await browser.getTitle();
-  console.log("标题是", title);
+  console.log("分身标题是", title);
 
   // 新开标签页
   await browser.newWindow('https://qq.com');
@@ -33,12 +43,16 @@ async function sessionTest() {
   // 获取所有打开的窗口句柄
   const windowHandles = await browser.getWindowHandles();
 
-  // 切换到新打开的标签页
-  await browser.switchToWindow(windowHandles[windowHandles.length - 1]);
+  for (let i =0;i <windowHandles.length;i++){
+    // 切换到新打开的标签页
+    await browser.switchToWindow(windowHandles[windowHandles.length - 1]);
+    
+    // 验证页面标题
+    title = await browser.getTitle();
+    console.log(i+"标题是", title);
+    await sleep(3000);
+  }
 
-  // 验证页面标题
-  title = await browser.getTitle();
-  console.log("标题是", title);
 
   // 进行其他操作...
 
@@ -58,29 +72,47 @@ describe('Electron App Test', () => {
     const version = await $('div[class*=app-version]').getText();
     console.log("版本号是：", version);
 
-    // expect(version).toBe('Clicked');
-    // await $('//span[text()="童1227"]').click();
+    await browser.waitUntil(async () => {
+      return await $('//div[text()="邮箱登录"]').isExisting() ||
+        await $(`//span[text()="${config.teamName}"]`).isExisting();
+    }, {
+      timeout: 5000, // 最长等待时间，单位：毫秒
+      interval: 500   // 检查间隔时间，单位：毫秒
+    });
 
-    // await sleep(3000);
-    // let windowIDs = await browser.getWindowHandles();
-    // console.log(windowIDs);
-    // browser.switchToWindow(windowIDs[0])
-    // await sleep(3000);
-    // let mainWindowID = await browser.getWindowHandle();
-    // console.log(mainWindowID);
+    if (await $('//div[text()="邮箱登录"]').isExisting()) {
+      await $(`//div[text()="邮箱登录"]`).click();
+      await $('#account').setValue(config.username);
+      await $('#password').setValue(config.password);
 
-    // await $('//a[text()="抖音_TJ"]').waitForExist({ timeout: 10 * 1000 })
-    // title = await browser.getTitle();
-    // console.log("标题是", title);
+      await $('.ant-btn-primary').click();
 
-    // await $('//a[text()="抖音_TJ"]').click();
-    // await $('//span[text()="打开浏览器"]').waitForExist({ timeout: 10 * 1000 });
-    // await $('//span[text()="打开浏览器"]').click();
+      await $(`//span[text()="${config.teamName}"]`).waitForExist({ timeout: 100 * 1000 })
+    }
+    await $(`//span[text()="${config.teamName}"]`).click();
 
-    // //
-    // await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
+    await sleep(3000);
+    let windowIDs = await browser.getWindowHandles();
+    console.log(windowIDs);
+    browser.switchToWindow(windowIDs[0])
+    await sleep(3000);
+    let mainWindowID = await browser.getWindowHandle();
+    console.log(mainWindowID);
 
-    // await sessionTest();
+    await $(`.icon-chrome_outline`).waitForExist({ timeout: 10 * 1000 })
+    await $(`.icon-chrome_outline`).click();
+
+    await $(`//a[text()="${config.shopName}"]`).waitForExist({ timeout: 10 * 1000 })
+    title = await browser.getTitle();
+    console.log("标题是", title);
+
+    await $(`//a[text()="${config.shopName}"]`).click();
+    await $('//span[text()="打开浏览器"]').waitForExist({ timeout: 10 * 1000 });
+    await $('//span[text()="打开浏览器"]').click();
+
+    await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
+
+    await sessionTest();
 
   });
 });
