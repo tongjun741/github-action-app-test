@@ -18,7 +18,7 @@ on:
         default: 'true'
         
   schedule:
-    - cron: '*/5 * * * *'  # 北京时间每天凌晨3点（UTC时间19点）
+    - cron: '5 19 * * *'  # 北京时间每天凌晨3点（UTC时间19点）
 
 jobs:
 
@@ -72,7 +72,7 @@ jobs:
           Get-ChildItem -Path "$PWD"
 
       - name: E2E Test for Electron 🧪
-        if: ${{ !contains(inputs.do_wdio, 'false') }}
+        if: ${{ !contains(inputs.do_wdio, 'true') }}
         env:
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
         run: yarn wdio
