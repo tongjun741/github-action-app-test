@@ -22,3 +22,19 @@ node yarn wdio
 set "PRODUCT_IP_TEST_PASSWORD=xxxx"
 node tests\ipTest.js
 ```
+
+## 远程触发
+```
+curl -X POST \
+  -H "Authorization: token github_Token" \
+  -H "Accept: application/vnd.github.v3+json" \
+  https://api.github.com/repos/tongjun741/github-action-app-test/actions/workflows/Windows10.yml/dispatches \
+  -d '{"ref": "main", "inputs": {"do_wdio": "true", "software_download_url": "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.0.648_zh_setup.exe"}}'
+
+
+curl -X POST \
+  -H "Authorization: token github_Token" \
+  -H "Accept: application/vnd.github.v3+json" \
+  https://api.github.com/repos/tongjun741/github-action-app-test/actions/workflows/Windows10.yml/dispatches \
+  -d '{"ref": "main", "inputs": {"do_ip_test": "true", "software_download_url": "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.0.648_zh_setup.exe"}}'
+```
