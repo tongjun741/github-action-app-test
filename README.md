@@ -10,3 +10,8 @@ macOS:
 1、下载https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip解压缩出chromedriver.exe放到%temp%\chromedriver\win64-108\chromedriver-win64下
 2、以管理员启动CMD，进入项目根目录
 3、执行 yarn wdio
+
+
+## 执行IP测试脚本
+完成Win 10 的前两条配置后执行下面的脚本：
+node tests\ipTest.js
