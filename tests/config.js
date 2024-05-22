@@ -12,8 +12,8 @@ let productConfig = {
 
 let ipTestConfig = {
     username: '1bc01c597f3b@drmail.in',
-    // teamName: 'TK私信-只养不发',
-    teamName: "童俊的测试团队",
+    teamName: 'TK私信-只养不发',
+    // teamName: "童俊的测试团队",
     shopName: 'demo-1',
 };
 
