@@ -74,7 +74,7 @@ jobs:
       - name: E2E Test for Electron 🧪
         if: ${{ github.event.inputs.do_wdio == 'true' }}
         env:
-          PRODUCT_IP_TEST_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
         run: yarn wdio
 
       - name: IP测试
