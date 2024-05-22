@@ -2,6 +2,7 @@ const path = require('path');
 const os = require('os');
 const login = require('./include/login');
 const {ipTestConfig} = require('./config');
+const { sleep } = require('./include/tools');
 const { remote } = require('webdriverio');
 
 let extCapabilities = {};
@@ -44,11 +45,14 @@ async function main() {
 
   while (true) {
     // 全选
+    await sleep(5*1000);
     await browser.$(`.ant-table-thead  .ant-checkbox-input`).click();
     console.log('开始测试');
+    await sleep(10*1000);
     await browser.$(`//div[text()="质量测试"]`).click();
     console.log('等待测试完成，1小时超时');
     await browser.$(`//button[not(self::node()[contains(concat(" ",normalize-space(@class)," "),"ant-btn-loading")])]//div[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 })
+    await sleep(5*1000);
 
     if (await browser.$('.icon-angle-right_24:not(.disabled)').isExisting()) {
       console.log('有下一页，进入下一页');
