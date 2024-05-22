@@ -44,7 +44,7 @@ jobs:
 
       - name: Install your_software
         run: |
-          Invoke-WebRequest -Uri "${{ github.event.inputs.software_download_url }}" -OutFile "$env:TEMP\your_software_installer.exe"
+          Invoke-WebRequest -Uri "${{ github.event.inputs.software_download_url || 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.0.648_zh_setup.exe' }}" -OutFile "$env:TEMP\your_software_installer.exe"
           Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait
 
       - name: List files in your_software
@@ -72,13 +72,13 @@ jobs:
           Get-ChildItem -Path "$PWD"
 
       - name: E2E Test for Electron 🧪
-        if: ${{ github.event.inputs.do_wdio == 'true' }}
+        if: ${{ !contains(inputs.do_wdio, 'false') }}
         env:
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
         run: yarn wdio
 
       - name: IP测试
-        if: ${{ github.event.inputs.do_ip_test == 'true' }}
+        if: ${{ !contains(inputs.do_ip_test, 'false') }}
         env:
           PRODUCT_IP_TEST_PASSWORD: ${{ secrets.PRODUCT_IP_TEST_PASSWORD }}
         run: node tests\ipTest.js
