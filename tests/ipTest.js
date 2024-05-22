@@ -1,7 +1,8 @@
 const path = require('path');
 const os = require('os');
 const login = require('./include/login');
-const { remote, $ } = require('webdriverio');
+const {ipTestConfig} = require('./config');
+const { remote } = require('webdriverio');
 
 let extCapabilities = {};
 if (os.platform() === 'darwin') {
@@ -31,7 +32,7 @@ async function main() {
     }
   });
 
-  await login(browser);
+  await login(ipTestConfig, process.env.PRODUCT_IP_TEST_PASSWORD, browser);
 
   // 进入IP列表页面
   await browser.$(`.icon-IP_24`).waitForExist({ timeout: 10 * 1000 })

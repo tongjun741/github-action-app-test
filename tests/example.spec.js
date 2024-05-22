@@ -1,11 +1,11 @@
-const config = require('./config');
+const { productConfig } = require('./config');
 const login = require('./include/login');
 const openSession = require('./include/openSession');
 
 describe('Electron App Test', () => {
   it('should open Electron app and perform actions', async () => {
 
-    await login();
+    await login(productConfig, process.env.PRODUCT_WDIO_PASSWORD);
 
     // 进入分身列表页面
     await $(`.icon-chrome_outline`).waitForExist({ timeout: 10 * 1000 })

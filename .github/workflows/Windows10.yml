@@ -9,6 +9,10 @@ on:
       software_download_url:
         description: 'Download url'
         required: true
+      do_wdio:
+        description: '是否执行 WDIO 测试'
+      do_ip_test:
+        description: '是否执行 IP 测试'
 
 jobs:
 
@@ -62,4 +66,13 @@ jobs:
           Get-ChildItem -Path "$PWD"
 
       - name: E2E Test for Electron 🧪
+        if: ${{ github.event.inputs.do_wdio == 'true' }}
+        env:
+          PRODUCT_IP_TEST_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
         run: yarn wdio
+
+      - name: IP测试
+        if: ${{ github.event.inputs.do_ip_test == 'true' }}
+        env:
+          PRODUCT_IP_TEST_PASSWORD: ${{ secrets.PRODUCT_IP_TEST_PASSWORD }}
+        run: node tests\ipTest.js

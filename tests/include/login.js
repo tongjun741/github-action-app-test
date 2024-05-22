@@ -1,7 +1,6 @@
-const config = require('../config');
 const { sleep } = require('./tools');
 
-async function login(targetBrowser) {
+async function login(config, password, targetBrowser) {
   if (targetBrowser) {
     browser = targetBrowser;
   }
@@ -27,7 +26,7 @@ async function login(targetBrowser) {
   if (await browser.$('//div[text()="邮箱登录"]').isExisting()) {
     await browser.$(`//div[text()="邮箱登录"]`).click();
     await browser.$('#account').setValue(config.username);
-    await browser.$('#password').setValue(config.password);
+    await browser.$('#password').setValue(password);
 
     await browser.$('.ant-btn-primary').click();
 
