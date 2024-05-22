@@ -9,10 +9,16 @@ on:
       software_download_url:
         description: 'Download url'
         required: true
+        default: 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_9.3.636_zh_setup.exe'
       do_wdio:
         description: '是否执行 WDIO 测试'
+        default: ''
       do_ip_test:
         description: '是否执行 IP 测试'
+        default: 'true'
+        
+  schedule:
+    - cron: '0 12 * * *'  # 北京时间每天凌晨3点（UTC时间19点）
 
 jobs:
 
