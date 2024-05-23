@@ -14,7 +14,7 @@ const { sleep } = require('./tools');
 async function openSession() {
   let browser = null;
   while (true) {
-    await sleep(3000);
+    await sleep(10000);
     try {
       browser = await remote({
         capabilities: {
@@ -34,7 +34,7 @@ async function openSession() {
     break;
   }
 
-  await sleep(3000);
+  await sleep(10000);
   // 验证页面标题
   let title = await browser.getTitle();
   console.log("当前窗口标题是", title);
