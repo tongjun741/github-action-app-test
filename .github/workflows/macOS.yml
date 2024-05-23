@@ -23,7 +23,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Check if running on M1 chip
+      - name: Check if running on M1 chip # github Action的macOS机器似乎都是M1芯片
         run: |
           if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
             echo "Running on an Apple Silicon (M1) chip"
@@ -62,8 +62,16 @@ jobs:
               echo "无法解析版本号"
           fi
           
+          appPath="/Volumes/花漾客户端 ${version}/花漾客户端.app"
+          if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
+            echo "M1芯片下appPath不一样"
+            appPath="/Volumes/花漾客户端 ${version}-arm64/花漾客户端.app"
+          else
+
+          echo $appPath
+
           hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
-          sudo cp -R '/Volumes/花漾客户端 ${version}/花漾客户端.app' /Applications/
+          sudo cp -R $appPath /Applications/
           hdiutil detach '/Volumes/花漾客户端 ${version}/'
 
       # - name: Start software
