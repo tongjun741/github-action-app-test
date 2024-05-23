@@ -81,10 +81,19 @@ jobs:
 
       - name: 准备chromedriver
         run: |
-          wget https://chromedriver.storage.googleapis.com/108.0.5359.22/chromedriver_mac64.zip
-          unzip chromedriver_mac64.zip
-          mkdir -p /tmp/chromedriver/mac-108/chromedriver-mac-x64/
-          mv chromedriver /tmp/chromedriver/mac-108/chromedriver-mac-x64/
+          if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
+            echo "M1芯片下chromedirver路径是：/tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/chromedriver"
+            wget https://chromedriver.storage.googleapis.com/108.0.5359.22/chromedriver_mac_arm64.zip
+            unzip chromedriver_mac_arm64.zip
+            mkdir -p /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/
+            mv chromedriver /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/
+          else
+            echo "Intel芯片下chromedirver路径是：/tmp/chromedriver/mac-108/chromedriver-mac-x64/chromedriver"
+            wget https://chromedriver.storage.googleapis.com/108.0.5359.22/chromedriver_mac64.zip
+            unzip chromedriver_mac64.zip
+            mkdir -p /tmp/chromedriver/mac-108/chromedriver-mac-x64/
+            mv chromedriver /tmp/chromedriver/mac-108/chromedriver-mac-x64/
+          fi
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4
@@ -95,9 +104,9 @@ jobs:
       - name: Install dependencies 👨🏻‍💻
         run: yarn
       
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
+
       - name: E2E Test for Electron 🧪
         env:
           DEV_WDIO_PASSWORD: ${{ secrets.DEV_WDIO_PASSWORD }}

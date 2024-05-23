@@ -4,7 +4,14 @@ C:\Users\<Username>\AppData\Local\Temp
 Ubuntu:
 /tmp
 macOS:
-需要通过wdio.conf.js中的cacheDir来指定
+/tmp/chromedriver/mac-108/chromedriver-mac-x64/chromedriver
+/tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/chromedriver
+需要通过wdio.conf.js中的cacheDir来指定，具体逻辑可以查看以下代码：
+```
+node_modules\@wdio\utils\build\node\utils.js:235
+
+let executablePath = computeExecutablePath({
+```
 
 ## Win 10 本地调试
 1、下载https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip解压缩出chromedriver.exe放到%temp%\chromedriver\win64-108\chromedriver-win64下
