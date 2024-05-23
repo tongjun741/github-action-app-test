@@ -41,6 +41,9 @@ jobs:
 
       - uses: actions/checkout@v4
       
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+      
       - name: 下载并安装客户端
         run: |
           if [ -z "${{ inputs.software_download_url }}" ]; then
@@ -62,17 +65,17 @@ jobs:
               echo "无法解析版本号"
           fi
           
-          appPath="/Volumes/花漾客户端 ${version}/花漾客户端.app"
+          appDir="/Volumes/花漾客户端 ${version}/"
           if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
             echo "M1芯片下appPath不一样"
-            appPath="/Volumes/花漾客户端 ${version}-arm64/花漾客户端.app"
+            appDir="/Volumes/花漾客户端 ${version}-arm64/"
           else
 
-          echo $appPath
+          echo "appDir: $appDir"
 
           hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
-          sudo cp -R $appPath /Applications/
-          hdiutil detach '/Volumes/花漾客户端 ${version}/'
+          sudo cp -R "${appDir}花漾客户端.app" /Applications/
+          hdiutil detach $appDir
 
       # - name: Start software
       #   run: |
@@ -93,9 +96,6 @@ jobs:
           
       - name: Install dependencies 👨🏻‍💻
         run: yarn
-      
-      # - name: Setup tmate session
-      #   uses: mxschmitt/action-tmate@v3
 
       - name: E2E Test for Electron 🧪
         env:
