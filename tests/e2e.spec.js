@@ -25,7 +25,9 @@ describe('Electron App Test', () => {
 
     await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
 
-    let ipText = await openSession();
+    let ipText = await openSession().catch(e=>{
+      console.error(e);
+    });
     let msg;
     let timeUse = (new Date().getTime() - startTime) / (60 * 1000);
     if (ipText) {
