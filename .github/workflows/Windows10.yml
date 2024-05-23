@@ -29,6 +29,10 @@ jobs:
     runs-on: windows-latest
     
     steps:
+      - name: 显示输入参数
+        run: |
+          Write-Output ${{ inputs.do_ip_test }} 
+    
       - uses: actions/checkout@v4
 
       - name: Use Node.js 20
