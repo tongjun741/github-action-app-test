@@ -50,8 +50,10 @@ curl -X POST \
   -H "Accept: application/vnd.github.v3+json" \
   https://api.github.com/repos/tongjun741/github-action-app-test/actions/workflows/macOS.yml/dispatches \
   -d '{"ref": "main", "inputs": {"in_dev": "false", "is_arm": "true", "software_download_url": "https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_10.0.559_zh_setup.dmg"}}'
+```
 
 # Ubuntu E2E 测试
+```
 curl -X POST \
   -H "Authorization: token github_Token" \
   -H "Accept: application/vnd.github.v3+json" \
