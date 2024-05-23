@@ -13,6 +13,9 @@ on:
       do_wdio:
         description: '是否执行 WDIO 测试'
         default: ''
+      in_dev:
+        description: '是否是测试环境'
+        default: 'false'
       do_ip_test:
         description: '是否执行 IP 测试'
         default: 'true'
@@ -74,8 +77,10 @@ jobs:
       - name: E2E Test for Electron 🧪
         if: ${{ contains(inputs.do_wdio, 'true') }}
         env:
+          DEV_WDIO_PASSWORD: ${{ secrets.DEV_WDIO_PASSWORD }}
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
           DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
+          IN_DEV: ${{ github.event.inputs.in_dev }}
         run: yarn wdio
 
       - name: IP测试

@@ -7,7 +7,8 @@ describe('Electron App Test', () => {
   it('should open Electron app and perform actions', async () => {
     let startTime = new Date().getTime();
 
-    await login(productConfig, process.env.PRODUCT_WDIO_PASSWORD);
+    let password = process.env.IN_DEV === "true" ? process.env.DEV_WDIO_PASSWORD : process.env.PRODUCT_WDIO_PASSWORD;
+    await login(productConfig, password);
 
     // 进入分身列表页面
     await $(`.icon-chrome_outline`).waitForExist({ timeout: 10 * 1000 })
@@ -25,7 +26,7 @@ describe('Electron App Test', () => {
 
     await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
 
-    let ipText = await openSession().catch(e=>{
+    let ipText = await openSession().catch(e => {
       console.error(e);
     });
     let msg;
