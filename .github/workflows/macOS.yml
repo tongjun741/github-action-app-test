@@ -69,13 +69,13 @@ jobs:
           if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
             echo "M1芯片下appPath不一样"
             appDir="/Volumes/花漾客户端 ${version}-arm64/"
-          else
+          fi
 
           echo "appDir: $appDir"
 
           hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
           sudo cp -R "${appDir}花漾客户端.app" /Applications/
-          hdiutil detach $appDir
+          hdiutil detach "${appDir}"
 
       # - name: Start software
       #   run: |
