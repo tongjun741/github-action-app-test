@@ -3,6 +3,9 @@
  * this.remoteDebugPort&&t.push
  * 替换成：
 this.remoteDebugPort=9221;t.push
+
+TODO
+关闭窗口后会话不结束
  */
 
 const { remote } = require('webdriverio');
@@ -20,50 +23,43 @@ async function openSession() {
           'goog:chromeOptions': {
             debuggerAddress: 'localhost:9221',
           }
-        }
+        },
+        logLevel: 'warn'
       });
     } catch (e) {
+      console.log(e)
       console.log("分身浏览器连接失败，3秒后重试");
       continue;
     }
     break;
   }
 
-  // while(true){
   await sleep(3000);
   // 验证页面标题
   let title = await browser.getTitle();
-  console.log("分身标题是", title);
-  // }
+  console.log("当前窗口标题是", title);
 
-  // await browser.$('//a[text()="定制浏览器首页"]').waitForExist({ timeout: 10 * 1000 })
+  // 浏览器检测页面
+  // await browser.switchWindow('szdamai.local');
+  // let t = await browser.$('.ant-pro-card-title').getText();
+  // console.log(t);
+  // await browser.$('//a[text()="定制浏览器首页"]').waitForExist({ timeout: 10 * 1000 });
 
+  // 新开标签页
+  await browser.newWindow('https://ip.sb');
+  await browser.switchWindow('ip.sb');
+  await sleep(3000);
+  
   // 验证页面标题
   title = await browser.getTitle();
   console.log("分身标题是", title);
-
-  // 新开标签页
-  await browser.newWindow('https://qq.com');
-
-  await sleep(3000);
-
-  // 获取所有打开的窗口句柄
-  const windowHandles = await browser.getWindowHandles();
-
-  for (let i = 0; i < windowHandles.length; i++) {
-    // 切换到新打开的标签页
-    await browser.switchToWindow(windowHandles[windowHandles.length - 1]);
-
-    // 验证页面标题
-    title = await browser.getTitle();
-    console.log(i + "标题是", title);
-    await sleep(3000);
-  }
-
-
-  // 进行其他操作...
-
-  await browser.deleteSession();
+  // await browser.savePDF('D:\\screenshot.pdf');
+  await browser.$('.proto_address a').waitForExist({ timeout: 60 * 1000 });
+  let ipText = await browser.$('.proto_address a').getText();
+  console.log(ipText);
+  return ipText;
 }
+
+openSession();
 
 module.exports = openSession;

@@ -2,9 +2,8 @@ const path = require('path');
 const os = require('os');
 const login = require('./include/login');
 const { ipTestConfig } = require('./config');
-const { sleep } = require('./include/tools');
+const { sleep, feishuNotify } = require('./include/tools');
 const { remote } = require('webdriverio');
-const axios = require('axios');
 
 let extCapabilities = {};
 if (os.platform() === 'darwin') {
@@ -71,28 +70,9 @@ async function main() {
 
   await browser.deleteSession()
 
-
-  // 飞书机器人Webhook URL
-  const webhookUrl = `https://open.feishu.cn/open-apis/bot/v2/hook/${process.env.FEISHU_TOKEN}`;
-
   let timeUse = (new Date().getTime() - startTime) / (60 * 1000);
-  // 要发送的消息内容
-  const message = {
-    msg_type: 'text',
-    content: {
-      text: `【花漾】IP测试完成！耗时${timeUse.toFixed(2)}分钟，最后一页是：${currentPage}`
-    }
-  };
-
-  // 发送POST请求
-  await axios.post(webhookUrl, message)
-    .then(response => {
-      console.log('通知发送成功:', response.data);
-    })
-    .catch(error => {
-      console.error('发送通知时出错:', error);
-    });
-
+  let msg = `IP测试完成！耗时${timeUse.toFixed(2)}分钟，最后一页是：${currentPage}`;
+  await feishuNotify(msg);
 }
 
 main();
