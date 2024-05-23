@@ -18,7 +18,7 @@ on:
         default: 'true'
         
   schedule:
-    - cron: '*/5 * * * *'  # 北京时间每天凌晨3点（UTC时间19点）
+    - cron: '5 * * * *'  # 北京时间每天凌晨3点（UTC时间19点）
 
 jobs:
 
