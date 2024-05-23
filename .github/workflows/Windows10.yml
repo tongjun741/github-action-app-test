@@ -75,6 +75,7 @@ jobs:
         if: ${{ contains(inputs.do_wdio, 'true') }}
         env:
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
         run: yarn wdio
 
       - name: IP测试
