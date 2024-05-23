@@ -21,7 +21,7 @@ on:
         default: 'true'
         
   schedule:
-    - cron: '5 19 * * *'  # 北京时间每天凌晨3点（UTC时间19点）自动进行IP测试
+    - cron: '5 */2 * * *'  # 每隔两个小时自动进行IP测试
 
 jobs:
 
