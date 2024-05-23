@@ -26,6 +26,13 @@ describe('Electron App Test', () => {
 
     await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
 
+    try {
+      // 处理有其他人在访问的情况
+      await $(`//span[text()="继续访问"]`).waitForExist({ timeout: 10 * 1000 })
+      await $(`//span[text()="继续访问"]`).click();
+    } catch (e) {
+    }
+
     let ipText = await openSession().catch(e => {
       console.error(e);
     });
