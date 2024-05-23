@@ -78,9 +78,6 @@ jobs:
       # - name: Start software
       #   run: |
       #     open /Applications/花漾客户端.app
-      
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
 
       - name: 准备chromedriver
         run: |
@@ -97,7 +94,10 @@ jobs:
           
       - name: Install dependencies 👨🏻‍💻
         run: yarn
-
+      
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        
       - name: E2E Test for Electron 🧪
         env:
           DEV_WDIO_PASSWORD: ${{ secrets.DEV_WDIO_PASSWORD }}
