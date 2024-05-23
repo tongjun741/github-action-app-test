@@ -30,7 +30,8 @@ async function main() {
         binary: exePath
       },
       ...extCapabilities
-    }
+    },
+    logLevel: 'warn'
   });
 
   await login(ipTestConfig, process.env.PRODUCT_IP_TEST_PASSWORD, browser);
@@ -46,6 +47,8 @@ async function main() {
   while (true) {
     // 全选
     await sleep(5*1000);
+    let currentPage = await browser.$(`span.current-page`).getText();
+    console.log(`${new Date().toLocaleString()}, 当前页码：${currentPage}`);
     await browser.$(`.ant-table-thead  .ant-checkbox-input`).click();
     console.log('开始测试');
     await sleep(10*1000);
