@@ -23,15 +23,15 @@ describe('Electron App Test', () => {
     // 打开浏览器
     await $('//span[text()="打开浏览器"]').waitForExist({ timeout: 10 * 1000 });
     await $('//span[text()="打开浏览器"]').click();
-
-    await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
-
+    
     try {
       // 处理有其他人在访问的情况
       await $(`//span[text()="继续访问"]`).waitForExist({ timeout: 10 * 1000 })
       await $(`//span[text()="继续访问"]`).click();
     } catch (e) {
     }
+
+    await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
 
     let ipText = await openSession().catch(e => {
       console.error(e);
