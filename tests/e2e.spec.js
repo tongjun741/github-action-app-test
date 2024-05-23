@@ -1,4 +1,4 @@
-const { productConfig } = require('./config');
+const { productConfig, devConfig } = require('./config');
 const login = require('./include/login');
 const openSession = require('./include/openSession');
 const { feishuNotify } = require('./include/tools');
@@ -7,8 +7,13 @@ describe('Electron App Test', () => {
   it('should open Electron app and perform actions', async () => {
     let startTime = new Date().getTime();
 
-    let password = process.env.IN_DEV === "true" ? process.env.DEV_WDIO_PASSWORD : process.env.PRODUCT_WDIO_PASSWORD;
-    await login(productConfig, password);
+    let config = productConfig;
+    let password = process.env.PRODUCT_WDIO_PASSWORD || "password";
+    if (process.env.IN_DEV === "true") {
+      config = devConfig;
+      password = process.env.DEV_WDIO_PASSWORD || "password";
+    }
+    await login(config, password);
 
     // 进入分身列表页面
     await $(`.icon-chrome_outline`).waitForExist({ timeout: 10 * 1000 })
