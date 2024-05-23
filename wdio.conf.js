@@ -6,6 +6,7 @@ let exePath, mainJsPath;
 let extCapabilities = {};
 if (os.platform() === 'darwin') {
     exePath = "/Applications/花漾客户端.app/Contents/MacOS/花漾客户端";
+    mainJsPath = "/Applications/花漾客户端.app/Contents/Resources/app/main.js";
     extCapabilities = {
         'wdio:chromedriverOptions': {
             cacheDir: '/tmp'
@@ -13,6 +14,7 @@ if (os.platform() === 'darwin') {
     }
 } else if (os.platform() === 'linux') {
     exePath = "/opt/花漾客户端/huayoung";
+    mainJsPath = "/opt/花漾客户端/resources/app/main.js";
 }else{
     exePath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', '花漾客户端.exe');
     mainJsPath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', 'resources', 'app', 'main.js');
