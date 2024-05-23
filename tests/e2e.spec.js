@@ -30,7 +30,7 @@ describe('Electron App Test', () => {
       await $(`//span[text()="继续访问"]`).click();
     } catch (e) {
     }
-
+    
     await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
 
     let ipText = await openSession().catch(e => {
