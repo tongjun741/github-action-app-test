@@ -1,7 +1,8 @@
 const path = require('path');
 const os = require('os');
+const fs = require('fs');
 
-let exePath;
+let exePath, mainJsPath;
 let extCapabilities = {};
 if (os.platform() === 'darwin') {
     exePath = "/Applications/花漾客户端.app/Contents/MacOS/花漾客户端";
@@ -14,7 +15,21 @@ if (os.platform() === 'darwin') {
     exePath = "/opt/花漾客户端/huayoung";
 }else{
     exePath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', '花漾客户端.exe');
+    mainJsPath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', 'resources', 'app', 'main.js');
 }
+
+/**
+ * 需要将main.js的
+ * this.remoteDebugPort&&t.push
+ * 替换成：
+this.remoteDebugPort=9221;t.push
+ */
+let fileContent = fs.readFileSync(mainJsPath, 'utf8');
+// 进行内容替换
+fileContent = fileContent.replace(/this\.remoteDebugPort\s*&&\s*t\.push/g, 'this.remoteDebugPort = 9221; t.push');
+// 写入替换后的内容到main.txt文件
+fs.writeFileSync(mainJsPath, fileContent, 'utf8');
+console.log('main.js替换完成');
 
 exports.config = {    //
     // ====================
