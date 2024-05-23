@@ -14,7 +14,7 @@ const { sleep } = require('./tools');
 async function openSession() {
   let browser = null;
   while (true) {
-    await sleep(10000);
+    await sleep(10 * 1000);
     try {
       browser = await remote({
         capabilities: {
@@ -26,6 +26,10 @@ async function openSession() {
         },
         logLevel: 'warn'
       });
+      await sleep(3 * 1000);
+      let title = await browser.getTitle();
+      console.log("当前窗口标题是", title);
+      console.log("分身浏览器连接成功");
     } catch (e) {
       console.log(e)
       console.log("分身浏览器连接失败，3秒后重试");
@@ -34,7 +38,7 @@ async function openSession() {
     break;
   }
 
-  await sleep(10000);
+  await sleep(1000);
   // 验证页面标题
   let title = await browser.getTitle();
   console.log("当前窗口标题是", title);
@@ -49,7 +53,7 @@ async function openSession() {
   await browser.newWindow('https://ip.sb');
   await browser.switchWindow('ip.sb');
   await sleep(3000);
-  
+
   // 验证页面标题
   title = await browser.getTitle();
   console.log("分身标题是", title);
