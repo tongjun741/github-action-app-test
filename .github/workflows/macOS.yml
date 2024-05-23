@@ -76,6 +76,7 @@ jobs:
           hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
           sudo cp -R "${appDir}花漾客户端.app" /Applications/
           hdiutil detach "${appDir}"
+          sudo chmod a+w /Applications/花漾客户端.app/Contents/Resources/app/main.js
 
       # - name: Start software
       #   run: |
