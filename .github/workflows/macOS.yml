@@ -3,6 +3,19 @@ name: macOS
 on:
   repository_dispatch:
     types: [macOS-start]
+    
+  workflow_dispatch:
+    inputs:
+      software_download_url:
+        description: 'Download url'
+        required: true
+        default: 'https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_10.0.559_zh_setup.dmg'
+      in_dev:
+        description: '是否是测试环境'
+        default: 'false'
+      is_arm:
+        description: '是否是ARM版的客户端'
+        default: 'true'
 
 jobs:
 
@@ -10,16 +23,50 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - name: Check if running on M1 chip
+        run: |
+          if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
+            echo "Running on an Apple Silicon (M1) chip"
+            if [ "${{ inputs.is_arm }}" == "false" ]; then
+              echo "Input parameter is_arm is false, exiting workflow..."
+              exit 1
+            fi
+          else
+            echo "Running on an Intel chip"
+            if [ "${{ inputs.is_arm }}" == "true" ]; then
+              echo "Input parameter is_arm is true, exiting workflow..."
+              exit 1
+            fi
+          fi
+
+      - uses: actions/checkout@v4
       
       - name: Download file with curl
-        run: curl -o /tmp/HuaYoungApp_Mac_setup.dmg https://dl.szdamai.com/downloads/mac_app_zh/HuaYoungApp_Mac_8.2.445_zh_setup.dmg
+        run: |
+          if [ -z "${{ inputs.software_download_url }}" ]; then
+            download_url="https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_10.0.559_zh_setup.dmg"
+          else
+            download_url="${{ inputs.software_download_url }}"
+          fi
+          curl -o /tmp/HuaYoungApp_Mac_setup.dmg $download_url
+
+          # 提取链接中的文件名部分
+          filename=$(basename $download_url)
+
+          # 使用正则表达式提取版本号
+          version=""
+          if [[ $filename =~ [0-9]+\.[0-9]+\.[0-9]+ ]]; then
+              version=${BASH_REMATCH[0]}
+              echo "版本号: $version"
+          else
+              echo "无法解析版本号"
+          fi
 
       - name: Install software
         run: |
           hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
-          sudo cp -R '/Volumes/花漾客户端 8.2.445/花漾客户端.app' /Applications/
-          hdiutil detach '/Volumes/花漾客户端 8.2.445/'
+          sudo cp -R '/Volumes/花漾客户端 ${version}/花漾客户端.app' /Applications/
+          hdiutil detach '/Volumes/花漾客户端 ${version}/'
 
       # - name: Start software
       #   run: |
@@ -33,7 +80,7 @@ jobs:
           mv chromedriver /tmp/chromedriver/mac-108/chromedriver-mac-x64/
 
       - name: Use Node.js 20
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           #cache: 'yarn'
@@ -45,4 +92,9 @@ jobs:
       #   uses: mxschmitt/action-tmate@v3
 
       - name: E2E Test for Electron 🧪
+        env:
+          DEV_WDIO_PASSWORD: ${{ secrets.DEV_WDIO_PASSWORD }}
+          PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
+          IN_DEV: ${{ github.event.inputs.in_dev }}
         run: yarn wdio
