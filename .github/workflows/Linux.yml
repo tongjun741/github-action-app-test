@@ -3,6 +3,16 @@ name: Ubuntu
 on:
   repository_dispatch:
     types: [linux-start]
+    
+  workflow_dispatch:
+    inputs:
+      software_download_url:
+        description: 'Download url'
+        required: true
+        default: 'https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_10.0.533_zh_setup.deb'
+      in_dev:
+        description: '是否是测试环境'
+        default: 'false'
 
 jobs:
 
@@ -10,13 +20,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       
       - name: Install libnotify4
         run: sudo apt-get update && sudo apt-get install -y libnotify4 xvfb desktop-file-utils
 
       - name: Download file with curl
-        run: curl -o /tmp/HuaYoungApp_Ubuntu_setup.deb https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_8.2.445_zh_setup.deb
+        run: |
+          if [ -z "${{ inputs.software_download_url }}" ]; then
+            download_url="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_10.0.533_zh_setup.deb"
+          else
+            download_url="${{ inputs.software_download_url }}"
+          fi
+          curl -o /tmp/HuaYoungApp_Ubuntu_setup.deb $download_url
 
       - name: Installation
         run: sudo dpkg -i /tmp/HuaYoungApp_Ubuntu_setup.deb
@@ -26,7 +42,7 @@ jobs:
           sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
 
       - name: Use Node.js 20
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           #cache: 'yarn'
@@ -46,5 +62,11 @@ jobs:
       #   uses: mxschmitt/action-tmate@v3
 
       - name: E2E Test for Electron 🧪
+        env:
+          DEV_WDIO_PASSWORD: ${{ secrets.DEV_WDIO_PASSWORD }}
+          PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
+          IN_DEV: ${{ github.event.inputs.in_dev }}
+          FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
         run: |
           DISPLAY=:99 yarn wdio
