@@ -81,4 +81,5 @@ jobs:
         if: ${{ !contains(inputs.do_ip_test, 'false') }}
         env:
           PRODUCT_IP_TEST_PASSWORD: ${{ secrets.PRODUCT_IP_TEST_PASSWORD }}
+          FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
         run: node tests\ipTest.js

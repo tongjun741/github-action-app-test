@@ -1,9 +1,10 @@
 const path = require('path');
 const os = require('os');
 const login = require('./include/login');
-const {ipTestConfig} = require('./config');
+const { ipTestConfig } = require('./config');
 const { sleep } = require('./include/tools');
 const { remote } = require('webdriverio');
+const axios = require('axios');
 
 let extCapabilities = {};
 if (os.platform() === 'darwin') {
@@ -44,18 +45,19 @@ async function main() {
   title = await browser.getTitle();
   console.log("标题是", title);
 
+  let startTime = new Date().getTime();
   while (true) {
     // 全选
-    await sleep(5*1000);
+    await sleep(5 * 1000);
     let currentPage = await browser.$(`span.current-page`).getText();
     console.log(`${new Date().toLocaleString()}, 当前页码：${currentPage}`);
     await browser.$(`.ant-table-thead  .ant-checkbox-input`).click();
     console.log('开始测试');
-    await sleep(10*1000);
+    await sleep(10 * 1000);
     await browser.$(`//div[text()="质量测试"]`).click();
     console.log('等待测试完成，1小时超时');
     await browser.$(`//button[not(self::node()[contains(concat(" ",normalize-space(@class)," "),"ant-btn-loading")])]//div[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 })
-    await sleep(5*1000);
+    await sleep(5 * 1000);
 
     if (await browser.$('.icon-angle-right_24:not(.disabled)').isExisting()) {
       console.log('有下一页，进入下一页');
@@ -67,6 +69,29 @@ async function main() {
   }
 
   await browser.deleteSession()
+
+
+  // 飞书机器人Webhook URL
+  const webhookUrl = `https://open.feishu.cn/open-apis/bot/v2/hook/${process.env.FEISHU_TOKEN}`;
+
+  let timeUse = (new Date().getTime() - startTime) / (60 * 1000);
+  // 要发送的消息内容
+  const message = {
+    msg_type: 'text',
+    content: {
+      text: `IP测试完成！耗时${timeUse.toFixed(2)}分钟`
+    }
+  };
+
+  // 发送POST请求
+  await axios.post(webhookUrl, message)
+    .then(response => {
+      console.log('通知发送成功:', response.data);
+    })
+    .catch(error => {
+      console.error('发送通知时出错:', error);
+    });
+
 }
 
 main();
