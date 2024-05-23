@@ -46,10 +46,11 @@ async function main() {
   console.log("标题是", title);
 
   let startTime = new Date().getTime();
+  let currentPage;
   while (true) {
     // 全选
     await sleep(5 * 1000);
-    let currentPage = await browser.$(`span.current-page`).getText();
+    currentPage = await browser.$(`span.current-page`).getText();
     console.log(`${new Date().toLocaleString()}, 当前页码：${currentPage}`);
     await browser.$(`.ant-table-thead  .ant-checkbox-input`).click();
     console.log('开始测试');
@@ -79,7 +80,7 @@ async function main() {
   const message = {
     msg_type: 'text',
     content: {
-      text: `IP测试完成！耗时${timeUse.toFixed(2)}分钟`
+      text: `【花漾】IP测试完成！耗时${timeUse.toFixed(2)}分钟，最后一页是：${currentPage}`
     }
   };
 
