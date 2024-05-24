@@ -67,6 +67,4 @@ async function openSession() {
   return { ipText, sessionScreenshotUrl };
 }
 
-openSession();
-
 module.exports = openSession;
