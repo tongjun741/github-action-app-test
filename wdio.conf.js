@@ -334,6 +334,7 @@ exports.config = {    //
     // afterAssertion: function(params) {
     // }
     timeout: 10*60*1000,
+    waitforTimeout: 10*60*1000, // 设置超时时间为 600 秒
     jasmineOpts: {
         defaultTimeoutInterval: (24 * 60 * 60 * 1000)
     }
