@@ -12,6 +12,9 @@ describe('Electron App Test', () => {
     let errorMsg = "";
 
     try {
+      // 设置浏览器窗口大小
+      browser.setWindowSize(1600, 1200);
+
       let config = productConfig;
       let password = process.env.PRODUCT_WDIO_PASSWORD || "password";
       if (process.env.IN_DEV === "true") {

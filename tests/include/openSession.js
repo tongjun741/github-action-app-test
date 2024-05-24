@@ -42,6 +42,9 @@ async function openSession() {
   // 验证页面标题
   let title = await browser.getTitle();
   console.log("当前窗口标题是", title);
+  
+  // 设置浏览器窗口大小
+  browser.setWindowSize(1600, 1200);
 
   // 浏览器检测页面
   // await browser.switchWindow('szdamai.local');
