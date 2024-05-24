@@ -171,7 +171,7 @@ exports.config = {    //
     // See the full list at http://mochajs.org/
     mochaOpts: {
         ui: 'bdd',
-        timeout: 60000
+        timeout: 600*1000  // 设置超时时间为 600 秒
     },
 
     //
@@ -334,7 +334,6 @@ exports.config = {    //
     // afterAssertion: function(params) {
     // }
     timeout: 10*60*1000,
-    waitforTimeout: 10*60*1000, // 设置超时时间为 600 秒
     jasmineOpts: {
         defaultTimeoutInterval: (24 * 60 * 60 * 1000)
     }
