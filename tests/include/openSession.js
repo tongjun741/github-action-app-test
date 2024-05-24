@@ -9,7 +9,7 @@ TODO
  */
 
 const { remote } = require('webdriverio');
-const { sleep } = require('./tools');
+const { sleep, screenshot } = require('./tools');
 
 async function openSession() {
   let browser = null;

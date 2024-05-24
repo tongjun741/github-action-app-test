@@ -1,7 +1,7 @@
 const { productConfig, devConfig } = require('./config');
 const login = require('./include/login');
 const openSession = require('./include/openSession');
-const { feishuNotify } = require('./include/tools');
+const { feishuNotify, screenshot } = require('./include/tools');
 
 describe('Electron App Test', () => {
   it('should open Electron app and perform actions', async () => {
@@ -49,7 +49,12 @@ describe('Electron App Test', () => {
       });
       ipText = rs.ipText;
       sessionScreenshotUrl = rs.sessionScreenshotUrl;
+    } catch (e) {
+      errorMsg += e.message + '\n';
+      console.error(e);
+    }
 
+    try {
       // 对客户端截图
       appScreenshotUrl = await screenshot(browser, 'app-screenshot.png');
     } catch (e) {
