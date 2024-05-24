@@ -38,7 +38,7 @@ async function openSession() {
     break;
   }
 
-  await sleep(1000);
+  await sleep(10*1000);
   // 验证页面标题
   let title = await browser.getTitle();
   console.log("当前窗口标题是", title);
