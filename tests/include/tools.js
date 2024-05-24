@@ -80,7 +80,7 @@ const screenshot = async (browser, fileName) => {
             // 在路径之前添加 inline
             url = `${protocol}${domain}/inline/${path}`;
 
-            console.log("Modified URL:", modifiedUrl);
+            console.log("预览地址:", url);
         } else {
             console.log("URL parsing failed.");
         }
