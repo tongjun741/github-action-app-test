@@ -30,7 +30,7 @@ jobs:
     
     steps:
       - name: 显示输入参数
-        if: ${{ ne(inputs.do_ip_test, '') }}
+        if: ${{ inputs.do_ip_test != '' }}
         run: |
           Write-Output ${{ inputs.do_ip_test }} 
     
