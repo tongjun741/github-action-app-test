@@ -38,13 +38,19 @@ async function openSession() {
     break;
   }
 
-  await sleep(10*1000);
+  await sleep(10 * 1000);
   // 验证页面标题
   let title = await browser.getTitle();
   console.log("当前窗口标题是", title);
-  
+
+  const windowSize = await browser.getWindowSize();
+  console.log("当前窗口大小是", windowSize);
+
   // 设置浏览器窗口大小
-  browser.setWindowSize(1600, 1200);
+  await browser.setWindowSize(1600, 1200);
+  
+  const windowSize2 = await browser.getWindowSize();
+  console.log("当前窗口大小2是", windowSize2);
 
   // 浏览器检测页面
   // await browser.switchWindow('szdamai.local');
