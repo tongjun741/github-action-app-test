@@ -57,11 +57,15 @@ async function openSession() {
   // 验证页面标题
   title = await browser.getTitle();
   console.log("分身标题是", title);
-  // await browser.savePDF('D:\\screenshot.pdf');
   await browser.$('.proto_address a').waitForExist({ timeout: 60 * 1000 });
   let ipText = await browser.$('.proto_address a').getText();
   console.log(ipText);
-  return ipText;
+
+  // 对分身浏览器截图
+  // 对客户端截图
+  let appScreenshotUrl = await screenshot(browser, 'session-screenshot.png');
+
+  return { ipText, appScreenshotUrl };
 }
 
 openSession();

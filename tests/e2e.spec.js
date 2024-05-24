@@ -7,6 +7,8 @@ describe('Electron App Test', () => {
   it('should open Electron app and perform actions', async () => {
     let startTime = new Date().getTime();
     let ipText;
+    let appScreenshotUrl;
+    let sessionScreenshotUrl;
     let errorMsg = "";
 
     try {
@@ -41,10 +43,15 @@ describe('Electron App Test', () => {
 
       await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
 
-      ipText = await openSession().catch(e => {
+      let rs = await openSession().catch(e => {
         errorMsg += e.message + '\n';
         console.error(e);
       });
+      ipText = rs.ipText;
+      sessionScreenshotUrl = rs.sessionScreenshotUrl;
+
+      // 对客户端截图
+      appScreenshotUrl = await screenshot(browser, 'app-screenshot.png');
     } catch (e) {
       errorMsg += e.message + '\n';
       console.error(e);
@@ -53,9 +60,9 @@ describe('Electron App Test', () => {
     let msg;
     let timeUse = (new Date().getTime() - startTime) / (60 * 1000);
     if (ipText) {
-      msg = `打开会话测试完成！耗时${timeUse.toFixed(2)}分钟，当前IP地址是：${ipText}。\n客户端下载地址是：${process.env.DOWNLOAD_URL}`;
+      msg = `打开会话测试完成！耗时${timeUse.toFixed(2)}分钟，当前IP地址是：${ipText}。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${sessionScreenshotUrl}`;
     } else {
-      msg = `打开会话测试失败！耗时${timeUse.toFixed(2)}分钟。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n${errorMsg}`;
+      msg = `打开会话测试失败！耗时${timeUse.toFixed(2)}分钟。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${sessionScreenshotUrl}\n\n${errorMsg}`;
     }
     console.log(msg);
     await feishuNotify(msg);
