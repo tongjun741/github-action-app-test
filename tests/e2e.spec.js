@@ -65,9 +65,9 @@ describe('Electron App Test', () => {
     let msg;
     let timeUse = (new Date().getTime() - startTime) / (60 * 1000);
     if (ipText) {
-      msg = `打开会话测试完成！耗时${timeUse.toFixed(2)}分钟，当前IP地址是：${ipText}。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${sessionScreenshotUrl}`;
+      msg = `打开会话测试完成！耗时${timeUse.toFixed(2)}分钟，当前IP地址是：${ipText}。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${appScreenshotUrl}`;
     } else {
-      msg = `打开会话测试失败！耗时${timeUse.toFixed(2)}分钟。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${sessionScreenshotUrl}\n\n${errorMsg}`;
+      msg = `打开会话测试失败！耗时${timeUse.toFixed(2)}分钟。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${appScreenshotUrl}\n\n${errorMsg}`;
     }
     console.log(msg);
     await feishuNotify(msg);

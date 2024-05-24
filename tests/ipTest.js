@@ -85,7 +85,7 @@ async function main() {
   }
 
   let timeUse = (new Date().getTime() - startTime) / (60 * 1000);
-  let msg = `IP测试完成！耗时${timeUse.toFixed(2)}分钟，最后一页是：${currentPage}\n客户端截图：${sessionScreenshotUrl}\n\n${errorMsg}`;
+  let msg = `IP测试完成！耗时${timeUse.toFixed(2)}分钟，最后一页是：${currentPage}\n客户端截图：${appScreenshotUrl}\n\n${errorMsg}`;
   await feishuNotify(msg);
 }
 

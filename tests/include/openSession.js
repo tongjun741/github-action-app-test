@@ -62,10 +62,9 @@ async function openSession() {
   console.log(ipText);
 
   // 对分身浏览器截图
-  // 对客户端截图
-  let appScreenshotUrl = await screenshot(browser, 'session-screenshot.png');
+  let sessionScreenshotUrl = await screenshot(browser, 'session-screenshot.png');
 
-  return { ipText, appScreenshotUrl };
+  return { ipText, sessionScreenshotUrl };
 }
 
 openSession();
