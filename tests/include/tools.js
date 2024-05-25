@@ -17,6 +17,7 @@ const feishuNotify = async (msg) => {
     };
 
     // 发送POST请求
+    console.log(message);
     await axios.post(webhookUrl, message)
         .then(response => {
             console.log('通知发送成功:', response.data);

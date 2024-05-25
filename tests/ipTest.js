@@ -2,7 +2,7 @@ const path = require('path');
 const os = require('os');
 const login = require('./include/login');
 const { ipTestConfig } = require('./config');
-const { sleep, feishuNotify } = require('./include/tools');
+const { sleep, feishuNotify, screenshot } = require('./include/tools');
 const { remote } = require('webdriverio');
 
 let extCapabilities = {};
@@ -36,7 +36,10 @@ async function main() {
 
   let startTime = new Date().getTime();
   let appScreenshotUrl;
+  let currentPage;
+  let totalCount;
   let errorMsg = "";
+  let unavailable = "";
 
   try {
     await login(ipTestConfig, process.env.PRODUCT_IP_TEST_PASSWORD, browser);
@@ -48,18 +51,23 @@ async function main() {
     await browser.$(`//div[text()="质量测试"]`).waitForExist({ timeout: 10 * 1000 })
     title = await browser.getTitle();
     console.log("标题是", title);
-    let currentPage;
     while (true) {
-      // 全选
-      await sleep(5 * 1000);
+      // 等待全选按钮出现
+      await browser.$(`.ant-table-thead  .ant-checkbox-input`).waitForExist({ timeout: 600 * 1000 });
+      // 等待当前页码出现
+      await browser.$(`span.current-page`).waitForExist({ timeout: 600 * 1000 });
+
       currentPage = await browser.$(`span.current-page`).getText();
       console.log(`${new Date().toLocaleString()}, 当前页码：${currentPage}`);
+      
+      // 全选
       await browser.$(`.ant-table-thead  .ant-checkbox-input`).click();
       console.log('开始测试');
-      await sleep(10 * 1000);
+      // 等待质量测试按钮可用
+      await browser.$(`//button[not(self::node()[contains(concat(" ",normalize-space(@class)," "),"disabled")])]//div[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 })
       await browser.$(`//div[text()="质量测试"]`).click();
       console.log('等待测试完成，1小时超时');
-      await browser.$(`//button[not(self::node()[contains(concat(" ",normalize-space(@class)," "),"ant-btn-loading")])]//div[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 })
+      await browser.$(`//button[not(self::node()[contains(concat(" ",normalize-space(@class)," "),"ant-btn-loading")])]//div[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 });
       await sleep(5 * 1000);
 
       if (await browser.$('.icon-angle-right_24:not(.disabled)').isExisting()) {
@@ -67,9 +75,16 @@ async function main() {
         await browser.$('.icon-angle-right_24:not(.disabled)').click();
       } else {
         console.log('没有下一页，退出');
+        totalCount = await browser.$(`.pagination > div >span`).getText();
         break;
       }
     }
+
+    // 失效的IP
+    await browser.$(`//span[text()="已失效的IP"]`).click();
+    await sleep(5 * 1000);
+    await browser.$(`.pagination > div >span`).waitForExist({ timeout: 60 * 60 * 1000 })
+    unavailable = await browser.$(`.pagination > div >span`).getText();
   } catch (e) {
     errorMsg += e.message + '\n';
     console.error(e);
@@ -85,7 +100,7 @@ async function main() {
   }
 
   let timeUse = (new Date().getTime() - startTime) / (60 * 1000);
-  let msg = `IP测试完成！耗时${timeUse.toFixed(2)}分钟，最后一页是：${currentPage}\n客户端截图：${appScreenshotUrl}\n\n${errorMsg}`;
+  let msg = `IP测试完成！耗时${timeUse.toFixed(2)}分钟\n最后一页是：${currentPage}\n总记录数：${totalCount}\n已失效的IP：${unavailable}\n客户端截图：${appScreenshotUrl}\n\n${errorMsg}`;
   await feishuNotify(msg);
 }
 
