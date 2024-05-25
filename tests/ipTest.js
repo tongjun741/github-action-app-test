@@ -56,10 +56,19 @@ async function main() {
       await browser.$(`.ant-table-thead  .ant-checkbox-input`).waitForExist({ timeout: 600 * 1000 });
       // 等待当前页码出现
       await browser.$(`span.current-page`).waitForExist({ timeout: 600 * 1000 });
+      // 等待Loading消失
+      const spin = await browser.$('.ant-spin-spinning');
+      if (await spin.isExisting()) {
+        await spin.waitUntil(async function () {
+          return !await this.isExisting()
+        }, {
+          timeout: 60 * 1000,
+        })
+      }
 
       currentPage = await browser.$(`span.current-page`).getText();
       console.log(`${new Date().toLocaleString()}, 当前页码：${currentPage}`);
-      
+
       // 全选
       await browser.$(`.ant-table-thead  .ant-checkbox-input`).click();
       console.log('开始测试');
