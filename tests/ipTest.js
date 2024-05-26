@@ -101,7 +101,7 @@ async function main() {
       console.log('查看失效的IP');
       await browser.$(`//span[text()="已失效的IP"]`).click();
       await sleep(5 * 1000);
-      await browser.$(`.pagination > div >span`).waitForExist({ timeout: 60 * 60 * 1000 })
+      await browser.$(`.pagination > div >span`).waitForExist({ timeout: 3 * 60 * 1000 })
       unavailable = await browser.$(`.pagination > div >span`).getText();
     } catch (e) {
       errorMsg += e.message + '\n';
