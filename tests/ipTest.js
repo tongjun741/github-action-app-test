@@ -83,7 +83,6 @@ async function main() {
       if (await browser.$('.icon-angle-right_24:not(.disabled)').isExisting()) {
         console.log('有下一页，进入下一页');
         await browser.$('.icon-angle-right_24:not(.disabled)').click();
-        break;
       } else {
         console.log('没有下一页，退出');
         break;
