@@ -100,9 +100,17 @@ async function main() {
       // 失效的IP
       console.log('查看失效的IP');
       await browser.$(`//span[text()="已失效的IP"]`).click();
-      await sleep(5 * 1000);
-      await browser.$(`.pagination > div >span`).waitForExist({ timeout: 3 * 60 * 1000 })
-      unavailable = await browser.$(`.pagination > div >span`).getText();
+      while (true) {
+        await sleep(5 * 1000);
+        if (await browser.$('.pagination > div >span').isExisting()) {
+          unavailable = await browser.$(`.pagination > div >span`).getText();
+          break;
+        }
+        if (await browser.$('//div[text()="暂无数据"]').isExisting()) {
+          unavailable = "暂无数据";
+          break;
+        }
+      }
     } catch (e) {
       errorMsg += e.message + '\n';
       console.error(e);
