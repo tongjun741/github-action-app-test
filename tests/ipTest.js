@@ -73,7 +73,8 @@ async function main() {
       await browser.$(`.ant-table-thead  .ant-checkbox-input`).click();
       console.log('开始测试');
       // 等待质量测试按钮可用
-      await browser.$(`//button[not(self::node()[contains(concat(" ",normalize-space(@class)," "),"disabled")])]//div[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 })
+      await browser.$(`//button[not(self::node()[contains(concat(" ",normalize-space(@class)," "),"disabled")])]//div[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 });
+      totalCount = await browser.$(`.pagination > div >span`).getText();
       await browser.$(`//div[text()="质量测试"]`).click();
       console.log('等待测试完成，1小时超时');
       await browser.$(`//button[not(self::node()[contains(concat(" ",normalize-space(@class)," "),"ant-btn-loading")])]//div[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 });
@@ -85,7 +86,6 @@ async function main() {
         break;
       } else {
         console.log('没有下一页，退出');
-        totalCount = await browser.$(`.pagination > div >span`).getText();
         break;
       }
     }
