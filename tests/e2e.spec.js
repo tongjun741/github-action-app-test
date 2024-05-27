@@ -50,8 +50,10 @@ describe('Electron App Test', () => {
         errorMsg += e.message + '\n';
         console.error(e);
       });
-      ipText = rs.ipText;
-      sessionScreenshotUrl = rs.sessionScreenshotUrl;
+      if(rs){
+        ipText = rs.ipText;
+        sessionScreenshotUrl = rs.sessionScreenshotUrl;
+      }
     } catch (e) {
       errorMsg += e.message + '\n';
       console.error(e);
