@@ -22,7 +22,7 @@ async function openSession() {
           browserVersion: '120',
           'goog:chromeOptions': {
             debuggerAddress: 'localhost:9221',
-            args: ['--window-size=1440,1280']
+            // args: ['--window-size=1440,1280']
           }
         },
         logLevel: 'warn'
@@ -44,14 +44,14 @@ async function openSession() {
   let title = await browser.getTitle();
   console.log("当前窗口标题是", title);
 
-  const windowSize = await browser.getWindowSize();
-  console.log("当前窗口大小是", windowSize);
+  // const windowSize = await browser.getWindowSize();
+  // console.log("当前窗口大小是", windowSize);
 
-  // 设置浏览器窗口大小
-  await browser.setWindowSize(1600, 1200);
+  // // 设置浏览器窗口大小
+  // await browser.setWindowSize(1600, 1200);
   
-  const windowSize2 = await browser.getWindowSize();
-  console.log("当前窗口大小2是", windowSize2);
+  // const windowSize2 = await browser.getWindowSize();
+  // console.log("当前窗口大小2是", windowSize2);
 
   // 浏览器检测页面
   // await browser.switchWindow('szdamai.local');
