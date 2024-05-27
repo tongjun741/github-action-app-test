@@ -22,6 +22,7 @@ async function openSession() {
           browserVersion: '120',
           'goog:chromeOptions': {
             debuggerAddress: 'localhost:9221',
+            args: ['--window-size=1440,1280']
           }
         },
         logLevel: 'warn'
