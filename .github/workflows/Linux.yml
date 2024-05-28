@@ -20,6 +20,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Install Chinese fonts
+        run: |
+          sudo apt update
+          sudo apt install -y fonts-wqy-zenhei
+
       - uses: actions/checkout@v4
       
       - name: Install libnotify4
