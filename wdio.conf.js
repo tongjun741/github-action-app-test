@@ -25,11 +25,18 @@ if (os.platform() === 'darwin') {
  * this.remoteDebugPort&&t.push
  * 替换成：
 this.remoteDebugPort=9221;t.push
+
+将
+t.push(...this.browserSwitches.split("\n"));
+替换成：
+t.push(...this.browserSwitches.split("\n"));t.push("--window-size=1000,600");
  */
 let fileContent = fs.readFileSync(mainJsPath, 'utf8');
-// 进行内容替换
+// 进行内容替换，默认开启9221调试端口
 fileContent = fileContent.replace(/this\.remoteDebugPort\s*&&\s*t\.push/g, 'this.remoteDebugPort = 9221; t.push');
-// 写入替换后的内容到main.txt文件
+// 进行内容替换，设置分身浏览器窗口大小
+fileContent = fileContent.replace('t.push(...this.browserSwitches.split("\\n"));', 't.push(...this.browserSwitches.split("\\n"));t.push("--window-size=1440,1280");');
+// 写入替换后的内容到main.js文件
 fs.writeFileSync(mainJsPath, fileContent, 'utf8');
 console.log('main.js替换完成');
 
