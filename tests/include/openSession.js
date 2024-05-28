@@ -49,7 +49,7 @@ async function openSession() {
 
   // // 设置浏览器窗口大小
   // await browser.setWindowSize(1600, 1200);
-  
+
   // const windowSize2 = await browser.getWindowSize();
   // console.log("当前窗口大小2是", windowSize2);
 
@@ -62,6 +62,18 @@ async function openSession() {
   // 新开标签页
   await browser.newWindow('https://ip.sb');
   await browser.switchWindow('ip.sb');
+  // 执行 JavaScript 脚本以获取浏览器窗口大小并在主进程中输出
+  await browser.execute(function() {
+      // 使用JavaScript获取浏览器窗口的宽度和高度
+      var windowWidth = window.innerWidth;
+      var windowHeight = window.innerHeight;
+      // 将窗口大小信息返回给WebdriverIO主进程
+      return { width: windowWidth, height: windowHeight };
+  }).then(function(size) {
+      // 在主进程中输出窗口大小信息
+      console.log("浏览器窗口宽度：" + size.width);
+      console.log("浏览器窗口高度：" + size.height);
+  });
   await sleep(3000);
 
   // 验证页面标题
