@@ -34,14 +34,9 @@ async function login(config, password, targetBrowser) {
   }
   await browser.$(`//span[text()="${config.teamName}"]`).click();
 
-  await sleep(3000);
-  let windowIDs = await browser.getWindowHandles();
-  console.log(windowIDs);
-  browser.switchToWindow(windowIDs[0])
-  await sleep(3000);
-  let mainWindowID = await browser.getWindowHandle();
-  console.log(mainWindowID);
-
+  await sleep(10 * 1000);
+  // 按标题切换到主窗口
+  await browser.switchWindow('首页 - 花漾灵动');
   title = await browser.getTitle();
   console.log("标题是", title);
 
