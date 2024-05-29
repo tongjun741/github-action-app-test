@@ -36,7 +36,8 @@ async function login(config, password, targetBrowser) {
 
   await sleep(10 * 1000);
   // 按标题切换到主窗口
-  await browser.switchWindow('首页 - 花漾灵动');
+  // 兼容有首页和默认只有分身页的情况
+  await browser.switchWindow(' - 花漾灵动');
   title = await browser.getTitle();
   console.log("标题是", title);
 
