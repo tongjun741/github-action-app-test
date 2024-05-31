@@ -3,6 +3,12 @@ name: Windows7
 on:
   repository_dispatch:
     types: [win7-start, retry-win7-start]
+    
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "Who to greet"
+        default: "World"
 
 jobs:
   Windows7:
