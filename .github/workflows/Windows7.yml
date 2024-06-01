@@ -33,12 +33,16 @@ jobs:
         with:
           repository: ${{ github.repository }}
           event-type: retry-win7-start
+
+      - uses: actions/checkout@v4
+      
+      - name: Install Vagrant 2.3.6
+        run: |
+          pwd
       
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
-
-      - uses: actions/checkout@v4
 
       - name: Install Vagrant 2.3.6
         run: |
