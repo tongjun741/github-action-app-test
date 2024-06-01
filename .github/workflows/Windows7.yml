@@ -70,7 +70,7 @@ jobs:
 
       - name: Copy files to Win7
         run: |
-          find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec cp {} ./win7/{} \;
+          find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec rsync --relative {} ./win7/ \;
 
       - name: Run vagrant up
         run: vagrant up || true
