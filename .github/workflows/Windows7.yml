@@ -6,9 +6,9 @@ on:
     
   workflow_dispatch:
     inputs:
-      name:
-        description: "Who to greet"
-        default: "World"
+      tmate:
+        description: "开启ssh调试"
+        default: "false"
 
 jobs:
   Windows7:
@@ -34,8 +34,9 @@ jobs:
           repository: ${{ github.repository }}
           event-type: retry-win7-start
       
-      # - name: Setup tmate session5
-      #   uses: mxschmitt/action-tmate@v3
+      - name: Setup tmate session5
+        if: ${{ !contains(inputs.tmate, 'false') }}
+        uses: mxschmitt/action-tmate@v3
 
       - uses: actions/checkout@v4
 
