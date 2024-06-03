@@ -44,161 +44,20 @@ jobs:
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
+        continue-on-error: true
         timeout-minutes: 30  # 设置超时时间为30分钟
       
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
+        continue-on-error: true
         timeout-minutes: 30  # 设置超时时间为30分钟
       
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
+        continue-on-error: true
         timeout-minutes: 30  # 设置超时时间为30分钟
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
 
       - name: Install Vagrant 2.3.6
         run: |
