@@ -40,21 +40,21 @@ jobs:
       - name: Install Vagrant 2.3.6
         run: |
           pwd
-      - name: Setup upterm session
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: lhotari/action-upterm@v1
       
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 30  # 设置超时时间为30分钟
       
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 30  # 设置超时时间为30分钟
       
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 30  # 设置超时时间为30分钟
       
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
