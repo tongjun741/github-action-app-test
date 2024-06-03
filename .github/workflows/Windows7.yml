@@ -46,18 +46,30 @@ jobs:
         uses: mxschmitt/action-tmate@v3
         continue-on-error: true
         timeout-minutes: 30  # 设置超时时间为30分钟
+
+      - name: clear tmate
+        run: |
+          rm -rf /Users/runner/.ssh/id_rsa
       
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
         continue-on-error: true
         timeout-minutes: 30  # 设置超时时间为30分钟
+
+      - name: clear tmate
+        run: |
+          rm -rf /Users/runner/.ssh/id_rsa
       
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
         continue-on-error: true
         timeout-minutes: 30  # 设置超时时间为30分钟
+
+      - name: clear tmate
+        run: |
+          rm -rf /Users/runner/.ssh/id_rsa
 
       - name: Install Vagrant 2.3.6
         run: |
