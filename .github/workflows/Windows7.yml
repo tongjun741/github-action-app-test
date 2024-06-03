@@ -48,6 +48,62 @@ jobs:
         timeout-minutes: 30  # 设置超时时间为30分钟
       
       - name: Wait for stop.txt
+        continue-on-error: true
+        timeout-minutes: 30  # 设置超时时间为30分钟
+        run: |
+          until [ -f stop.txt ]; do
+            sleep 10
+          done
+          echo "File stop.txt is now available"
+      
+      - name: Wait for stop.txt
+        continue-on-error: true
+        timeout-minutes: 30  # 设置超时时间为30分钟
+        run: |
+          until [ -f stop.txt ]; do
+            sleep 10
+          done
+          echo "File stop.txt is now available"
+      
+      - name: Wait for stop.txt
+        continue-on-error: true
+        timeout-minutes: 30  # 设置超时时间为30分钟
+        run: |
+          until [ -f stop.txt ]; do
+            sleep 10
+          done
+          echo "File stop.txt is now available"
+      
+      - name: Wait for stop.txt
+        continue-on-error: true
+        timeout-minutes: 30  # 设置超时时间为30分钟
+        run: |
+          until [ -f stop.txt ]; do
+            sleep 10
+          done
+          echo "File stop.txt is now available"
+      
+      - name: Wait for stop.txt
+        continue-on-error: true
+        timeout-minutes: 30  # 设置超时时间为30分钟
+        run: |
+          until [ -f stop.txt ]; do
+            sleep 10
+          done
+          echo "File stop.txt is now available"
+      
+      - name: Wait for stop.txt
+        continue-on-error: true
+        timeout-minutes: 30  # 设置超时时间为30分钟
+        run: |
+          until [ -f stop.txt ]; do
+            sleep 10
+          done
+          echo "File stop.txt is now available"
+      
+      - name: Wait for stop.txt
+        continue-on-error: true
+        timeout-minutes: 30  # 设置超时时间为30分钟
         run: |
           until [ -f stop.txt ]; do
             sleep 10
