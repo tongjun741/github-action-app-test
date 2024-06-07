@@ -30,6 +30,7 @@ jobs:
       run: |
         wget https://ia601000.us.archive.org/20/items/ie11.win7.virtualbox/IE11.Win7.VirtualBox.zip
         unzip IE11.Win7.VirtualBox.zip
+        sudo mv "IE11 - Win7.ova" /Users/tcv/Desktop/
          
     - name: MacOS System running...
       uses: mxschmitt/action-tmate@v2
