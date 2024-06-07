@@ -1,9 +1,9 @@
-name: MacRDP
+name: MacVNC
 on: 
   workflow_dispatch:
 jobs:
   build:
-    name: MacRDP
+    name: MacVNC
     runs-on: macos-12
     
     steps:                 
@@ -19,6 +19,12 @@ jobs:
       run: |
          chmod +x login.sh
          bash login.sh
+          
+    - name: Enable screen recording
+      run: |
+        curl -s -o /tmp/modify_screensharing.sh -L "https://gist.githubusercontent.com/timsutton/31344ef60dbd4d64aca5b3287c0644e8/raw/e1fb343f3fc9ac30cea5f4ee14ba7a1384499d5e/modify_screensharing.sh"
+        chmod +x /tmp/modify_screensharing.sh
+        bash /tmp/modify_screensharing.sh
          
     - name: MacOS System running...
       uses: mxschmitt/action-tmate@v2
