@@ -1,0 +1,25 @@
+name: Ubuntu
+
+on:
+  repository_dispatch:
+    types: [linux-start]
+    
+  workflow_dispatch:
+    inputs:
+      software_download_url:
+        description: 'Download url'
+        required: true
+        default: 'https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_10.0.533_zh_setup.deb'
+      in_dev:
+        description: '是否是测试环境'
+        default: 'false'
+
+jobs:
+
+  Ubuntu:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
