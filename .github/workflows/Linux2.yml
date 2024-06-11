@@ -1,4 +1,4 @@
-name: Ubuntu
+name: Ubuntu2
 
 on:
   repository_dispatch:
