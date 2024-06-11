@@ -17,13 +17,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Add Group
-        run: |
-          sudo usermod -aG libvirt $(whoami)
-          sudo su - $(whoami)
-          groups
-          cd /home/runner/work/github-action-app-test/github-action-app-test
       
       - name: Install Vagrant
         run: |
@@ -47,6 +40,13 @@ jobs:
           sudo apt install qemu libvirt-daemon-system libvirt-clients libxslt-dev libxml2-dev libvirt-dev zlib1g-dev ruby-dev ruby-libvirt ebtables dnsmasq-base
           vagrant plugin install vagrant-libvirt
           vagrant plugin install vagrant-mutate
+
+      - name: Add Group
+        run: |
+          sudo usermod -aG libvirt $(whoami)
+          sudo su - $(whoami)
+          groups
+          cd /home/runner/work/github-action-app-test/github-action-app-test
 
       # - name: 下载安装包
       #   run: |
