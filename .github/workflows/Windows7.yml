@@ -12,112 +12,17 @@ on:
 
 jobs:
   Windows7:
-    runs-on: macos-12
+    runs-on: ubuntu-latest
     timeout-minutes: 600
 
     steps:
-      - name: Check Image Version
-        run: |
-          version=$(grep -oE 'Image Version: ([0-9]{8}\.[0-9])' ~/systeminfo.md | awk '{print $3}')
-          required_version="20240119.1"
-
-          if [[ $version == $required_version || $version > $required_version ]]; then
-            echo "Image Version 大于等于 ${required_version}，可以正常工作"
-          else
-            echo "Image Version 小于 ${required_version}，退出工作流，发出retry-workflow事件重试。"
-            exit 1
-          fi
-
-      - name: Rerun workflow
-        if: failure()
-        uses: peter-evans/repository-dispatch@v2
-        with:
-          repository: ${{ github.repository }}
-          event-type: retry-win7-start
-
       - uses: actions/checkout@v4
       
-      - name: Install Vagrant 2.3.6
+      - name: Install Vagrant
         run: |
-          pwd
-      
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-        continue-on-error: true
-        timeout-minutes: 30  # 设置超时时间为30分钟
-      
-      - name: Wait for stop.txt
-        continue-on-error: true
-        timeout-minutes: 30  # 设置超时时间为30分钟
-        run: |
-          until [ -f stop.txt ]; do
-            sleep 10
-          done
-          echo "File stop.txt is now available"
-      
-      - name: Wait for stop.txt
-        continue-on-error: true
-        timeout-minutes: 30  # 设置超时时间为30分钟
-        run: |
-          until [ -f stop.txt ]; do
-            sleep 10
-          done
-          echo "File stop.txt is now available"
-      
-      - name: Wait for stop.txt
-        continue-on-error: true
-        timeout-minutes: 30  # 设置超时时间为30分钟
-        run: |
-          until [ -f stop.txt ]; do
-            sleep 10
-          done
-          echo "File stop.txt is now available"
-      
-      - name: Wait for stop.txt
-        continue-on-error: true
-        timeout-minutes: 30  # 设置超时时间为30分钟
-        run: |
-          until [ -f stop.txt ]; do
-            sleep 10
-          done
-          echo "File stop.txt is now available"
-      
-      - name: Wait for stop.txt
-        continue-on-error: true
-        timeout-minutes: 30  # 设置超时时间为30分钟
-        run: |
-          until [ -f stop.txt ]; do
-            sleep 10
-          done
-          echo "File stop.txt is now available"
-      
-      - name: Wait for stop.txt
-        continue-on-error: true
-        timeout-minutes: 30  # 设置超时时间为30分钟
-        run: |
-          until [ -f stop.txt ]; do
-            sleep 10
-          done
-          echo "File stop.txt is now available"
-      
-      - name: Wait for stop.txt
-        continue-on-error: true
-        timeout-minutes: 30  # 设置超时时间为30分钟
-        run: |
-          until [ -f stop.txt ]; do
-            sleep 10
-          done
-          echo "File stop.txt is now available"
-
-      - name: Install Vagrant 2.3.6
-        run: |
-          brew uninstall vagrant
-          wget https://releases.hashicorp.com/vagrant/2.3.6/vagrant_2.3.6_darwin_amd64.dmg
-          hdiutil attach vagrant_2.3.6_darwin_amd64.dmg
-          sudo installer -pkg /Volumes/Vagrant/vagrant.pkg -target /
-          hdiutil detach /Volumes/Vagrant/
-          vagrant --version
+          wget -O- https://apt.releases.hashicorp.com/gpg |  sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo  "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $( lsb_release -cs ) main"  |  sudo  tee /etc/apt/sources.list.d/hashicorp.list
+          sudo  apt update &&  sudo  apt  install vagrant
 
       # - name: Cache Vagrant boxes
       #   uses: actions/cache@v2
@@ -140,6 +45,12 @@ jobs:
 
       - name: Run vagrant up
         run: vagrant up || true
+
+      - name: Setup tmate session5
+        if: ${{ !contains(inputs.tmate, 'false') }}
+        uses: mxschmitt/action-tmate@v3
+        continue-on-error: true
+        timeout-minutes: 30  # 设置超时时间为30分钟
 
       - name: 等待测试完成
         run: |
