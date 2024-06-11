@@ -44,9 +44,11 @@ jobs:
       - name: Add Group
         run: |
           sudo usermod -aG libvirt $(whoami)
-          sudo su - $(whoami)
+          sudo su - runner
           groups
-          cd /home/runner/work/github-action-app-test/github-action-app-test
+          sudo mkdir /mnt/v
+          sudo cp -r /home/runner/work/github-action-app-test/github-action-app-test/* /mnt/v
+          cd /mnt/v
 
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
