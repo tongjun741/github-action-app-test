@@ -48,6 +48,11 @@ jobs:
           groups
           cd /home/runner/work/github-action-app-test/github-action-app-test
 
+      - name: Setup tmate session5
+        if: ${{ !contains(inputs.tmate, 'false') }}
+        uses: mxschmitt/action-tmate@v3
+        continue-on-error: true
+
       # - name: 下载安装包
       #   run: |
       #     wget https://dev.thinkoncloud.cn/downloads/win7_app_zh/HuaYoungApp_Win7_dev_zh_setup.exe -O installer.exe
@@ -58,12 +63,6 @@ jobs:
 
       - name: Run vagrant up
         run: vagrant up --provider=libvirt
-
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-        continue-on-error: true
-        timeout-minutes: 30  # 设置超时时间为30分钟
 
       - name: 等待测试完成
         run: |
