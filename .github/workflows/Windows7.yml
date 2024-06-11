@@ -17,6 +17,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Add Group
+        run: |
+          sudo usermod -aG libvirt $(whoami)
+          sudo su - $(whoami)
+          groups
+          cd /home/runner/work/github-action-app-test/github-action-app-test
       
       - name: Install Vagrant
         run: |
@@ -35,16 +42,22 @@ jobs:
       - name: Show Vagrant version
         run: vagrant --version
 
-      - name: 下载安装包
+      - name: 安装 Vagrant 插件
         run: |
-          wget https://dev.thinkoncloud.cn/downloads/win7_app_zh/HuaYoungApp_Win7_dev_zh_setup.exe -O installer.exe
+          sudo apt install qemu libvirt-daemon-system libvirt-clients libxslt-dev libxml2-dev libvirt-dev zlib1g-dev ruby-dev ruby-libvirt ebtables dnsmasq-base
+          vagrant plugin install vagrant-libvirt
+          vagrant plugin install vagrant-mutate
 
-      - name: Copy files to Win7
-        run: |
-          find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec rsync --relative {} ./win7/ \;
+      # - name: 下载安装包
+      #   run: |
+      #     wget https://dev.thinkoncloud.cn/downloads/win7_app_zh/HuaYoungApp_Win7_dev_zh_setup.exe -O installer.exe
+
+      # - name: Copy files to Win7
+      #   run: |
+      #     find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec rsync --relative {} ./win7/ \;
 
       - name: Run vagrant up
-        run: vagrant up || true
+        run: vagrant up --provider=libvirt
 
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
