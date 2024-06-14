@@ -13,12 +13,12 @@ jobs:
     - name: Enabling Remote Access
       run: |
           chmod +x ./macOS_VNC/start.sh
-          bash ./macOS_VNC/start.sh
+          sudo ./macOS_VNC/start.sh
           
     - name: Log In Details To VNC Server
       run: |
          chmod +x ./macOS_VNC/login.sh
-         bash ./macOS_VNC/login.sh
+         sudo ./macOS_VNC/login.sh
           
     - name: Enable screen recording
       run: |
@@ -40,6 +40,12 @@ jobs:
             echo "版本号: $version"
         else
             echo "无法解析版本号"
+        fi
+          
+        appDir="/Volumes/花漾客户端 ${version}/"
+        if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
+          echo "M1芯片下appPath不一样"
+          appDir="/Volumes/花漾客户端 ${version}-arm64/"
         fi
 
         hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
