@@ -11,11 +11,9 @@ jobs:
     - uses: actions/checkout@v4 
 
     - name: Enabling Remote Access
-      env:
-        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
       run: |
           chmod +x ./macOS_VNC/start.sh
-          bash start.sh "$NGROK_AUTH_TOKEN"
+          bash ./macOS_VNC/start.sh
           
     - name: Log In Details To VNC Server
       run: |
