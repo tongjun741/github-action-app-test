@@ -1,0 +1,57 @@
+name: Mac-latest_VNC
+on: 
+  workflow_dispatch:
+jobs:
+  build:
+    name: Mac-latest_VNC
+    runs-on: macos-latest
+    
+    steps:     
+    
+    - uses: actions/checkout@v4 
+
+    - name: Enabling Remote Access
+      env:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+      run: |
+          chmod +x ./macOS_VNC/start.sh
+          bash start.sh "$NGROK_AUTH_TOKEN"
+          
+    - name: Log In Details To VNC Server
+      run: |
+         chmod +x ./macOS_VNC/login.sh
+         bash ./macOS_VNC/login.sh
+          
+    - name: Enable screen recording
+      run: |
+        sudo chmod +x ./macOS_VNC/modify_screensharing-14.sh
+        sudo ./macOS_VNC/modify_screensharing-14.sh
+
+    - name: 下载并安装客户端
+      run: |
+        download_url="https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_10.0.559_zh_setup.dmg"
+        curl -o /tmp/HuaYoungApp_Mac_setup.dmg $download_url
+
+        # 提取链接中的文件名部分
+        filename=$(basename $download_url)
+
+        # 使用正则表达式提取版本号
+        version=""
+        if [[ $filename =~ [0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            version=${BASH_REMATCH[0]}
+            echo "版本号: $version"
+        else
+            echo "无法解析版本号"
+        fi
+
+        hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
+        sudo cp -R "${appDir}花漾客户端.app" /Applications/
+
+    - name: 启动frpc
+      run: |
+        curl -Lo frpc https://nya.globalslb.net/natfrp/client/frpc/0.51.0-sakura-5.1/frpc_darwin_arm64
+        chmod +x frpc
+        frpc -c ./macOS_VNC/frpc_15897721.ini &
+
+    - name: MacOS System running...
+      uses: mxschmitt/action-tmate@v2
