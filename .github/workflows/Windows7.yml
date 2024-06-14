@@ -22,7 +22,7 @@ jobs:
         run: |
           wget -O- https://apt.releases.hashicorp.com/gpg |  sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
           echo  "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $( lsb_release -cs ) main"  |  sudo  tee /etc/apt/sources.list.d/hashicorp.list
-          sudo  apt update &&  sudo  apt  install vagrant
+          sudo  apt update &&  sudo  apt  install vagrant -y
 
       # - name: Cache Vagrant boxes
       #   uses: actions/cache@v2
@@ -37,18 +37,30 @@ jobs:
 
       - name: 安装 Vagrant 插件
         run: |
-          sudo apt install qemu libvirt-daemon-system libvirt-clients libxslt-dev libxml2-dev libvirt-dev zlib1g-dev ruby-dev ruby-libvirt ebtables dnsmasq-base
+          sudo apt install qemu libvirt-daemon-system libvirt-clients libxslt-dev libxml2-dev libvirt-dev zlib1g-dev ruby-dev ruby-libvirt ebtables dnsmasq-base -y
           vagrant plugin install vagrant-libvirt
           vagrant plugin install vagrant-mutate
 
       - name: Add Group
         run: |
           sudo usermod -aG libvirt $(whoami)
-          sudo su - runner
+          newgrp libvirt
           groups
           sudo mkdir /mnt/v
           sudo cp -r /home/runner/work/github-action-app-test/github-action-app-test/* /mnt/v
+          sudo chown -R runner /mnt/v
           cd /mnt/v
+          
+          # 将.vagrant.d目录移动到/mnt目录
+          sudo mv ~/.vagrant.d /mnt
+          sudo chown -R runner /mnt/.vagrant.d
+          # 创建符号链接
+          ln -s /mnt/.vagrant.d ~/.vagrant.d
+          
+          # 将/opt/vagrant目录移动到/mnt目录
+          sudo mv /opt/vagrant /mnt
+          # 创建符号链接
+          ln -s /mnt/vagrant /opt/vagrant
 
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
