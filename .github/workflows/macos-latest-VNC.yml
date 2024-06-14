@@ -27,7 +27,7 @@ jobs:
 
     - name: 下载并安装客户端
       run: |
-        download_url="https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_10.0.559_zh_setup.dmg"
+        download_url="http://ds.0728123.xyz:60001/s/HuaYoungApp_Mac_arm64-dev_10.3.5033_zh_setup.dmg"
         curl -o /tmp/HuaYoungApp_Mac_setup.dmg $download_url
 
         # 提取链接中的文件名部分
