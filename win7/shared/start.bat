@@ -27,3 +27,4 @@ bitsadmin /transfer myDownloadJob /download /priority normal "%url%" "%CD%\respo
 
 cd c:\work
 c:\node\node c:\work\cmd.js > \\host.lan\Data\start.log
+echo "start.bat over" >> "\\host.lan\Data\done.log"
