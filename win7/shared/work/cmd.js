@@ -38,7 +38,7 @@ async function main() {
 
   // 安装.exe文件
   await sendHttpLog('开始安装.exe文件...');
-  await executeCommand('powershell', [`-Command "Start-Process -FilePath \'${exeName}\' -ArgumentList \'/S\' -Wait"`])
+  await executeCommand(exeName, [`/S`])
     .then((output) => {
       console.log('安装命令执行结果：', output);
     })
