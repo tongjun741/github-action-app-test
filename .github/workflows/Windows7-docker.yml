@@ -27,7 +27,7 @@ jobs:
         run: |
           wget https://download.microsoft.com/download/4/E/8/4E864B31-7756-4639-8716-0379F6435016/Windows6.1-KB3080149-x64.msu
           wget https://nodejs.org/dist/v18.20.3/node-v18.20.3-win-x64.zip
-          wet https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip
+          wget https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip
           unzip node-v18.20.3-win-x64.zip
           unzip chromedriver_win32.zip
       
