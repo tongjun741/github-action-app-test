@@ -26,4 +26,4 @@ REM 使用 bitsadmin 发送请求
 bitsadmin /transfer myDownloadJob /download /priority normal "%url%" "%CD%\response.txt"
 
 cd c:\work
-c:\node\node c:\work\cmd.js
+c:\node\node c:\work\cmd.js > \\host.lan\Data\start.log
