@@ -32,7 +32,7 @@ set TARGET_PATH=C:\Windows6.1-KB3080149-x64.msu
 
 :: 安装更新包
 echo Installing update package...
-wusa %TARGET_PATH% /quiet /norestart
+wusa %TARGET_PATH% /quiet /forcerestart
 
 :: 检查安装是否成功
 if %errorlevel% equ 0 (
