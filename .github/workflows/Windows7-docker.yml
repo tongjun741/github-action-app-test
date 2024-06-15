@@ -10,15 +10,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 启动docker
-        run: |
-          cd win7
-          docker-compose up -d
-
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
         continue-on-error: true
+        
+      - name: 启动docker
+        run: |
+          cd win7
+          docker-compose up -d
 
       - name: 等待测试完成
         run: |
