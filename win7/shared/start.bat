@@ -20,7 +20,7 @@ REM 获取 Node.js 版本
 for /f "delims=" %%v in ('c:\node\node -v') do set nodeVersion=%%v
 
 REM 替换 URL 中的 "newline2" 为当前时间
-set url=http://ds.0728123.xyz:65080/log_channel12?text=%currentTime%_NodeVersion_%nodeVersion%
+set url=http://ds.0728123.xyz:65080/log_channel12?text=start.bat_%currentTime%_NodeVersion_%nodeVersion%
 
 REM 使用 bitsadmin 发送请求
 bitsadmin /transfer myDownloadJob /download /priority normal "%url%" "%CD%\response.txt"

