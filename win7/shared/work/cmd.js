@@ -12,7 +12,8 @@ const executeCommand = async (command, args) => {
       "PATH": "c:\\node;" + process.env.PATH
     }
     const childProcess = spawn(command, args, {
-      ...process.env, ...envVars
+      env: { ...process.env, ...envVars },
+      shell: true
     });
     let stdout = '';
 
@@ -106,7 +107,7 @@ async function main() {
 
     // npm install
     await sendHttpLog('开始npm install...');
-    await executeCommand('c:\\node\\npm', ['install yarn -g && c:\\node\\yarn'])
+    await executeCommand('npm install yarn -g && yarn'])
       .then((output) => {
         console.log('npm install命令执行结果：', output);
       })
@@ -116,7 +117,7 @@ async function main() {
 
     // 开始测试
     await sendHttpLog('开始测试...');
-    await executeCommand(`c:\\node\\yarn`, ['wdio'])
+    await executeCommand(`yarn`, ['wdio'])
       .then((output) => {
         console.log('测试执行结果：', output);
       })
