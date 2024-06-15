@@ -22,10 +22,6 @@ jobs:
         run: |
           cd win7
           docker-compose up -d
-        
-      - name: pwd
-        run: |
-          pwd
 
       - name: 下载补丁和nodejs
         run: |
@@ -46,13 +42,12 @@ jobs:
         run: |
           find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec rsync --relative {} ./win7/shared/work \;
         
-      - name: 启动docker
+      - name: 复制相关文件到虚拟机共享目录
         run: |
           cd win7
           cp ../Windows6.1-KB3080149-x64.msu ./shared
           cp ../installer.exe ./shared/work
           cp -r ../node-v18.20.3-win-x64 ./shared/node
-          docker-compose up -d
 
       - name: 启动frpc
         run: |
