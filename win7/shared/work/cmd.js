@@ -3,6 +3,10 @@ const path = require('path');
 const http = require('http');
 const fs = require('fs');
 
+// 读取 passwd.json 文件
+const passwdJson = fs.readFileSync('passwd.json', 'utf8');
+const passwdData = JSON.parse(passwdJson);
+
 // 异步执行命令并输出标准输出内容
 const executeCommand = async (command, args) => {
   await sendHttpLog(`开始执行命令：${command} ${args}`);
@@ -11,6 +15,10 @@ const executeCommand = async (command, args) => {
       "NODE_SKIP_PLATFORM_CHECK": 1,
       "PATH": "c:\\node;" + process.env.PATH
     }
+
+    // 将 passwdData 中的环境变量追加到 envVars 中
+    Object.assign(envVars, passwdData);
+    
     const childProcess = spawn(command, args, {
       env: { ...process.env, ...envVars },
       shell: true
