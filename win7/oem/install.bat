@@ -27,7 +27,8 @@ xcopy "\\host.lan\Data\work" "c:\work" /E /H /C /I /Y
 REM 设置开机自动启动
 copy "\\host.lan\Data\start.bat" "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\start.bat"
 
-set TARGET_PATH=\\host.lan\Data\Windows6.1-KB3080149-x64.msu
+copy "\\host.lan\Data\Windows6.1-KB3080149-x64.msu" "C:\Windows6.1-KB3080149-x64.msu"
+set TARGET_PATH=C:\Windows6.1-KB3080149-x64.msu
 
 :: 安装更新包
 echo Installing update package...
