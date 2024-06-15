@@ -17,6 +17,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        
+      - name: 启动docker
+        run: |
+          cd win7
+          docker-compose up -d
+        
+      - name: pwd
+        run: |
+          pwd
 
       - name: 下载补丁和nodejs
         run: |
