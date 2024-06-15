@@ -9,16 +9,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup tmate session5
-        if: ${{ !contains(inputs.tmate, 'false') }}
-        uses: mxschmitt/action-tmate@v3
-        continue-on-error: true
         
       - name: 启动docker
         run: |
           cd win7
           docker-compose up -d
+
+      - name: 启动frpc
+        run: |
+          curl -Lo frpc https://nya.globalslb.net/natfrp/client/frpc/0.51.0-sakura-5.1/frpc_linux_amd64
+          chmod +x frpc
+          ./frpc -c ./win7/frpc_16020852.ini &
+
+      - name: Setup tmate session5
+        if: ${{ !contains(inputs.tmate, 'false') }}
+        uses: mxschmitt/action-tmate@v3
+        continue-on-error: true
 
       - name: 等待测试完成
         run: |
