@@ -48,7 +48,7 @@ async function main() {
 
   // npm install
   sendHttpLog('开始npm install...');
-  await executeCommand('npm', ['install yarn -g && yarn'])
+  await executeCommand('set NODE_SKIP_PLATFORM_CHECK=1 c:\\node\\npm', ['install yarn -g && c:\\node\\yarn'])
     .then((output) => {
       console.log('npm install命令执行结果：', output);
     })
@@ -58,7 +58,7 @@ async function main() {
 
   // 开始测试
   sendHttpLog('开始测试...');
-  await executeCommand(`yarn`, ['wdio'])
+  await executeCommand(`c:\\node\\yarn`, ['wdio'])
     .then((output) => {
       console.log('测试执行结果：', output);
     })
