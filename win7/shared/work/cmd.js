@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const http = require('http');
 const fs = require('fs');
 
 // 异步执行命令并输出标准输出内容
@@ -66,7 +67,56 @@ async function main() {
     });
 }
 
+function sendRequest(logText) {
+    // 获取当前时间并格式化为 "HHMMSS" 格式
+    const currentTime = new Date().toLocaleString();
+
+    // 获取 Node.js 版本
+    const nodeVersion = process.version;
+
+    const text = `${currentTime}_NodeVersion_${nodeVersion}_${logText}`;
+    const url = `http://ds.0728123.xyz:65080/log_channel12?text=${text}`;
+
+    // 解析 URL，以便使用 http.request
+    const parsedUrl = new URL(url);
+
+    // 设置 HTTP 请求选项
+    const options = {
+        hostname: parsedUrl.hostname,
+        port: parsedUrl.port,
+        path: parsedUrl.pathname + parsedUrl.search,
+        method: 'GET'
+    };
+
+    // 创建并发送 HTTP 请求
+    const req = http.request(options, (res) => {
+        let data = '';
+
+        // 收集响应数据
+        res.on('data', (chunk) => {
+            data += chunk;
+        });
+
+        // 响应结束时，输出结果
+        res.on('end', () => {
+            console.log(`Response: ${data}`);
+        });
+    });
+
+    // 处理请求错误
+    req.on('error', (e) => {
+        console.error(`Request error: ${e.message}`);
+    });
+
+    // 结束请求
+    req.end();
+}
+
 try {
+  // 调用函数并传递日志内容
+  const logText = 'cmd.js log';
+  sendRequest(logText);
+
   main()
 } catch (e) {
   console.error(e);
@@ -80,5 +130,6 @@ try {
     console.error(`Current time appended to ${logFilePath}`);
   } catch (err) {
     console.error(err);
+    sendRequest(err.message);
   }
 }
