@@ -1,8 +1,7 @@
 name: Windows7-docker
 
 on:
-  repository_dispatch:
-    types: [win7-start, retry-win7-start]
+  workflow_dispatch:
 
 jobs:
   Windows7:
