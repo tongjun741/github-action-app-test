@@ -31,7 +31,7 @@ jobs:
           else
             download_url="${{ inputs.software_download_url }}"
           fi
-          curl -o installer.exe
+          curl -o installer.exe $download_url
 
       - name: Copy files to Win7
         run: |
