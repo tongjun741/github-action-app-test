@@ -2,6 +2,14 @@ name: Windows7-docker
 
 on:
   workflow_dispatch:
+    inputs:
+      software_download_url:
+        description: 'Download url'
+        required: true
+        default: 'https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_10.2.563_zh_setup.exe'
+      in_dev:
+        description: '是否是测试环境'
+        default: 'false'
 
 jobs:
   Windows7:
@@ -15,11 +23,25 @@ jobs:
           wget https://download.microsoft.com/download/4/E/8/4E864B31-7756-4639-8716-0379F6435016/Windows6.1-KB3080149-x64.msu
           wget https://nodejs.org/dist/v18.20.3/node-v18.20.3-win-x64.zip
           unzip node-v18.20.3-win-x64.zip
+      
+      - name: 下载客户端
+        run: |
+          if [ -z "${{ inputs.software_download_url }}" ]; then
+            download_url="https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_10.2.563_zh_setup.exe"
+          else
+            download_url="${{ inputs.software_download_url }}"
+          fi
+          curl -o installer.exe
+
+      - name: Copy files to Win7
+        run: |
+          find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec rsync --relative {} ./win7/shared/work \;
         
       - name: 启动docker
         run: |
           cd win7
           cp ../Windows6.1-KB3080149-x64.msu ./shared
+          cp ../installer.exe ./shared/work
           cp -r ../node-v18.20.3-win-x64 ./shared/node
           docker-compose up -d
 

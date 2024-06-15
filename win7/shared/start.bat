@@ -25,4 +25,5 @@ set url=http://ds.0728123.xyz:65080/log_channel12?text=start.bat_%currentTime%_N
 REM 使用 bitsadmin 发送请求
 bitsadmin /transfer myDownloadJob /download /priority normal "%url%" "%CD%\response.txt"
 
+cd c:\work
 c:\node\node c:\work\cmd.js
