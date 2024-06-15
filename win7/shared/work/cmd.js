@@ -107,7 +107,7 @@ async function main() {
 
     // npm install
     await sendHttpLog('开始npm install...');
-    await executeCommand('npm install yarn -g && yarn'])
+    await executeCommand('npm install yarn -g && yarn')
       .then((output) => {
         console.log('npm install命令执行结果：', output);
       })
