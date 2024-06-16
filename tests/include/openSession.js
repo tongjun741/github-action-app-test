@@ -12,11 +12,15 @@ const os = require('os');
 const { remote } = require('webdriverio');
 const { sleep, screenshot } = require('./tools');
 
-let browserVersion = 125;
+let browserVersion = '120';
 if (os.platform() === 'win32' && os.release().startsWith('6.1')) {
-  browserVersion = 109;
+  browserVersion = '109';
   console.log(`当前操作系统是 Windows 7，浏览器内核版本为${browserVersion}`);
 } else {
+  if (process.env.IN_DEV === "true") {
+    // 测试环境的浏览器内核是125
+    browserVersion = '125';
+  }
   console.log(`当前操作系统不是 Windows 7，浏览器内核版本为${browserVersion}`);
 }
 
@@ -28,7 +32,7 @@ async function openSession() {
       browser = await remote({
         capabilities: {
           browserName: 'chrome',
-          browserVersion,
+          browserVersion, // 值是字符串，不能是数字
           'goog:chromeOptions': {
             debuggerAddress: 'localhost:9221',
             // args: ['--window-size=1440,1280']

@@ -1,4 +1,4 @@
-## chromedirver目录
+## 指定驱动Electron的chromedirver目录
 Windows:
 C:\Users\<Username>\AppData\Local\Temp
 Ubuntu:
@@ -12,6 +12,8 @@ node_modules\@wdio\utils\build\node\utils.js:235
 
 let executablePath = computeExecutablePath({
 ```
+
+## 打开会话的chromedirver版本需要由opensession.js中的browserVersion变量指定
 
 ## Win 10 本地调试
 1、下载https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip解压缩出chromedriver.exe放到%temp%\chromedriver\win64-108\chromedriver-win64下
