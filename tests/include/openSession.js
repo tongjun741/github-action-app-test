@@ -18,8 +18,8 @@ if (os.platform() === 'win32' && os.release().startsWith('6.1')) {
   console.log(`当前操作系统是 Windows 7，浏览器内核版本为${browserVersion}`);
 } else {
   if (process.env.IN_DEV === "true") {
-    // 测试环境的浏览器内核是125
-    // browserVersion = '125';
+    // 测试环境的浏览器内核是125.0.6422.150，但没有这个版本的chromedriver，所以换个相近版本的
+    browserVersion = '125.0.6422.60';
   }
   console.log(`当前操作系统不是 Windows 7，浏览器内核版本为${browserVersion}`);
 }
