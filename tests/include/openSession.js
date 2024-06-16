@@ -8,8 +8,17 @@ TODO
 关闭窗口后会话不结束
  */
 
+const os = require('os');
 const { remote } = require('webdriverio');
 const { sleep, screenshot } = require('./tools');
+
+let browserVersion = 125;
+if (os.platform() === 'win32' && os.release().startsWith('6.1')) {
+  browserVersion = 109;
+  console.log(`当前操作系统是 Windows 7，浏览器内核版本为${browserVersion}`);
+} else {
+  console.log(`当前操作系统不是 Windows 7，浏览器内核版本为${browserVersion}`);
+}
 
 async function openSession() {
   let browser = null;
@@ -19,7 +28,7 @@ async function openSession() {
       browser = await remote({
         capabilities: {
           browserName: 'chrome',
-          browserVersion: '120',
+          browserVersion,
           'goog:chromeOptions': {
             debuggerAddress: 'localhost:9221',
             // args: ['--window-size=1440,1280']
