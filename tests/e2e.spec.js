@@ -37,20 +37,26 @@ describe('Electron App Test', () => {
       await $('//span[text()="打开浏览器"]').waitForExist({ timeout: 10 * 1000 });
       await $('//span[text()="打开浏览器"]').click();
 
-      try {
-        // 处理有其他人在访问的情况
-        await $(`//span[text()="继续访问"]`).waitForExist({ timeout: 10 * 1000 })
-        await $(`//span[text()="继续访问"]`).click();
-      } catch (e) {
-      }
+      // 处理有其他人在访问的情况
+      while (true) {
+        try {
+          await $(`//span[text()="继续访问"]`).waitForExist({ timeout: 5 * 1000 })
+          await $(`//span[text()="继续访问"]`).click();
+        } catch (e) {
+        }
 
-      await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 120 * 1000 });
+        try {
+          await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 5 * 1000 });
+          break;
+        } catch (e) {
+        }
+      }
 
       let rs = await openSession().catch(e => {
         errorMsg += e.message + '\n';
         console.error(e);
       });
-      if(rs){
+      if (rs) {
         ipText = rs.ipText;
         sessionScreenshotUrl = rs.sessionScreenshotUrl;
       }
