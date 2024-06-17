@@ -73,15 +73,15 @@ jobs:
           chmod +x frpc
           ./frpc -c ./win7/frpc_16020852.ini &
 
-      - name: 查看日志
-        run: |
-          tail -f win7/share/start.log
-
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
         timeout-minutes: 25
         continue-on-error: true
+
+      - name: 查看日志
+        run: |
+          tail -f win7/share/start.log
 
       - name: 等待测试完成
         run: |
