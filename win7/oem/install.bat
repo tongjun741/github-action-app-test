@@ -27,7 +27,7 @@ xcopy "\\host.lan\Data\work" "c:\work" /E /H /C /I /Y
 REM 设置开机自动启动
 copy "\\host.lan\Data\start.bat" "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\start.bat"
 
-REM 准备chromedriver.exe
+REM 准备chromedriver.exe  108
 set SOURCE_PATH=C:\work\chromedriver.exe
 set TARGET_DIR=%TEMP%\chromedriver\win64-108\chromedriver-win64
 REM 创建目标目录（如果不存在）
@@ -36,6 +36,17 @@ if not exist "%TARGET_DIR%" (
 )
 
 REM 复制 chromedriver.exe 到目标目录
+copy "%SOURCE_PATH%" "%TARGET_DIR%"
+
+REM 准备chromedriver.exe  109
+set SOURCE_PATH=C:\work\chromedriver\win64-109\chromedriver-win64\chromedriver.exe
+set TARGET_DIR=%TEMP%\chromedriver\win64-109\chromedriver-win64
+REM 创建目标目录（如果不存在）
+if not exist "%TARGET_DIR%" (
+    mkdir "%TARGET_DIR%"
+)
+
+REM 复制 chromedriver.exe 109 到目标目录
 copy "%SOURCE_PATH%" "%TARGET_DIR%"
 
 copy "\\host.lan\Data\Windows6.1-KB3080149-x64.msu" "C:\Windows6.1-KB3080149-x64.msu"
