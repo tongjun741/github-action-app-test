@@ -76,8 +76,9 @@ async function openSession() {
   // console.log(t);
   // await browser.$('//a[text()="定制浏览器首页"]').waitForExist({ timeout: 10 * 1000 });
 
-  // 新开标签页
-  await browser.newWindow('https://ip.sb');
+  // 新开标签页，109中只能用url不能用newWindow
+  await browser.url('https://ip.sb');
+  await sleep(10 * 1000);
   await browser.switchWindow('ip.sb');
   // 执行 JavaScript 脚本以获取浏览器窗口大小并在主进程中输出
   await browser.execute(function() {
