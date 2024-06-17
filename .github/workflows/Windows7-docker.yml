@@ -76,6 +76,7 @@ jobs:
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 25
         continue-on-error: true
 
       - name: 等待测试完成
