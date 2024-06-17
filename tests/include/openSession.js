@@ -25,7 +25,8 @@ async function openSession() {
     await sleep(10 * 1000);
     try {
       let chromeOptions = {};
-      if (1||os.platform() === 'win32' && os.release().startsWith('6.1')) {
+      if (os.platform() === 'win32' && os.release().startsWith('6.1')) {
+        // 下载地址：https://chromedriver.storage.googleapis.com/109.0.5414.74/chromedriver_win32.zip
         chromeOptions.binary = 'C:\\work\\chromedriver\\win64-109\\chromedriver-win64\\chromedriver.exe';
         browserVersion = '109';
         console.log(`当前操作系统是 Windows 7，浏览器内核版本为109，需要手工指定browserVersion为${browserVersion}，chromedriver的路径：${chromeOptions.binary}`);
