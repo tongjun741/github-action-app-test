@@ -47,6 +47,9 @@ async function openSession() {
       await sleep(3 * 1000);
       let title = await browser.getTitle();
       console.log("当前窗口标题是", title);
+      if(!title){
+        throw new Error("窗口标题为空");
+      }
       console.log("分身浏览器连接成功");
     } catch (e) {
       console.log(e)
