@@ -13,28 +13,31 @@ const { remote } = require('webdriverio');
 const { sleep, screenshot } = require('./tools');
 
 let browserVersion = '120';
-if (os.platform() === 'win32' && os.release().startsWith('6.1')) {
-  browserVersion = '109';
-  console.log(`当前操作系统是 Windows 7，浏览器内核版本为${browserVersion}`);
-} else {
-  if (process.env.IN_DEV === "true") {
-    // 测试环境的浏览器内核是125.0.6422.150，但没有这个版本的chromedriver，所以换个相近版本的
-    browserVersion = '125.0.6422.60';
-  }
-  console.log(`当前操作系统不是 Windows 7，浏览器内核版本为${browserVersion}`);
+if (process.env.IN_DEV === "true") {
+  // 测试环境的浏览器内核是125.0.6422.150，但没有这个版本的chromedriver，所以换个相近版本的
+  browserVersion = '125.0.6422.60';
 }
+console.log(`浏览器内核版本为${browserVersion}`);
 
 async function openSession() {
   let browser = null;
   while (true) {
     await sleep(10 * 1000);
     try {
+      let chromeOptions = {};
+      if (1||os.platform() === 'win32' && os.release().startsWith('6.1')) {
+        chromeOptions.binary = 'C:\\work\\chromedriver\\win64-109\\chromedriver-win64\\chromedriver.exe';
+        browserVersion = '109';
+        console.log(`当前操作系统是 Windows 7，浏览器内核版本为109，需要手工指定browserVersion为${browserVersion}，chromedriver的路径：${chromeOptions.binary}`);
+      }
+
       browser = await remote({
         capabilities: {
           browserName: 'chrome',
           browserVersion, // 值是字符串，不能是数字
           'goog:chromeOptions': {
             debuggerAddress: 'localhost:9221',
+            ...chromeOptions,
             // args: ['--window-size=1440,1280']
           }
         },
