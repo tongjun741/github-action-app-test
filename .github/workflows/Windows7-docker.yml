@@ -73,6 +73,12 @@ jobs:
           chmod +x frpc
           ./frpc -c ./win7/frpc_16020852.ini &
 
+      - name: 等待测试开始
+        run: |
+          while [ ! -f "/var/win7/shared/start.log" ]; do
+              sleep 10
+          done
+          
       - name: Setup tmate session5
         if: ${{ !contains(inputs.tmate, 'false') }}
         uses: mxschmitt/action-tmate@v3
