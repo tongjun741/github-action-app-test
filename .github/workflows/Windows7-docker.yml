@@ -85,6 +85,7 @@ jobs:
 
       - name: 等待测试完成
         run: |
+          cat win7/share/start.log
           while [ ! -f "/var/win7/share/done.log" ]; do
               sleep 10
           done
