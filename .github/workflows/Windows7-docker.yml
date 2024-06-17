@@ -78,7 +78,7 @@ jobs:
 
       - name: 等待测试开始
         run: |
-          while [ ! -f "/var/win7/shared/start.log" ]; do
+          while [ ! -f "win7/shared/start.log" ]; do
               sleep 10
           done
           
@@ -95,10 +95,10 @@ jobs:
       - name: 等待测试完成
         run: |
           cat win7/shared/start.log
-          while [ ! -f "/var/win7/shared/done.log" ]; do
+          while [ ! -f "win7/shared/done.log" ]; do
               sleep 10
           done
-          echo "File /var/win7/shared/done.log found!"
+          echo "File win7/shared/done.log found!"
           cat win7/shared/start.log
           cat win7/shared/done.log
           echo "测试结束"
