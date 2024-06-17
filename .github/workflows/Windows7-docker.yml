@@ -81,7 +81,10 @@ jobs:
 
       - name: 等待测试完成
         run: |
-          while ! inotifywait -e create win7/share/done.log; do echo "等待文件 win7/share/done.log 出现..."; done; echo "文件 win7/share/done.log 已经出现"
+          while [ ! -f "/var/win7/share/done.log" ]; do
+              sleep 10
+          done
+          echo "File /var/win7/share/done.log found!"
           cat win7/share/start.log
           cat win7/share/done.log
           echo "测试结束"
