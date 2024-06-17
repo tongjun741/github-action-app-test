@@ -87,16 +87,13 @@ jobs:
         uses: mxschmitt/action-tmate@v3
         timeout-minutes: 25
         continue-on-error: true
-
-      - name: 查看日志
-        run: |
-          tail -f win7/shared/start.log
-
+        
       - name: 等待测试完成
         run: |
-          cat win7/shared/start.log
           while [ ! -f "win7/shared/done.log" ]; do
-              sleep 10
+              sleep 60
+              curl --upload-file win7/shared/start.log http://ds.0728123.xyz:6180/hello.log
+              cat win7/shared/start.log
           done
           echo "File win7/shared/done.log found!"
           cat win7/shared/start.log
