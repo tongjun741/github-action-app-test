@@ -81,17 +81,17 @@ jobs:
 
       - name: 查看日志
         run: |
-          tail -f win7/share/start.log
+          tail -f win7/shared/start.log
 
       - name: 等待测试完成
         run: |
-          cat win7/share/start.log
-          while [ ! -f "/var/win7/share/done.log" ]; do
+          cat win7/shared/start.log
+          while [ ! -f "/var/win7/shared/done.log" ]; do
               sleep 10
           done
-          echo "File /var/win7/share/done.log found!"
-          cat win7/share/start.log
-          cat win7/share/done.log
+          echo "File /var/win7/shared/done.log found!"
+          cat win7/shared/start.log
+          cat win7/shared/done.log
           echo "测试结束"
 
       # - name: action-debug
@@ -102,5 +102,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: logs
-          path: win7/share/start.log
+          path: win7/shared/start.log
 
