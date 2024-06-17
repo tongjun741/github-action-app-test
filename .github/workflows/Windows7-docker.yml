@@ -10,6 +10,9 @@ on:
       in_dev:
         description: '是否是测试环境'
         default: 'false'
+      tmate:
+        description: '是否开启ssh调试'
+        default: 'false'
 
 jobs:
   Windows7:
