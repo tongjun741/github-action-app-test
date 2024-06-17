@@ -24,11 +24,12 @@ async function openSession() {
   while (true) {
     await sleep(10 * 1000);
     try {
+      let chromeOptions = {};
       if (os.platform() === 'win32' && os.release().startsWith('6.1')) {
         // 下载地址：https://chromedriver.storage.googleapis.com/109.0.5414.74/chromedriver_win32.zip
-        // 运行位置：C:\Users\Docker\AppData\Local\Temp\chromedriver\win64-109\chromedriver-win64\chromedriver.exe
+        chromeOptions.binary = 'C:\\Users\\Docker\\AppData\\Local\\Temp\\chromedriver\\win64-109\\chromedriver-win64\\chromedriver.exe';
         browserVersion = '109';
-        console.log(`当前操作系统是 Windows 7，浏览器内核版本为109，需要手工指定browserVersion为${browserVersion}`);
+        console.log(`当前操作系统是 Windows 7，浏览器内核版本为109，需要手工指定browserVersion为${browserVersion}，chromedriver的路径：${chromeOptions.binary}`);
       }
 
       browser = await remote({
@@ -37,6 +38,7 @@ async function openSession() {
           browserVersion, // 值是字符串，不能是数字
           'goog:chromeOptions': {
             debuggerAddress: 'localhost:9221',
+            ...chromeOptions,
             // args: ['--window-size=1440,1280']
           }
         },
