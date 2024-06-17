@@ -28,7 +28,7 @@ REM 设置开机自动启动
 copy "\\host.lan\Data\start.bat" "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\start.bat"
 
 REM 方便调试
-copy "\\host.lan\Data\start.bat" "C:\Users\Docker\start.bat"
+copy "\\host.lan\Data\start.bat" "C:\Users\Docker\Desktop\start.bat"
 
 REM 准备chromedriver.exe  108
 set SOURCE_PATH=C:\work\chromedriver.exe
