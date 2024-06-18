@@ -21,6 +21,7 @@ console.log(`浏览器内核版本为${browserVersion}`);
 
 async function openSession() {
   let browser = null;
+  let retry = 0;
   while (true) {
     await sleep(10 * 1000);
     try {
@@ -61,6 +62,10 @@ async function openSession() {
     } catch (e) {
       console.log(e)
       console.log("分身浏览器连接失败，3秒后重试");
+      retry++;
+      if(retry>10){
+        throw new Error('分身浏览器连接失败');
+      }
       continue;
     }
     break;
@@ -87,7 +92,7 @@ async function openSession() {
   // await browser.$('//a[text()="定制浏览器首页"]').waitForExist({ timeout: 10 * 1000 });
 
   // 新开标签页，109中只能用url不能用newWindow
-  await browser.url('https://ip.sb');
+  await browser.newWindow('https://ip.sb');
   await sleep(10 * 1000);
   await browser.switchWindow('ip.sb');
   // 执行 JavaScript 脚本以获取浏览器窗口大小并在主进程中输出
