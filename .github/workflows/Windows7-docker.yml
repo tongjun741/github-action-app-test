@@ -49,6 +49,8 @@ jobs:
             "PRODUCT_WDIO_PASSWORD": "'"${PRODUCT_WDIO_PASSWORD}"'",
             "IN_DEV": "'"${IN_DEV}"'",
             "FEISHU_TOKEN": "'"${FEISHU_TOKEN}"'",
+            "LOGGER_SERVER": "'"${LOGGER_SERVER}"'",
+            "TRANSITER_SH_SERVER": "'"${TRANSITER_SH_SERVER}"'",
             "DOWNLOAD_URL": "'"${DOWNLOAD_URL}"'"
           }' > passwd.json
       
