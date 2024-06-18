@@ -27,16 +27,8 @@ jobs:
         run: |
           if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
             echo "Running on an Apple Silicon (M1) chip"
-            if [ "${{ inputs.is_arm }}" == "false" ]; then
-              echo "Input parameter is_arm is false, exiting workflow..."
-              exit 1
-            fi
           else
             echo "Running on an Intel chip"
-            if [ "${{ inputs.is_arm }}" == "true" ]; then
-              echo "Input parameter is_arm is true, exiting workflow..."
-              exit 1
-            fi
           fi
 
       - uses: actions/checkout@v4
