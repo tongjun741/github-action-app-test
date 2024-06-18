@@ -105,6 +105,10 @@ async function main() {
 
     // 安装.exe文件
     while (true) {
+      if (fs.existsSync('C:\\Users\\Docker\\Desktop\\花漾客户端.lnk')) {
+        await sendHttpLog('桌面有花漾客户端.lnk，安装成功');
+        break;
+      }
       await sendHttpLog('开始安装.exe文件...');
       await executeCommand(exeName, [`/S`, ` 2>NUL`])
         .then((output) => {
@@ -113,9 +117,6 @@ async function main() {
         .catch((error) => {
           console.error('安装命令执行出错：', error);
         });
-      if(fs.existsSync('C:\\Users\\Docker\\Desktop\\花漾客户端.lnk')){
-        break;
-      }
       await sendHttpLog('安装.exe文件失败，重试');
     }
 
