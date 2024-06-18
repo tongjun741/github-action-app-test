@@ -106,6 +106,7 @@ jobs:
           DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
           IN_DEV: ${{ github.event.inputs.in_dev }}
           FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
+          FEISHU_ME: ${{ secrets.FEISHU_ME }}
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: yarn wdio
