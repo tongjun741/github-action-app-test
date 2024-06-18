@@ -143,7 +143,7 @@ async function main() {
     // 标记任务结束
     try {
       // 文件输出到了done.log
-      const logFilePath = path.join(__dirname, '\\\\host.lan\\Data\\done.log');
+      const logFilePath = '\\\\host.lan\\Data\\done.log';
       const currentTime = new Date().toString() + '\n';
       fs.appendFileSync(logFilePath, currentTime);
       console.error(`Current time appended to ${logFilePath}`);
