@@ -9,7 +9,7 @@ const passwdData = JSON.parse(passwdJson);
 
 // 异步执行命令并输出标准输出内容
 const executeCommand = async (command, args) => {
-  await sendHttpLog(`开始执行命令：${command} ${args}`);
+  await sendHttpLog(`开始执行命令：${command} ${JSON.stringify({args})}`);
   return new Promise((resolve, reject) => {
     const envVars = {
       "NODE_SKIP_PLATFORM_CHECK": 1,
@@ -38,11 +38,11 @@ const executeCommand = async (command, args) => {
 
     // 监听命令执行完成事件
     childProcess.on('close', (code) => {
-      console.log(`命令执行结束，退出码：${code}`);
+      console.log(`命令【${command} ${JSON.stringify({args})}】执行结束，退出码：${code}`);
       if (code === 0) {
         resolve(stdout);
       } else {
-        reject(new Error(`命令执行失败，退出码：${code}`));
+        reject(new Error(`命令【${command} ${JSON.stringify({args})}】执行失败，退出码：${code}`));
       }
     });
   });
