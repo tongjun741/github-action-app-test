@@ -3,14 +3,15 @@ const login = require('./include/login');
 const openSession = require('./include/openSession');
 const { feishuNotify, screenshot } = require('./include/tools');
 
+global.testData = {
+  startTime: new Date().getTime(),
+  ipText: '',
+  sessionScreenshotUrl: '',
+  errorMsg: '',
+};
+
 describe('Electron App Test', () => {
   it('should open Electron app and perform actions', async () => {
-    let startTime = new Date().getTime();
-    let ipText;
-    let appScreenshotUrl;
-    let sessionScreenshotUrl;
-    let errorMsg = "";
-
     try {
       // 设置浏览器窗口大小
       browser.setWindowSize(1600, 1200);
@@ -53,17 +54,22 @@ describe('Electron App Test', () => {
       }
 
       let rs = await openSession().catch(e => {
-        errorMsg += e.message + '\n';
+        global.testData.errorMsg += e.message + '\n';
         console.error(e);
       });
       if (rs) {
-        ipText = rs.ipText;
-        sessionScreenshotUrl = rs.sessionScreenshotUrl;
+        global.testData.ipText = rs.ipText;
+        global.testData.sessionScreenshotUrl = rs.sessionScreenshotUrl;
       }
     } catch (e) {
-      errorMsg += e.message + '\n';
+      global.testData.errorMsg += e.message + '\n';
       console.error(e);
     }
+  });
+
+  it('report', async () => {
+    const { startTime, ipText, sessionScreenshotUrl, errorMsg } = global.testData;
+    let appScreenshotUrl;
 
     try {
       // 对客户端截图
@@ -78,7 +84,7 @@ describe('Electron App Test', () => {
     if (ipText) {
       msg = `打开会话测试完成！耗时${timeUse.toFixed(2)}分钟，当前IP地址是：${ipText}。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${appScreenshotUrl}`;
     } else {
-      msg = `打开会话测试失败！耗时${timeUse.toFixed(2)}分钟。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${appScreenshotUrl}\n\n${errorMsg}`+`\n<at user_id=\"${process.env.FEISHU_ME}\">me</at>`;
+      msg = `打开会话测试失败！耗时${timeUse.toFixed(2)}分钟。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${appScreenshotUrl}\n\n${errorMsg}` + `\n<at user_id=\"${process.env.FEISHU_ME}\">me</at>`;
     }
     console.log(msg);
     await feishuNotify(msg);
