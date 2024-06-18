@@ -25,34 +25,6 @@ jobs:
         sudo chmod +x ./macOS_VNC/modify_screensharing-14.sh
         sudo ./macOS_VNC/modify_screensharing-14.sh
 
-    - name: 下载并安装客户端
-      env:
-        TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
-      run: |
-        download_url="${TRANSITER_SH_SERVER}/s/HuaYoungApp_Mac_arm64-dev_10.3.5033_zh_setup.dmg"
-        curl -o /tmp/HuaYoungApp_Mac_setup.dmg $download_url
-
-        # 提取链接中的文件名部分
-        filename=$(basename $download_url)
-
-        # 使用正则表达式提取版本号
-        version=""
-        if [[ $filename =~ [0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            version=${BASH_REMATCH[0]}
-            echo "版本号: $version"
-        else
-            echo "无法解析版本号"
-        fi
-          
-        appDir="/Volumes/花漾客户端 ${version}/"
-        if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
-          echo "M1芯片下appPath不一样"
-          appDir="/Volumes/花漾客户端 ${version}-arm64/"
-        fi
-
-        hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
-        sudo cp -R "${appDir}花漾客户端.app" /Applications/
-
     - name: 启动frpc
       run: |
         sed -i "s/user = .*/user = ${{ secrets.FRPC_USER }}/g" macOS_VNC/frpc_15897721.ini
