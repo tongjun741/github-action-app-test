@@ -42,7 +42,7 @@ const screenshot = async (browser, fileName) => {
     const fileStream = fs.createReadStream(filePath);
 
     // 设置请求参数
-    const uploadUrl = `http://ds.0728123.xyz:6180/${fileName}`;
+    const uploadUrl = `${process.env.TRANSITER_SH_SERVER}/${fileName}`;
 
     // 发起请求
     url = "截图上传失败";

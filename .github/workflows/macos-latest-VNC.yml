@@ -26,8 +26,10 @@ jobs:
         sudo ./macOS_VNC/modify_screensharing-14.sh
 
     - name: 下载并安装客户端
+      env:
+        TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
       run: |
-        download_url="http://ds.0728123.xyz:60001/s/HuaYoungApp_Mac_arm64-dev_10.3.5033_zh_setup.dmg"
+        download_url="${TRANSITER_SH_SERVER}/s/HuaYoungApp_Mac_arm64-dev_10.3.5033_zh_setup.dmg"
         curl -o /tmp/HuaYoungApp_Mac_setup.dmg $download_url
 
         # 提取链接中的文件名部分

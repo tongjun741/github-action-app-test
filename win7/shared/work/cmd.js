@@ -57,7 +57,7 @@ function sendHttpLog(logText) {
     const nodeVersion = process.version;
 
     const text = `${currentTime}_NodeVersion_${nodeVersion}_${logText}`;
-    const url = `http://ds.0728123.xyz:65080/log_channel12?text=cmd.js_${text}`;
+    const url = `${passwdData.LOGGER_SERVER}/log_channel12?text=cmd.js_${text}`;
 
     // 解析 URL，以便使用 http.request
     const parsedUrl = new URL(url);
