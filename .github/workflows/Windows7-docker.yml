@@ -40,12 +40,14 @@ jobs:
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
           IN_DEV: ${{ github.event.inputs.in_dev }}
           FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
+          DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
         run: |
           echo '{
             "DEV_WDIO_PASSWORD": "'"${DEV_WDIO_PASSWORD}"'",
             "PRODUCT_WDIO_PASSWORD": "'"${PRODUCT_WDIO_PASSWORD}"'",
             "IN_DEV": "'"${IN_DEV}"'",
-            "FEISHU_TOKEN": "'"${FEISHU_TOKEN}"'"
+            "FEISHU_TOKEN": "'"${FEISHU_TOKEN}"'",
+            "DOWNLOAD_URL": "'"${DOWNLOAD_URL}"'"
           }' > passwd.json
       
       - name: 下载客户端
@@ -100,11 +102,7 @@ jobs:
           cat win7/shared/done.log
           echo "测试结束"
 
-      # - name: action-debug
-      #   uses: fawazahmed0/action-debug@main
-
       - name: Save Logs on Error
-        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: logs
