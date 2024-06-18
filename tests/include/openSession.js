@@ -47,13 +47,15 @@ async function openSession() {
       await sleep(3 * 1000);
       let title = await browser.getTitle();
       console.log("当前窗口标题是", title);
-      await browser.newWindow('https://ip.sb');
-      await sleep(10 * 1000);
-      await browser.switchWindow('ip.sb');
-      title = await browser.getTitle();
-      console.log("当前窗口标题是", title);
-      if(!title){
-        throw new Error("窗口标题为空");
+      if (browserVersion === "109") {
+        await browser.url('https://ip.sb');
+        await sleep(10 * 1000);
+        await browser.switchWindow('ip.sb');
+        title = await browser.getTitle();
+        console.log("当前窗口标题是", title);
+        if (!title) {
+          throw new Error("窗口标题为空");
+        }
       }
       console.log("分身浏览器连接成功");
     } catch (e) {
@@ -89,16 +91,16 @@ async function openSession() {
   await sleep(10 * 1000);
   await browser.switchWindow('ip.sb');
   // 执行 JavaScript 脚本以获取浏览器窗口大小并在主进程中输出
-  await browser.execute(function() {
-      // 使用JavaScript获取浏览器窗口的宽度和高度
-      var windowWidth = window.innerWidth;
-      var windowHeight = window.innerHeight;
-      // 将窗口大小信息返回给WebdriverIO主进程
-      return { width: windowWidth, height: windowHeight };
-  }).then(function(size) {
-      // 在主进程中输出窗口大小信息
-      console.log("浏览器窗口宽度：" + size.width);
-      console.log("浏览器窗口高度：" + size.height);
+  await browser.execute(function () {
+    // 使用JavaScript获取浏览器窗口的宽度和高度
+    var windowWidth = window.innerWidth;
+    var windowHeight = window.innerHeight;
+    // 将窗口大小信息返回给WebdriverIO主进程
+    return { width: windowWidth, height: windowHeight };
+  }).then(function (size) {
+    // 在主进程中输出窗口大小信息
+    console.log("浏览器窗口宽度：" + size.width);
+    console.log("浏览器窗口高度：" + size.height);
   });
   await sleep(3000);
 
