@@ -47,7 +47,7 @@ async function openSession() {
       await sleep(3 * 1000);
       let title = await browser.getTitle();
       console.log("当前窗口标题是", title);
-      await browser.url('https://ip.sb');
+      await browser.newWindow('https://ip.sb');
       await sleep(10 * 1000);
       await browser.switchWindow('ip.sb');
       title = await browser.getTitle();
