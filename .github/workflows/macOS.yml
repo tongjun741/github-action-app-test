@@ -13,14 +13,14 @@ on:
       in_dev:
         description: '是否是测试环境'
         default: 'false'
-      is_arm:
-        description: '是否是ARM版的客户端'
-        default: 'true'
+      runs_on:
+        description: 'macos-latest(arm64)还是macos-12(x64)'
+        default: 'macos-latest'
 
 jobs:
 
   macOS:
-    runs-on: macos-latest
+    runs-on: ${{ github.event.inputs.runs_on }}
 
     steps:
       - name: Check if running on M1 chip # github Action的macOS机器似乎都是M1芯片
