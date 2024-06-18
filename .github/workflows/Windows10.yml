@@ -91,6 +91,8 @@ jobs:
           DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
           IN_DEV: ${{ github.event.inputs.in_dev }}
           FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
+          LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
+          TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: yarn wdio
 
       - name: IP测试
@@ -98,4 +100,6 @@ jobs:
         env:
           PRODUCT_IP_TEST_PASSWORD: ${{ secrets.PRODUCT_IP_TEST_PASSWORD }}
           FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
+          LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
+          TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: node tests\ipTest.js
