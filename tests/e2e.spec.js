@@ -4,7 +4,7 @@ const openSession = require('./include/openSession');
 const { feishuNotify, screenshot } = require('./include/tools');
 
 global.testData = {
-  startTime: new Date().getTime(),
+  startTime: 0,
   ipText: '',
   sessionScreenshotUrl: '',
   errorMsg: '',
@@ -12,6 +12,7 @@ global.testData = {
 
 describe('Electron App Test', () => {
   it('should open Electron app and perform actions', async () => {
+    global.testData.startTime = new Date().getTime();
     try {
       // 设置浏览器窗口大小
       browser.setWindowSize(1600, 1200);
@@ -40,6 +41,11 @@ describe('Electron App Test', () => {
 
       // 处理有其他人在访问的情况
       while (true) {
+        try {
+          await $(`//span[text()="继续访问"]`).waitForExist({ timeout: 5 * 1000 })
+          await $(`//span[text()="继续访问"]`).click();
+        } catch (e) {
+        }
         try {
           await $(`//span[text()="继续访问"]`).waitForExist({ timeout: 5 * 1000 })
           await $(`//span[text()="继续访问"]`).click();
