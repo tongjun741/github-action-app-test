@@ -4,12 +4,12 @@ c:\node\node -v
 REM 等待网络共享文件夹就绪
 set SHARE_PATH=\\host.lan\Data
 
-:CheckShare
-ping -n 1 %SHARE_PATH% >nul
+:MapDrive
+net use %SHARE_PATH% /persistent:no >nul 2>&1
 if errorlevel 1 (
-    echo Network share %SHARE_PATH% is not accessible. Waiting 10 seconds...
+    echo Failed to map %SHARE_PATH%. Waiting 10 seconds...
     timeout /t 10 >nul
-    goto CheckShare
+    goto MapDrive
 )
 
 echo Network share %SHARE_PATH% is accessible.
