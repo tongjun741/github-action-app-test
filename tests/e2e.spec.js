@@ -46,11 +46,6 @@ describe('Electron App Test', () => {
           await $(`//span[text()="继续访问"]`).click();
         } catch (e) {
         }
-        try {
-          await $(`//span[text()="继续访问"]`).waitForExist({ timeout: 5 * 1000 })
-          await $(`//span[text()="继续访问"]`).click();
-        } catch (e) {
-        }
 
         try {
           await $('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 5 * 1000 });
