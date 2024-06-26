@@ -13,6 +13,7 @@ const executeCommand = async (command, args) => {
   return new Promise((resolve, reject) => {
     const envVars = {
       "NODE_SKIP_PLATFORM_CHECK": 1,
+      "IN_WIN7": true,
       "PATH": "c:\\node;" + process.env.PATH
     }
 

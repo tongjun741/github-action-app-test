@@ -25,16 +25,21 @@ describe('Electron App Test', () => {
       }
       await login(config, password);
 
+      let shopName = config.shopName;
+      if(process.env.IN_WIN7==="true"){
+        // win7只有109的浏览器内核，所以要使用特定的分身
+        shopName = config.win7shopName;
+      }
       // 进入分身列表页面
       await $(`.icon-chrome_outline`).waitForExist({ timeout: 10 * 1000 })
       await $(`.icon-chrome_outline`).click();
 
-      await $(`//a[text()="${productConfig.shopName}"]`).waitForExist({ timeout: 10 * 1000 })
+      await $(`//a[text()="${shopName}"]`).waitForExist({ timeout: 10 * 1000 })
       title = await browser.getTitle();
       console.log("标题是", title);
 
       // 进入分身详情页面
-      await $(`//a[text()="${productConfig.shopName}"]`).click();
+      await $(`//a[text()="${shopName}"]`).click();
       // 打开浏览器
       await $('//span[text()="打开浏览器"]').waitForExist({ timeout: 10 * 1000 });
       await $('//span[text()="打开浏览器"]').click();

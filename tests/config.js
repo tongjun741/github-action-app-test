@@ -2,12 +2,14 @@ let devConfig = {
     username: '945b33aa5652@drmail.in',
     teamName: '945b33的团队',
     shopName: 'demo-1',
+    win7shopName: 'UA109',
 };
 
 let productConfig = {
     username: '8606d3fbe819@drmail.in',
     teamName: '用户8606的团队',
     shopName: 'demo-1',
+    win7shopName: 'UA109',
 };
 
 let ipTestConfig = {
