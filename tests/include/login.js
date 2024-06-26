@@ -4,6 +4,18 @@ async function login(config, password, targetBrowser) {
   if (targetBrowser) {
     browser = targetBrowser;
   }
+  
+  while (true) {
+    await sleep(5 * 1000);
+
+    try {
+      // 按标题切换到主窗口
+      // 兼容有首页和默认只有分身页的情况
+      await browser.switchWindow(' - 花漾灵动');
+      break;
+    } catch (e) {
+    }
+  }
 
   await browser.$('div[class*=app-version]').waitForExist({ timeout: 100 * 1000 })
 
