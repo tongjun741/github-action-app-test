@@ -1,5 +1,11 @@
 @echo off
 
+echo Disabling automatic time synchronization...
+reg add "HKLM\SYSTEM\CurrentControlSet\Services\W32Time\TimeProviders\NtpClient" /v "Enabled" /t REG_DWORD /d 0 /f
+net stop w32time
+net start w32time
+echo Automatic time synchronization disabled.
+
 REM 拷贝相关文件
 xcopy "\\host.lan\Data\node" "c:\node" /E /H /C /I /Y
 xcopy "\\host.lan\Data\work" "c:\work" /E /H /C /I /Y
