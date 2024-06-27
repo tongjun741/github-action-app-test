@@ -13,6 +13,7 @@ global.testData = {
 describe('Electron App Test', () => {
   it('should open Electron app and perform actions', async () => {
     global.testData.startTime = new Date().getTime();
+    console.log(`E2E测试开始，当前时间是${new Date().toLocaleString()}`);
     try {
       // 设置浏览器窗口大小
       browser.setWindowSize(1600, 1200);
@@ -23,6 +24,7 @@ describe('Electron App Test', () => {
         config = devConfig;
         password = process.env.DEV_WDIO_PASSWORD || "password";
       }
+      console.log(`开始登录，当前时间是${new Date().toLocaleString()}`);
       await login(config, password);
 
       let shopName = config.shopName;
@@ -59,6 +61,7 @@ describe('Electron App Test', () => {
         }
       }
 
+      console.log(`开始打开会话，当前时间是${new Date().toLocaleString()}`);
       let rs = await openSession().catch(e => {
         global.testData.errorMsg += e.message + '\n';
         console.error(e);
@@ -71,9 +74,11 @@ describe('Electron App Test', () => {
       global.testData.errorMsg += e.message + '\n';
       console.error(e);
     }
+    console.log(`E2E测试结束，当前时间是${new Date().toLocaleString()}`);
   });
 
   it('report', async () => {
+    console.log(`Report开始，当前时间是${new Date().toLocaleString()}`);
     const { startTime, ipText, sessionScreenshotUrl, errorMsg } = global.testData;
     let appScreenshotUrl;
 
