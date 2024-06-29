@@ -8,7 +8,8 @@ let devConfig = {
 let productConfig = {
     username: '8606d3fbe819@drmail.in',
     teamName: '用户8606的团队',
-    shopName: 'demo-1',
+    shopName111: 'demo-1',
+    shopName: 'UA109',
     win7shopName: 'UA109',
 };
 
