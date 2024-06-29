@@ -13,7 +13,7 @@ const { remote } = require('webdriverio');
 const { sleep, screenshot } = require('./tools');
 
 let browserVersion = '120';
-if (process.env.IN_DEV === "true") {
+if (1||process.env.IN_DEV === "true") {
   // 测试环境的浏览器内核是125.0.6422.150，但没有这个版本的chromedriver，所以换个相近版本的
   browserVersion = '125.0.6422.60';
 }
