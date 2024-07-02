@@ -12,9 +12,10 @@ const os = require('os');
 const { remote } = require('webdriverio');
 const { sleep, screenshot } = require('./tools');
 
-let browserVersion = '120';
-if (1||process.env.IN_DEV === "true") {
-  // 测试环境的浏览器内核是125.0.6422.150，但没有这个版本的chromedriver，所以换个相近版本的
+// 当前浏览器内核是125.0.6422.150，但没有这个版本的chromedriver，所以换个相近版本的
+let browserVersion = '125.0.6422.60';
+if (process.env.IN_DEV === "true") {
+  // 如果测试环境上了新内核可以改这个地方
   browserVersion = '125.0.6422.60';
 }
 console.log(`浏览器内核版本为${browserVersion}`);
