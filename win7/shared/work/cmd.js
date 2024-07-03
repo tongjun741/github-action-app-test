@@ -131,6 +131,18 @@ async function main() {
         console.error('npm install命令执行出错：', error);
       });
 
+    // 获取当前用户的用户名，自动创建工作目录
+    const username = process.env.USERNAME;
+    // 构建目标路径
+    const directoryPath = path.join('C:', 'Users', username, 'AppData', 'Roaming', 'HuaYoung');
+    try {
+      // 同步创建目录
+      fs.mkdirSync(directoryPath, { recursive: true });
+      console.log('目录创建成功:', directoryPath);
+    } catch (err) {
+      console.error('创建目录'+directoryPath+'失败:', err);
+    }
+
     // 开始测试
     await sendHttpLog('开始测试...');
     await executeCommand(`yarn`, ['wdio'])
