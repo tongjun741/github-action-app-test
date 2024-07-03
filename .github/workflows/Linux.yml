@@ -65,7 +65,7 @@ jobs:
 
       - name: 自动创建工作目录
         run: |
-          mkdir -p ~/Library/Application\ Support/HuaYoung
+          mkdir -p ~/.config/HuaYoung
       
       # - name: Setup tmate session
       #   uses: mxschmitt/action-tmate@v3
