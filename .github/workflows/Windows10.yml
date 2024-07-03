@@ -81,14 +81,14 @@ jobs:
         run: |
           Write-Output $PWD
           Get-ChildItem -Path "$PWD"
-          
+
       - name: Create directory
         run: |
           mkdir "C:\Users\${{ github.actor }}\AppData\Roaming\HuaYoung"
         shell: cmd
 
       - name: Enable TS
-        if: ${{ !contains(inputs.debug, 'false') }}
+        if: ${{ contains(inputs.debug, 'true') }}
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server'-name "fDenyTSConnections" -Value 0
           Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
@@ -96,7 +96,7 @@ jobs:
           Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
 
       - name: 启动frpc
-        if: ${{ !contains(inputs.debug, 'false') }}
+        if: ${{ contains(inputs.debug, 'true') }}
         run: |
           (Get-Content macOS_VNC/frpc_15897721.ini) -replace "user = .*", "user = $env:FRPC_USER" | Set-Content macOS_VNC/frpc_15897721.ini
           (Get-Content macOS_VNC/frpc_15897721.ini) -replace "remote_port = .*", "remote_port = $env:FRPC_MAC_REMOTE_PORT" | Set-Content macOS_VNC/frpc_15897721.ini
