@@ -95,6 +95,10 @@ jobs:
           
       - name: Install dependencies 👨🏻‍💻
         run: yarn
+
+      - name: 自动创建工作目录
+        run: |
+          mkdir -p ~/Library/Application\ Support/HuaYoung
       
       # - name: Setup tmate session
       #   uses: mxschmitt/action-tmate@v3
