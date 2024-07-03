@@ -84,7 +84,7 @@ jobs:
 
       - name: Create directory
         run: |
-          mkdir "C:\Users\${{ github.actor }}\AppData\Roaming\HuaYoung"
+          mkdir "C:\Users\%USERNAME%\AppData\Roaming\HuaYoung"
         shell: cmd
 
       - name: Enable TS
