@@ -43,8 +43,8 @@ describe('Electron App Test', () => {
       // 进入分身详情页面
       await $(`//a[text()="${shopName}"]`).click();
       // 打开浏览器
-      await $('//span[text()="打开浏览器"]').waitForExist({ timeout: 10 * 1000 });
-      await $('//span[text()="打开浏览器"]').click();
+      await $('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 10 * 1000 });
+      await $('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').click();
 
       // 处理有其他人在访问的情况
       while (true) {
