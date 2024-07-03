@@ -1,6 +1,8 @@
 name: Windows10-Desktop
 
-on: [push, workflow_dispatch]
+on:
+  repository_dispatch:
+    types: [win10-desktop]
 
 jobs:
   build:
