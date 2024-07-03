@@ -81,6 +81,11 @@ jobs:
         run: |
           Write-Output $PWD
           Get-ChildItem -Path "$PWD"
+          
+      - name: Create directory
+        run: |
+          mkdir "C:\Users\${{ github.actor }}\AppData\Roaming\HuaYoung"
+        shell: cmd
 
       - name: Enable TS
         if: ${{ !contains(inputs.debug, 'false') }}
