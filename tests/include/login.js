@@ -27,6 +27,7 @@ async function login(config, password, targetBrowser) {
   const version = await browser.$('div[class*=app-version]').getText();
   console.log("版本号是：", version);
 
+  // 检查当前是登录页面还是团队选择界面
   await browser.waitUntil(async () => {
     return await browser.$('//div[text()="邮箱登录"]').isExisting() ||
       await browser.$(`//span[text()="${config.teamName}"]`).isExisting();
@@ -35,6 +36,13 @@ async function login(config, password, targetBrowser) {
     interval: 500   // 检查间隔时间，单位：毫秒
   });
 
+  // 服务器不可用，等待服务器恢复
+  while (await browser.$('//div[contains(concat(" ", normalize-space(@class), " "), " marquee-container ")]//span[contains(., "请检查您的网络是否通畅")]').isExisting()) {
+    console.log("服务器不可用，等待服务器恢复")
+    await sleep(60 * 1000);
+  }
+
+  // 当前是登录页面，开始登录
   if (await browser.$('//div[text()="邮箱登录"]').isExisting()) {
     await browser.$(`//div[text()="邮箱登录"]`).click();
     await browser.$('#account').setValue(config.username);
