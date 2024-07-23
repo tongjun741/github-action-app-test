@@ -1,13 +1,10 @@
 const path = require('path');
 const os = require('os');
-const fs = require('fs');
-const asar = require('asar');
 
-let exePath, appAsarPath;
+let exePath;
 let extCapabilities = {};
 if (os.platform() === 'darwin') {
     exePath = "/Applications/花漾客户端.app/Contents/MacOS/花漾客户端";
-    appAsarPath = "/Applications/花漾客户端.app/Contents/Resources/app/app.asar";
     extCapabilities = {
         'wdio:chromedriverOptions': {
             cacheDir: '/tmp'
@@ -15,49 +12,10 @@ if (os.platform() === 'darwin') {
     }
 } else if (os.platform() === 'linux') {
     exePath = "/opt/花漾客户端/huayoung";
-    appAsarPath = "/opt/花漾客户端/resources/app/app.asar";
 }else{
     exePath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', '花漾客户端.exe');
-    appAsarPath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', 'resources', 'app', 'app.asar');
 }
 
-// 解压到的临时目录
-const tempDir = `${appAsarPath}_tmp`;
-
-try {
-  // 同步解压 .asar 文件
-  asar.extractAllSync(asarFilePath, tempDir);
-  console.log(`Extracted ${asarFilePath} to ${tempDir}`);
-
-  // 执行修改 main.js 的操作
-  // 在 tempDir 中找到 main.js，修改它的内容
-  const mainJsPath = path.join(tempDir, 'main.js');
-  /**
-   * 需要将main.js的
-   * this.remoteDebugPort&&t.push
-   * 替换成：
-  this.remoteDebugPort=9221;t.push
-
-  将
-  t.push(...this.browserSwitches.split("\n"));
-  替换成：
-  t.push(...this.browserSwitches.split("\n"));t.push("--window-size=1000,600");
-  */
-  let fileContent = fs.readFileSync(mainJsPath, 'utf8');
-  // 进行内容替换，默认开启9221调试端口
-  fileContent = fileContent.replace(/this\.remoteDebugPort\s*&&\s*t\.push/g, 'this.remoteDebugPort = 9221; t.push');
-  // 进行内容替换，设置分身浏览器窗口大小
-  fileContent = fileContent.replace('t.push(...this.browserSwitches.split("\\n"));', 't.push(...this.browserSwitches.split("\\n"));t.push("--window-size=1920,1080");');
-  // 写入替换后的内容到main.js文件
-  fs.writeFileSync(mainJsPath, fileContent, 'utf8');
-  console.log('main.js替换完成');
-
-  // 同步重新打包修改后的内容
-  asar.createPackageSync(tempDir, asarFilePath);
-  console.log(`Successfully replaced ${asarFilePath} with modified version.`);
-} catch (err) {
-  console.error(`Error: ${err.message}`);
-}
 
 exports.config = {    //
     // ====================
