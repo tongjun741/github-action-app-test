@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "test": "xvfb-maybe -- playwright test",
-    "wdio": "wdio run ./wdio.conf.js"
+    "wdio": "node modifyMain.js && wdio run ./wdio.conf.js"
   },
   "repository": "https://github.com/electron/electron-quick-start",
   "keywords": [
@@ -29,7 +29,7 @@
     "@wdio/spec-reporter": "8.38.2"
   },
   "dependencies": {
-    "asar": "^3.2.0",
+    "@electron/asar": "^3.2.10",
     "chromedriver": "^108.0.0"
   }
 }
