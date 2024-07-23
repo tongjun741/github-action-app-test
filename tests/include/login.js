@@ -36,6 +36,8 @@ async function login(config, password, targetBrowser) {
     interval: 500   // 检查间隔时间，单位：毫秒
   });
 
+  // 等待10s确认服务器是否可用
+  await sleep(10 * 1000);
   // 服务器不可用，等待服务器恢复
   while (await browser.$('//div[contains(concat(" ", normalize-space(@class), " "), " marquee-container ")]//span[contains(., "请检查您的网络是否通畅")]').isExisting()) {
     console.log("服务器不可用，等待服务器恢复")
