@@ -29,6 +29,7 @@
     "@wdio/spec-reporter": "8.38.2"
   },
   "dependencies": {
+    "asar": "^3.2.0",
     "chromedriver": "^108.0.0"
   }
 }
