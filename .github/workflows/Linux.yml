@@ -67,8 +67,8 @@ jobs:
         run: |
           mkdir -p ~/.config/HuaYoung
       
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
 
       - name: E2E Test for Electron 🧪
         env:
@@ -82,4 +82,5 @@ jobs:
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: |
           sudo chmod a+w /opt/花漾客户端/resources/app.asar
-          DISPLAY=:99 sudo node modifyMain.js && yarn wdio
+          sudo node modifyMain.js
+          DISPLAY=:99 yarn wdio
