@@ -2,6 +2,7 @@ name: Notify on Failure
 
 on:
   workflow_run:
+    workflows: [Windows10, Windows7-docker, macOS, Ubuntu]
     types:
       - completed
 
