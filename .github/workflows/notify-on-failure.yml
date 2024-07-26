@@ -12,12 +12,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Print GitHub Event
-        env:
-          GITHUB_EVENT: ${{ toJson(github.event) }}  # 将事件信息转换为 JSON 字符串
-        run: |
-          echo "GitHub Event:"
-          echo "${GITHUB_EVENT}"  # 打印 GitHub 事件的详细信息
+      # - name: Print GitHub Event
+      #   env:
+      #     GITHUB_EVENT: ${{ toJson(github.event) }}  # 将事件信息转换为 JSON 字符串
+      #   run: |
+      #     echo "GitHub Event:"
+      #     echo "${GITHUB_EVENT}"  # 打印 GitHub 事件的详细信息
 
       - name: Send notification to Feishu
         env:

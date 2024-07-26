@@ -24,9 +24,9 @@ jobs:
 
     steps:
 
-      - name: Intentionally Fail
-        run: exit 1  # 此处退出状态为1，表示故意失败
-        
+      # - name: Intentionally Fail
+      #   run: exit 1  # 此处退出状态为1，表示故意失败
+
       - name: Check if running on M1 chip # github Action的macOS机器似乎都是M1芯片
         run: |
           if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
