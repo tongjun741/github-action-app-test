@@ -12,9 +12,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
       - name: Send notification to Feishu
         env:
           FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
