@@ -20,10 +20,4 @@ jobs:
           FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
           FEISHU_ME: ${{ secrets.FEISHU_ME }}
         run: |
-          curl -X POST -H "Content-Type: application/json" -d '{
-              "content": {
-                "text": `【花漾】Workflow failed: '${{ github.event.workflow_run.event }}' on '${{ github.repository }}'\n<at user_id=\"${FEISHU_ME}\">me</at>`
-              },
-              "title": "GitHub Actions Notification",
-              "msg_type": "text"
-          }' https://open.feishu.cn/open-apis/bot/v2/hook/$FEISHU_TOKEN
+          curl -X POST -H "Content-Type: application/json" -d '{"content":{"text": "【花漾】Workflow failed: '${{ github.event.workflow_run.event }}' on '${{ github.repository }}'\n<at user_id=\"${FEISHU_ME}\">me</at>"},"msg_type":"text"}' https://open.feishu.cn/open-apis/bot/v2/hook/$FEISHU_TOKEN
