@@ -82,4 +82,4 @@ jobs:
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: |
           sudo chmod a+w /opt/花漾客户端/resources/app.asar
-          DISPLAY=:99 yarn wdio
+          DISPLAY=:99 sudo node modifyMain.js && yarn wdio

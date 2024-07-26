@@ -143,6 +143,9 @@ async function main() {
       console.error('创建目录'+directoryPath+'失败:', err);
     }
 
+    await sendHttpLog('修改main.js...');
+    await executeCommand(`node`, ['modifyMain.js'])
+
     // 开始测试
     await sendHttpLog('开始测试...');
     await executeCommand(`yarn`, ['wdio'])

@@ -99,9 +99,9 @@ jobs:
       - name: 自动创建工作目录
         run: |
           mkdir -p ~/Library/Application\ Support/HuaYoung
-      
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
+
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
 
       - name: E2E Test for Electron 🧪
         env:
@@ -113,4 +113,4 @@ jobs:
           FEISHU_ME: ${{ secrets.FEISHU_ME }}
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
-        run: yarn wdio
+        run: sudo node modifyMain.js && yarn wdio

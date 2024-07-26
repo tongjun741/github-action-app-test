@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "test": "xvfb-maybe -- playwright test",
-    "wdio": "node modifyMain.js && wdio run ./wdio.conf.js"
+    "wdio": "wdio run ./wdio.conf.js"
   },
   "repository": "https://github.com/electron/electron-quick-start",
   "keywords": [
