@@ -48,6 +48,10 @@ async function main() {
     await browser.$(`.icon-IP_24`).waitForExist({ timeout: 10 * 1000 })
     await browser.$(`.icon-IP_24`).click();
 
+    // 展开菜单
+    await browser.$(`div.icon-gengduo_24`).waitForExist({ timeout: 10 * 1000 })
+    await browser.$(`div.icon-gengduo_24`).click();
+    
     await browser.$(`//span[text()="质量测试"]`).waitForExist({ timeout: 10 * 1000 })
     title = await browser.getTitle();
     console.log("标题是", title);
