@@ -78,11 +78,11 @@ async function main() {
       await browser.$(`.dm-table-footer div.icon-gengduo_24`).click();
       
       // 等待质量测试按钮可用
-      await browser.$(`//button[not(self::node()[contains(concat(" ",normalize-space(@class)," "),"disabled")])]//span[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 });
+      await browser.$(`//*[contains(concat(" ",normalize-space(@class)," ")," dm-table-footer ")]//span[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 });
       totalCount = await browser.$(`.pagination > div >span`).getText();
-      await browser.$(`//span[text()="质量测试"]`).click();
+      await browser.$(`//*[contains(concat(" ",normalize-space(@class)," ")," dm-table-footer ")]//span[text()="质量测试"]`).click();
       console.log('等待测试完成，1小时超时');
-      await browser.$(`//button[not(self::node()[contains(concat(" ",normalize-space(@class)," "),"ant-btn-loading")])]//span[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 });
+      await browser.$(`//*[contains(concat(" ",normalize-space(@class)," ")," dm-table-footer ")]//span[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 });
       await sleep(5 * 1000);
 
       if (await browser.$('.icon-angle-right_24:not(.disabled)').isExisting()) {
