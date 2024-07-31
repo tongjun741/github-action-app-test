@@ -74,8 +74,8 @@ async function main() {
       console.log('开始测试');
 
       // 展开菜单
-      await browser.$(`div.icon-gengduo_24`).waitForExist({ timeout: 10 * 1000 })
-      await browser.$(`div.icon-gengduo_24`).click();
+      await browser.$(`.dm-table-footer div.icon-gengduo_24`).waitForExist({ timeout: 10 * 1000 })
+      await browser.$(`.dm-table-footer div.icon-gengduo_24`).click();
       
       // 等待质量测试按钮可用
       await browser.$(`//button[not(self::node()[contains(concat(" ",normalize-space(@class)," "),"disabled")])]//span[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 });
