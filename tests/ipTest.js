@@ -76,13 +76,22 @@ async function main() {
       // 展开菜单
       await browser.$(`.dm-table-footer div.icon-gengduo_24`).waitForExist({ timeout: 10 * 1000 })
       await browser.$(`.dm-table-footer div.icon-gengduo_24`).click();
-      
+      await sleep(5 * 1000);
+
       // 等待质量测试按钮可用
-      await browser.$(`//*[contains(concat(" ",normalize-space(@class)," ")," dm-table-footer ")]//span[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 });
+      await browser.$(`//*[contains(concat(" ",normalize-space(@class)," ")," ant-dropdown-placement-topCenter ")]//span[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 });
       totalCount = await browser.$(`.pagination > div >span`).getText();
-      await browser.$(`//*[contains(concat(" ",normalize-space(@class)," ")," dm-table-footer ")]//span[text()="质量测试"]`).click();
+      console.log(`总共有${totalCount}个IP`);
+      await browser.$(`//*[contains(concat(" ",normalize-space(@class)," ")," ant-dropdown-placement-topCenter ")]//span[text()="质量测试"]`).click();
       console.log('等待测试完成，1小时超时');
-      await browser.$(`//*[contains(concat(" ",normalize-space(@class)," ")," dm-table-footer ")]//span[text()="质量测试"]`).waitForExist({ timeout: 60 * 60 * 1000 });
+      await browser.$(`.dm-table-footer div.icon-gengduo_24`).moveTo();
+      await browser.$(`.dm-table-footer div.icon-gengduo_24`).waitUntil(async function () {
+        return !(await browser.$(`.ant-dropdown-placement-topCenter .ant-btn-loading-icon`).isExisting())
+      }, {
+        timeout: 60 * 60 * 1000,
+        timeoutMsg: '质量测试1小时都没有结束'
+      });
+      console.log('本页质量测试完成');
       await sleep(5 * 1000);
 
       if (await browser.$('.icon-angle-right_24:not(.disabled)').isExisting()) {
