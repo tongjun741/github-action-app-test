@@ -81,6 +81,8 @@ jobs:
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: |
-          sudo chmod -f a+w /opt/花漾客户端/resources/app.asar
+          if [ -f "/opt/花漾客户端/resources/app.asar" ]; then
+            sudo chmod a+w /opt/花漾客户端/resources/app.asar
+          fi
           sudo node modifyMain.js
           DISPLAY=:99 yarn wdio
