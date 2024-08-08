@@ -4,44 +4,50 @@ const fs = require('fs');
 const asar = require('@electron/asar');
 
 async function main() {
-    let asarFilePath;
+    let asarFilePath, tempDir, mainJsPath;
     if (os.platform() === 'darwin') {
         asarFilePath = "/Applications/花漾客户端.app/Contents/Resources/app.asar";
+        mainJsPath = "/Applications/花漾客户端.app/Contents/Resources/app/main.js";
     } else if (os.platform() === 'linux') {
         asarFilePath = "/opt/花漾客户端/resources/app.asar";
+        mainJsPath = "/opt/花漾客户端/resources/app/main.js";
     } else {
         asarFilePath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', 'resources', 'app.asar');
+        mainJsPath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', 'resources', 'app', 'main.js');
     }
 
-    // 解压到的临时目录
-    const tempDir = `${asarFilePath}_tmp`;
+    if (fs.existsSync(asarFilePath)) {
+        console.log("当前客户端用了asar压缩包格式");
+        // 如果是asar压缩包格式需要先解压到的临时目录
+        tempDir = `${asarFilePath}_tmp`;
 
-    // 检查 tempDir 是否存在，存在则同步删除
-    try {
-        const stats = await fs.statSync(tempDir);
-        if (stats.isDirectory()) {
-            await fs.rmdirSync(tempDir, { recursive: true });
-            console.log(`Deleted existing temporary directory ${tempDir}`);
+        // 检查 tempDir 是否存在，存在则同步删除
+        try {
+            const stats = await fs.statSync(tempDir);
+            if (stats.isDirectory()) {
+                await fs.rmdirSync(tempDir, { recursive: true });
+                console.log(`Deleted existing temporary directory ${tempDir}`);
+            }
+        } catch (err) {
+            // 如果目录不存在或删除失败，可以忽略错误继续操作
+            if (err.code !== 'ENOENT') {
+                throw err;
+            }
         }
-    } catch (err) {
-        // 如果目录不存在或删除失败，可以忽略错误继续操作
-        if (err.code !== 'ENOENT') {
-            throw err;
-        }
-    }
 
-    try {
-        // 解压 .asar 文件
-        asar.extractAll(asarFilePath, tempDir);
-        console.log(`Extracted ${asarFilePath} to ${tempDir}`);
-    } catch (err) {
-        console.error(`Error Extracted asar package: ${err.message}`);
+        try {
+            // 解压 .asar 文件
+            asar.extractAll(asarFilePath, tempDir);
+            console.log(`Extracted ${asarFilePath} to ${tempDir}`);
+        } catch (err) {
+            console.error(`Error Extracted asar package: ${err.message}`);
+        }
+
+        // 在 tempDir 中找到 main.js，修改它的内容
+        mainJsPath = path.join(tempDir, 'main.js');
     }
 
     // 执行修改 main.js 的操作
-    // 在 tempDir 中找到 main.js，修改它的内容
-    const mainJsPath = path.join(tempDir, 'main.js');
-    // 这里可以根据需要修改 main.js 的内容，比如更改代码逻辑或修复 bug
     /**
      * 需要将main.js的
      * this.remoteDebugPort&&t.push
@@ -62,12 +68,15 @@ async function main() {
     fs.writeFileSync(mainJsPath, fileContent, 'utf8');
     console.log('main.js替换完成');
 
-    try {
-        // 重新打包修改后的内容
-        asar.createPackage(tempDir, asarFilePath);
-        console.log(`Successfully replaced ${asarFilePath} with modified version.`);
-    } catch (err) {
-        console.error(`Error creating asar package: ${err.message}`);
+    if (fs.existsSync(asarFilePath)) {
+        // 如果是asar压缩包格式需要重新打包修改后的内容
+        try {
+            // 重新打包修改后的内容
+            asar.createPackage(tempDir, asarFilePath);
+            console.log(`Successfully replaced ${asarFilePath} with modified version.`);
+        } catch (err) {
+            console.error(`Error creating asar package: ${err.message}`);
+        }
     }
 
 }
