@@ -1,0 +1,45 @@
+name: Windows10Screenshot
+
+on:
+  repository_dispatch:
+    types: [win10-start]
+    
+  workflow_dispatch:
+    inputs:
+      software_download_url:
+        description: 'Download url'
+        required: true
+        default: 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.6.719_zh_setup.exe'
+
+
+jobs:
+  screenshot:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up PowerShell script for screenshot
+      run: |
+        $script = @"
+        Add-Type -AssemblyName System.Windows.Forms
+        Add-Type -AssemblyName System.Drawing
+
+        $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+        $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+        $bitmap.Save('screenshot.png', [System.Drawing.Imaging.ImageFormat]::Png)
+        "@
+        Set-Content -Path screenshot.ps1 -Value $script
+
+    - name: Run PowerShell script to take screenshot
+      run: |
+        pwsh ./screenshot.ps1
+
+    - name: Upload screenshot
+      uses: actions/upload-artifact@v3
+      with:
+        name: screenshot
+        path: screenshot.png
