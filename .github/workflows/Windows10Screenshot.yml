@@ -2,16 +2,8 @@ name: Windows10Screenshot
 
 on:
   repository_dispatch:
-    types: [win10-start]
+    types: [win10-screenshot]
     
-  workflow_dispatch:
-    inputs:
-      software_download_url:
-        description: 'Download url'
-        required: true
-        default: 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.6.719_zh_setup.exe'
-
-
 jobs:
   screenshot:
     runs-on: windows-latest
@@ -24,7 +16,7 @@ jobs:
         pwsh ./screenCapture.ps1
 
     - name: Upload screenshot
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: screenshot
         path: screenshot.png
