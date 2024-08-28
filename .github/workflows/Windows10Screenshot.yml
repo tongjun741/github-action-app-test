@@ -24,13 +24,14 @@ jobs:
       run: |
         $script = @"
         Add-Type -AssemblyName System.Windows.Forms
-        Add-Type -AssemblyName System.Drawing
-
-        $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-        $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
-        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-        $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
-        $bitmap.Save('screenshot.png', [System.Drawing.Imaging.ImageFormat]::Png)
+        $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+        $image = New-Object System.Drawing.Bitmap($screen.Width, $screen.Height)
+        $graphic = [System.Drawing.Graphics]::FromImage($image)
+        $point = New-Object System.Drawing.Point(0, 0)
+        $graphic.CopyFromScreen($point, $point, $image.Size)
+        $cursorBounds = New-Object System.Drawing.Rectangle([System.Windows.Forms.Cursor]::Position, [System.Windows.Forms.Cursor]::Current.Size)
+        [System.Windows.Forms.Cursors]::Default.Draw($graphic, $cursorBounds)
+        $image.Save('screenshot.png', [System.Drawing.Imaging.ImageFormat]::Png)
         "@
         Set-Content -Path screenshot.ps1 -Value $script
 
