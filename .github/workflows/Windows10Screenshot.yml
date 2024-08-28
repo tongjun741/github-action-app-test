@@ -18,9 +18,8 @@ jobs:
 
     steps:
     - name: Checkout repository
-
     - uses: actions/checkout@v4
-    
+
     - name: Run PowerShell script to take screenshot
       run: |
         pwsh ./screenCapture.ps1
