@@ -55,7 +55,7 @@ jobs:
 
       - name: Install your_software
         run: |
-          Invoke-WebRequest -Uri "${{ github.event.inputs.software_download_url || 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.0.648_zh_setup.exe' }}" -OutFile "$env:TEMP\your_software_installer.exe"
+          Invoke-WebRequest -Uri "${{ github.event.inputs.software_download_url || 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.6.719_zh_setup.exe' }}" -OutFile "$env:TEMP\your_software_installer.exe"
           Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait
 
       - name: List files in your_software
