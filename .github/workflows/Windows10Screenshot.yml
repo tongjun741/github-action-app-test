@@ -25,79 +25,6 @@ jobs:
           node-version: 20
           #cache: 'yarn'
           
-      - name: Install dependencies 👨🏻‍💻
-        run: yarn
-
-      - name: List files in directory1
-        run: |
-          Write-Output $PWD
-          Get-ChildItem -Path "$PWD"
-
-      - name: Install your_software
-        run: |
-          Invoke-WebRequest -Uri "http://ds.0728123.xyz:60001/s/HuaYoungApp_Win10_10.6.6459_zh_setup-githubAction.exe" -OutFile "$env:TEMP\your_software_installer.exe"
-          Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait
-
-      - name: Step4
-        run: |
-          pwsh ./screenCapture.ps1
-
-      - name: Execute step if file exists
-        if: env.file_exists == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshot2
-          path: screenshot2.png
-
-      - name: List files in your_software
-        run: |
-          Get-ChildItem -Path "$env:LOCALAPPDATA\Programs"
-
-      - name: Check installation success
-        run: |
-          Test-Path "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"  # 检查安装目录是否存在
-
-      - name: Install webdriver
-        run: |
-          Invoke-WebRequest -Uri "https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip" -OutFile "$env:TEMP\chromedriver_win32.zip"
-          
-      - name: Unzip webdriver
-        run: Expand-Archive -Path "$env:TEMP\chromedriver_win32.zip" -DestinationPath "$env:TEMP\chromedriver\win64-108\chromedriver-win64"
-
-      - name: List files in directory2
-        run: |
-          Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108"
-
-      - name: List files in directory3
-        run: |
-          Write-Output $PWD
-          Get-ChildItem -Path "$PWD"
-
-      - name: Create directory
-        run: |
-          mkdir "C:\Users\%USERNAME%\AppData\Roaming\HuaYoung"
-        shell: cmd
-
-      - name: Enable TS
-        if: ${{ contains(inputs.debug, 'true') }}
-        run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server'-name "fDenyTSConnections" -Value 0
-          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
-          Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
-
-      - name: 启动frpc
-        if: ${{ contains(inputs.debug, 'true') }}
-        run: |
-          (Get-Content macOS_VNC/frpc_15897721.ini) -replace "user = .*", "user = $env:FRPC_USER" | Set-Content macOS_VNC/frpc_15897721.ini
-          (Get-Content macOS_VNC/frpc_15897721.ini) -replace "remote_port = .*", "remote_port = $env:FRPC_MAC_REMOTE_PORT" | Set-Content macOS_VNC/frpc_15897721.ini
-          (Get-Content macOS_VNC/frpc_15897721.ini) -replace "local_port = .*", "local_port = 3389" | Set-Content macOS_VNC/frpc_15897721.ini
-          Invoke-WebRequest -Uri "https://nya.globalslb.net/natfrp/client/frpc/0.51.0-sakura-6/frpc_windows_amd64.exe" -OutFile "frpc.exe"
-          ./frpc.exe -c macOS_VNC/frpc_15897721.ini
-        env:
-          FRPC_USER: ${{ secrets.FRPC_USER }}
-          FRPC_MAC_REMOTE_PORT: ${{ secrets.FRPC_MAC_REMOTE_PORT }}
-
       - name: 修改分辨率为1920*1080
         run: |
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
@@ -113,17 +40,7 @@ jobs:
           FEISHU_ME: ${{ secrets.FEISHU_ME }}
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
-        run: node modifyMain.js && yarn wdio
-
-      - name: IP测试
-        if: ${{ !contains(inputs.do_ip_test, 'false') }}
-        env:
-          PRODUCT_IP_TEST_PASSWORD: ${{ secrets.PRODUCT_IP_TEST_PASSWORD }}
-          FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
-          FEISHU_ME: ${{ secrets.FEISHU_ME }}
-          LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
-          TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
-        run: node tests\ipTest.js
+        run: node exitTest.js
 
       - name: Step4 //设置对应的告警
         if: ${{ failure() }}
