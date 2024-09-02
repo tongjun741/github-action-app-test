@@ -4,6 +4,12 @@ on:
   repository_dispatch:
     types: [win10-screenshot]
 
+  workflow_dispatch:
+    inputs:
+      software_download_url:
+        description: 'Download url'
+        default: 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.6.719_zh_setup.exe'
+
 jobs:
 
   Windows10:
