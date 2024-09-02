@@ -18,7 +18,7 @@ $savePath = [System.IO.Path]::Combine($currentDirectory, 'screenshot.png')
 $image.Save($savePath, [System.Drawing.Imaging.ImageFormat]::Png)
 
 # 上传截图
-$uploadUrl = "http://ds.0728123.xyz:6180/screenshot.png"
+$uploadUrl = "$($env:TRANSITER_SH_SERVER)/screenshot.png"
 # 上传文件
 $response = Invoke-RestMethod -Uri $uploadUrl -Method Put -InFile $savePath -ContentType "application/octet-stream"
 $returnedUrl = $response.ToString()
