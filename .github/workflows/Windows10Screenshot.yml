@@ -59,7 +59,7 @@ jobs:
           }
 
       - name: Execute step if file exists
-        if: env.file_exists == 'true'
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: screenshot
