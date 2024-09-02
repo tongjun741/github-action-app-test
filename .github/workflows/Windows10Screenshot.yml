@@ -41,22 +41,10 @@ jobs:
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: node exitTest.js
 
-      - name: Step4 //设置对应的告警
+      - name: 失败时截图
         if: ${{ failure() }}
         run: |
           pwsh ./screenCapture.ps1
-
-      - name: Check if screenshot.png exists
-        id: check_file
-        shell: pwsh
-        run: |
-          if (Test-Path -Path "screenshot.png") {
-            Write-Host "File exists"
-            echo "file_exists=true" >> $env:GITHUB_ENV
-          } else {
-            Write-Host "File does not exist"
-            echo "file_exists=false" >> $env:GITHUB_ENV
-          }
 
       - name: Execute step if file exists
         if: ${{ failure() }}
