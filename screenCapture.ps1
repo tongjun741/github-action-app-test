@@ -11,16 +11,22 @@ $cursorBounds = New-Object System.Drawing.Rectangle([System.Windows.Forms.Cursor
 # Get a screenshot
 [System.Windows.Forms.Cursors]::Default.Draw($graphic, $cursorBounds)
 # Save the screenshot as a PNG file
-$image.Save('screenshot.png', [System.Drawing.Imaging.ImageFormat]::Png)
+# 当前目录
+$currentDirectory = Get-Location
+# 图片保存路径
+$savePath = [System.IO.Path]::Combine($currentDirectory, 'screenshot.png')
+$image.Save($savePath, [System.Drawing.Imaging.ImageFormat]::Png)
 
 # 上传截图
-$filePath = "./screenshot.png"
 $uploadUrl = "http://ds.0728123.xyz:6180/screenshot.png"
 # 上传文件
-$response = Invoke-RestMethod -Uri $uploadUrl -Method Put -InFile $filePath -ContentType "application/octet-stream"
+$response = Invoke-RestMethod -Uri $uploadUrl -Method Put -InFile $savePath -ContentType "application/octet-stream"
 $returnedUrl = $response.ToString()
-# 在返回的 URL 的最后一个斜线前插入 "/inline"
-$inlineUrl = $returnedUrl -replace '(\/[^\/]*)$', '/inline$1'
+$uri = [System.Uri]::new($returnedUrl)
+# 构造新的 URL，路径部分最前面插入 "/inline"
+$inlineUrl = $uri.Scheme + "://" + $uri.Host +":$($uri.Port)" + ($uri.AbsolutePath -replace '^/', '/inline/') + $uri.Query + $uri.Fragment
+# 输出最终 URL
+Write-Output $inlineUrl
 
 # 发送飞书通知
 $headers = @{
