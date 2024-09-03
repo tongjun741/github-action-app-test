@@ -35,7 +35,7 @@ $headers = @{
 
 $body = @{
     content = @{
-        text = "【花漾】Workflow failed: $($env:GITHUB_EVENT_WORKFLOW_NAME)`n<at user_id=`"$($env:FEISHU_ME)`">me</at>(github actions request)\n\n屏幕截图：$($inlineUrl)"
+        text = "【花漾】Windows 10 自动化脚本执行失败 <at user_id=`"$($env:FEISHU_ME)`">me</at>(github actions request)`n`n屏幕截图：$($inlineUrl)"
     }
     msg_type = "text"
 } | ConvertTo-Json

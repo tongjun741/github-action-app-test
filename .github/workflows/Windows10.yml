@@ -133,3 +133,20 @@ jobs:
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: node tests\ipTest.js
+
+      - name: 失败时截图
+        if: ${{ failure() }}
+        env:
+          FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
+          FEISHU_ME: ${{ secrets.FEISHU_ME }}
+          LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
+          TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
+        run: |
+          pwsh ./notifyOnWin10Failure.ps1
+
+      - name: 如果有截图就上传到附件
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshot
+          path: screenshot.png
