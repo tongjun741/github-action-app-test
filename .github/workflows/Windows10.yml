@@ -60,7 +60,18 @@ jobs:
           Test-Path "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"
           
       - name: 复制Chrome Driver到指定临时目录
-        run: Copy-Item -Path "./tools/chromedriver_108.0.5359.71_win32.exe" -Destination "$env:TEMP\chromedriver\win64-108\chromedriver-win64\chromedriver.exe"
+        run: |
+          # 目标目录路径
+          $destinationPath = "$env:TEMP\chromedriver\win64-108\chromedriver-win64"
+          $destinationFile = "$destinationPath\chromedriver.exe"
+
+          # 确保目标目录存在
+          if (-not (Test-Path -Path $destinationPath)) {
+              New-Item -Path $destinationPath -ItemType Directory -Force
+          }
+
+          # 执行文件复制
+          Copy-Item -Path "./tools/chromedriver_108.0.5359.71_win32.exe" -Destination $destinationFile -Force
 
       - name: 检查Chrome Driver
         run: |
