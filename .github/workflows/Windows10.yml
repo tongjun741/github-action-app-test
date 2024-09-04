@@ -52,6 +52,8 @@ jobs:
         run: |
           Invoke-WebRequest -Uri "${{ github.event.inputs.software_download_url || 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.6.719_zh_setup.exe' }}" -OutFile "$env:TEMP\your_software_installer.exe"
           Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait
+          # 启动软件
+          Start-Process -FilePath "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"
 
       - name: 检查安装目录是否存在
         run: |
