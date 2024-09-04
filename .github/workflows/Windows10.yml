@@ -48,39 +48,21 @@ jobs:
       - name: Install dependencies 👨🏻‍💻
         run: yarn
 
-      - name: List files in directory1
-        run: |
-          Write-Output $PWD
-          Get-ChildItem -Path "$PWD"
-
-      - name: Install your_software
+      - name: 安装客户端
         run: |
           Invoke-WebRequest -Uri "${{ github.event.inputs.software_download_url || 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.6.719_zh_setup.exe' }}" -OutFile "$env:TEMP\your_software_installer.exe"
           Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait
 
-      - name: List files in your_software
+      - name: 检查安装目录是否存在
         run: |
-          Get-ChildItem -Path "$env:LOCALAPPDATA\Programs"
-
-      - name: Check installation success
-        run: |
-          Test-Path "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"  # 检查安装目录是否存在
-
-      - name: Install webdriver
-        run: |
-          Invoke-WebRequest -Uri "https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip" -OutFile "$env:TEMP\chromedriver_win32.zip"
+          Test-Path "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"
           
-      - name: Unzip webdriver
-        run: Expand-Archive -Path "$env:TEMP\chromedriver_win32.zip" -DestinationPath "$env:TEMP\chromedriver\win64-108\chromedriver-win64"
+      - name: 复制Chrome Driver到指定临时目录
+        run: Copy-Item -Path "./tools/chromedriver_108.0.5359.71_win32.exe" -Destination "$env:TEMP\chromedriver\win64-108\chromedriver-win64\chromedriver.exe"
 
-      - name: List files in directory2
+      - name: 检查Chrome Driver
         run: |
           Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108"
-
-      - name: List files in directory3
-        run: |
-          Write-Output $PWD
-          Get-ChildItem -Path "$PWD"
 
       - name: Create directory
         run: |

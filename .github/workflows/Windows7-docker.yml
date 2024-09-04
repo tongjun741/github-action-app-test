@@ -26,14 +26,6 @@ jobs:
           cd win7
           docker compose up -d
 
-      - name: 下载补丁和nodejs
-        run: |
-          wget https://download.microsoft.com/download/4/E/8/4E864B31-7756-4639-8716-0379F6435016/Windows6.1-KB3080149-x64.msu
-          wget https://nodejs.org/dist/v18.20.3/node-v18.20.3-win-x64.zip
-          wget https://chromedriver.storage.googleapis.com/108.0.5359.71/chromedriver_win32.zip
-          unzip node-v18.20.3-win-x64.zip
-          unzip chromedriver_win32.zip
-
       - name: 保存密码
         env:
           DEV_WDIO_PASSWORD: ${{ secrets.DEV_WDIO_PASSWORD }}
@@ -71,10 +63,12 @@ jobs:
         
       - name: 复制相关文件到虚拟机共享目录
         run: |
-          cd win7
-          cp ../Windows6.1-KB3080149-x64.msu ./shared
+          cd tools
+          unzip node-v18.20.3-win-x64.zip
+          cd ../win7
+          cp ../tools/Windows6.1-KB3080149-x64.msu ./shared
           cp ../installer.exe ./shared/work
-          cp ../chromedriver.exe ./shared/work
+          cp ../tools/chromedriver_108.0.5359.71_win32.exe ./shared/work/chromedriver.exe
           cp ../passwd.json ./shared/work
           cp -r ../node-v18.20.3-win-x64 ./shared/node
 
