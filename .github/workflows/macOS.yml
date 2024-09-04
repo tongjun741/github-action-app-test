@@ -120,3 +120,12 @@ jobs:
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: sudo node modifyMain.js && yarn wdio
+
+      - name: 失败时截图
+        if: ${{ failure() }}
+        env:
+          FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
+          FEISHU_ME: ${{ secrets.FEISHU_ME }}
+          LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
+          TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
+        run: node tests\onError.js
