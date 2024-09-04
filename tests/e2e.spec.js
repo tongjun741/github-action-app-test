@@ -1,7 +1,7 @@
 const { productConfig, devConfig } = require('./config');
 const login = require('./include/login');
 const openSession = require('./include/openSession');
-const { feishuNotify, screenshot } = require('./include/tools');
+const { feishuNotify, screenshot, showResultTable } = require('./include/tools');
 
 global.testData = {
   startTime: 0,
