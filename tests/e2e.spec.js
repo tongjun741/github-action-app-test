@@ -97,6 +97,8 @@ describe('Electron App Test', () => {
     } else {
       msg = `打开会话测试失败！耗时${timeUse.toFixed(2)}分钟。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${appScreenshotUrl}\n\n${errorMsg}` + `\n<at user_id=\"${process.env.FEISHU_ME}\">me</at>`;
     }
+    let rs = await showResultTable(ipText);
+    msg += `${rs}`;
     console.log(msg);
     await feishuNotify(msg);
   });

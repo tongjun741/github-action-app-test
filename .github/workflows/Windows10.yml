@@ -111,6 +111,11 @@ jobs:
         run: |
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
 
+      - name: 下载以前的执行结果
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-result
+
       - name: E2E Test for Electron 🧪
         if: ${{ contains(inputs.do_wdio, 'true') }}
         env:
@@ -123,6 +128,12 @@ jobs:
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: node modifyMain.js && yarn wdio
+
+      - name: 上传新的执行结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-result
+          path: result.json
 
       - name: IP测试
         if: ${{ !contains(inputs.do_ip_test, 'false') }}
@@ -141,12 +152,4 @@ jobs:
           FEISHU_ME: ${{ secrets.FEISHU_ME }}
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
-        run: |
-          pwsh ./notifyOnWin10Failure.ps1
-
-      - name: 如果有截图就上传到附件
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshot
-          path: screenshot.png
+        run: node tests\onError.js

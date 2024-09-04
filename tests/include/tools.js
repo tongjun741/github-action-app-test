@@ -27,17 +27,8 @@ const feishuNotify = async (msg) => {
         });
 }
 
-const screenshot = async (browser, fileName) => {
-    let url = "截图失败";
-
-    // 截图
-    const filePath = path.join(__dirname, fileName);
-    try {
-        await browser.saveScreenshot(filePath);
-    } catch (e) {
-        return `截图失败：${e.message}`;
-    }
-
+const uploadFile = async (filePath) => {
+    let fileName = path.basename(filePath);
     // 读取要上传的文件
     const fileStream = fs.createReadStream(filePath);
 
@@ -90,9 +81,30 @@ const screenshot = async (browser, fileName) => {
             url = `截图上传失败：${error.message}`;
             console.error("Error occurred:", error.message);
         });
+
     return url;
 }
 
+const screenshot = async (browser, fileName) => {
+    let url = "截图失败";
+
+    // 截图
+    const filePath = path.join(__dirname, fileName);
+    try {
+        await browser.saveScreenshot(filePath);
+    } catch (e) {
+        return `截图失败：${e.message}`;
+    }
+
+    url = uploadFile(filePath);
+    return url;
+};
+
+const showResultTable = async (browser, fileName) => {
+    let rs = "";
+    return rs;
+};
+
 module.exports = {
-    sleep, feishuNotify, screenshot
+    sleep, feishuNotify, screenshot, showResultTable, uploadFile
 };
