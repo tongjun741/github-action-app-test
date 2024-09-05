@@ -2251,7 +2251,7 @@
   "resolved" "https://registry.npmmirror.com/node-domexception/-/node-domexception-1.0.0.tgz"
   "version" "1.0.0"
 
-"node-fetch@^2.6.12":
+"node-fetch@^2.6.12", "node-fetch@^2.7.0":
   "integrity" "sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A=="
   "resolved" "https://registry.npmmirror.com/node-fetch/-/node-fetch-2.7.0.tgz"
   "version" "2.7.0"
