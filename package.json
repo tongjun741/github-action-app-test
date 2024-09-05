@@ -31,7 +31,6 @@
   "dependencies": {
     "@electron/asar": "^3.2.10",
     "chromedriver": "^108.0.0",
-    "node-fetch": "^2.7.0",
     "screenshot-desktop": "1.15.0"
   }
 }
