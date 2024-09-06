@@ -161,7 +161,7 @@ const showResultTable = async (isDev) => {
         }).join('\n');
     }
 
-    return str;
+    return "\n\n"+str;
 };
 
 module.exports = {
