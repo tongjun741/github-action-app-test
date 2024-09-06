@@ -83,10 +83,12 @@ jobs:
             echo "M1芯片下chromedirver路径是：/tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/chromedriver"
             mkdir -p /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/
             cp tools/chromedriver/108.0.5359.71/mac-arm64/chromedriver /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/
+            echo "E2E_PLATFORM=macOS-arm64" >> $GITHUB_ENV
           else
             echo "Intel芯片下chromedirver路径是：/tmp/chromedriver/mac-108/chromedriver-mac-x64/chromedriver"
             mkdir -p /tmp/chromedriver/mac-108/chromedriver-mac-x64/
             cp tools/chromedriver/108.0.5359.71/mac-x64/chromedriver /tmp/chromedriver/mac_arm-108/chromedriver-mac-x64/
+            echo "E2E_PLATFORM=macOS-x64" >> $GITHUB_ENV
           fi
 
       - name: Use Node.js 20
@@ -107,7 +109,7 @@ jobs:
 
       - name: E2E Test for Electron 🧪
         env:
-          E2E_PLATFORM: "Mac os"
+          E2E_PLATFORM: ${{ secrets.E2E_PLATFORM }}
           DEV_WDIO_PASSWORD: ${{ secrets.DEV_WDIO_PASSWORD }}
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
           DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
