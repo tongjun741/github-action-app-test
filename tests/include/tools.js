@@ -2,6 +2,11 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 
+const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+const namespaceId = process.env.CLOUDFLARE_KV_NAMESPACE_ID;
+const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+const e2eResultKey = "e2e_test_result";
+
 const sleep = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
 const feishuNotify = async (msg) => {
@@ -100,11 +105,105 @@ const screenshot = async (browser, fileName) => {
     return url;
 };
 
-const showResultTable = async (browser, fileName) => {
-    let rs = "";
-    return rs;
+const saveResult = async (isDev, platform, result) => {
+    let rs = {};
+    // 先取出上次保存的结果
+    try {
+        rs = await getKey(e2eResultKey);
+        console.log(113, JSON.stringify(rs))
+        if (typeof rs !== "object") {
+            rs = {};
+        }
+    } catch (e) {
+        rs = {};
+    }
+
+    // 区分是否测试环境
+    let env = isDev ? 'dev' : 'product';
+    console.log(123, JSON.stringify(rs))
+    if (!rs[env]) {
+        rs[env] = {};
+    }
+    console.log(127, JSON.stringify(rs))
+
+    if (!rs[env][platform]) {
+        rs[env][platform] = [];
+    }
+    console.log(132, JSON.stringify(rs))
+    rs[env][platform].push(result);
+    console.log(134,JSON.stringify(rs))
+    // 最多保留10个结果
+    let maxLength = 10;
+    if (rs[env][platform].length > maxLength) {
+        rs[env][platform] = rs[env][platform].slice(-maxLength);
+    }
+    console.log(139, JSON.stringify(rs))
+
+    // 保存新结果
+    try {
+        rs = JSON.stringify(rs);
+        let putResult = await putKey(e2eResultKey, rs);
+        console.log(putResult);
+    } catch (error) {
+        console.error('保存E2E测试结果失败:', error);
+    }
 };
 
+const showResultTable = async (isDev) => {
+    let rs = {};
+    // 先取出之前保存的测试结果
+    try {
+        rs = await getKey(e2eResultKey);
+        console.log(156, JSON.stringify(rs))
+    } catch (e) {
+        rs = {};
+    }
+
+    // 输出每个平台的最后三次测试结果
+    let env = isDev ? 'dev' : 'product';
+    let str = "";
+    if (rs[env]) {
+        str = Object.keys(rs[env]).map((k) => {
+            let v = rs[env][k];
+            let t = v.slice(-3).join(',');
+            return `${k}: ${t}`;
+        }).join('\n');
+    }
+
+    return str;
+};
+
+async function getKey(key) {
+    try {
+        const response = await axios.get(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/${key}`, {
+            headers: {
+                'Authorization': `Bearer ${apiToken}`,
+                'Content-Type': 'application/json',
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching key:', error);
+        throw error;
+    }
+}
+
+async function putKey(key, value) {
+    try {
+        await sleep(2000);
+        const response = await axios.put(`https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/${key}`, value, {
+            headers: {
+                'Authorization': `Bearer ${apiToken}`,
+                'Content-Type': 'text/plain',
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error putting key:', error);
+        throw error;
+    }
+}
+
 module.exports = {
-    sleep, feishuNotify, screenshot, showResultTable, uploadFile
+    sleep, feishuNotify, screenshot, saveResult, showResultTable, uploadFile
 };
