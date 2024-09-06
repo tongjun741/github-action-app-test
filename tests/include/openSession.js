@@ -52,9 +52,9 @@ async function openSession() {
       let title = await browser.getTitle();
       console.log("当前窗口标题是", title);
       if (browserVersion === "109") {
-        await browser.url('https://ip.sb');
+        await browser.url('https://ipapi.co/');
         await sleep(10 * 1000);
-        await browser.switchWindow('ip.sb');
+        await browser.switchWindow('ipapi.co');
         title = await browser.getTitle();
         console.log("当前窗口标题是", title);
         if (!title) {
@@ -95,9 +95,9 @@ async function openSession() {
   // await browser.$('//a[text()="定制浏览器首页"]').waitForExist({ timeout: 10 * 1000 });
 
   // 新开标签页，109中只能用url不能用newWindow
-  await browser.newWindow('https://ip.sb');
+  await browser.newWindow('https://ipapi.co/');
   await sleep(10 * 1000);
-  await browser.switchWindow('ip.sb');
+  await browser.switchWindow('ipapi.co');
   // 执行 JavaScript 脚本以获取浏览器窗口大小并在主进程中输出
   await browser.execute(function () {
     // 使用JavaScript获取浏览器窗口的宽度和高度
@@ -115,8 +115,8 @@ async function openSession() {
   // 验证页面标题
   title = await browser.getTitle();
   console.log("分身标题是", title);
-  await browser.$('.proto_address a').waitForExist({ timeout: 60 * 1000 });
-  let ipText = await browser.$('.proto_address a').getText();
+  await browser.$('#jumbo-ip').waitForExist({ timeout: 60 * 1000 });
+  let ipText = await browser.$('#jumbo-ip').getAttribute('data-ip');
   console.log(ipText);
 
   // 对分身浏览器截图
