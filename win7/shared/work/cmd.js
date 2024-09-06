@@ -148,7 +148,7 @@ async function main() {
 
     // 开始测试
     await sendHttpLog('开始测试...');
-    await executeCommand(`yarn`, ['wdio'])
+    await executeCommand(`node`, ['tests/start.js', 'e2e'])
       .then((output) => {
         console.log('测试执行结果：', output);
       })

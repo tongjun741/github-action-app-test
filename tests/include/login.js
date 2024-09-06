@@ -6,8 +6,6 @@ async function login(config, password, targetBrowser) {
   }
   
   while (true) {
-    await sleep(5 * 1000);
-
     try {
       // 按标题切换到主窗口
       // 兼容有首页和默认只有分身页的情况
@@ -15,6 +13,7 @@ async function login(config, password, targetBrowser) {
       break;
     } catch (e) {
     }
+    await sleep(2 * 1000);
   }
 
   await browser.$('div[class*=app-version]').waitForExist({ timeout: 100 * 1000 })
@@ -69,7 +68,6 @@ async function login(config, password, targetBrowser) {
   }
   title = await browser.getTitle();
   console.log("标题是", title);
-
 };
 
 module.exports = login;

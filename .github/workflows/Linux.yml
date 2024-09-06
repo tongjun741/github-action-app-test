@@ -83,7 +83,7 @@ jobs:
             sudo chmod a+w /opt/花漾客户端/resources/app.asar
           fi
           sudo node modifyMain.js
-          DISPLAY=:99 yarn wdio
+          DISPLAY=:99 node tests\start.js e2e
 
       - name: 上传前先同步代码
         uses: actions/checkout@v4
@@ -93,12 +93,3 @@ jobs:
           message: '自动上传新的E2E测试结果'
           add: '*.json --force'
           cwd: './e2eTestResult/'
-
-      - name: 失败时截图
-        if: ${{ failure() }}
-        env:
-          FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
-          FEISHU_ME: ${{ secrets.FEISHU_ME }}
-          LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
-          TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
-        run: node tests\onError.js
