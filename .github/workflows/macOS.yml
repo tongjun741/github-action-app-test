@@ -81,16 +81,12 @@ jobs:
         run: |
           if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
             echo "M1芯片下chromedirver路径是：/tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/chromedriver"
-            wget https://chromedriver.storage.googleapis.com/108.0.5359.22/chromedriver_mac_arm64.zip
-            unzip chromedriver_mac_arm64.zip
             mkdir -p /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/
-            mv chromedriver /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/
+            cp tools/chromedriver/108.0.5359.71/mac-arm64/chromedriver /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/
           else
             echo "Intel芯片下chromedirver路径是：/tmp/chromedriver/mac-108/chromedriver-mac-x64/chromedriver"
-            wget https://chromedriver.storage.googleapis.com/108.0.5359.22/chromedriver_mac64.zip
-            unzip chromedriver_mac64.zip
             mkdir -p /tmp/chromedriver/mac-108/chromedriver-mac-x64/
-            mv chromedriver /tmp/chromedriver/mac-108/chromedriver-mac-x64/
+            cp tools/chromedriver/108.0.5359.71/mac-x64/chromedriver /tmp/chromedriver/mac_arm-108/chromedriver-mac-x64/
           fi
 
       - name: Use Node.js 20

@@ -71,7 +71,7 @@ jobs:
           }
 
           # 执行文件复制
-          Copy-Item -Path "./tools/chromedriver_108.0.5359.71_win32.exe" -Destination $destinationFile -Force
+          Copy-Item -Path "./tools/chromedriver/108.0.5359.71/win32/chromedriver.exe" -Destination $destinationFile -Force
 
       - name: 检查Chrome Driver
         run: |

@@ -58,10 +58,7 @@ jobs:
       - name: 准备chromedriver
         run: |
           mkdir -p /tmp/chromedriver/linux-108/chromedriver-linux64
-          cd /tmp/chromedriver/linux-108/chromedriver-linux64
-          wget https://chromedriver.storage.googleapis.com/108.0.5359.22/chromedriver_linux64.zip
-          unzip chromedriver_linux64.zip
-          cd -
+          cp tools/chromedriver/108.0.5359.71/linux64/chromedriver /tmp/chromedriver/linux-108/chromedriver-linux64/
 
       - name: 自动创建工作目录
         run: |

@@ -69,7 +69,7 @@ jobs:
           cd ../win7
           cp ../tools/Windows6.1-KB3080149-x64.msu ./shared
           cp ../installer.exe ./shared/work
-          cp ../tools/chromedriver_108.0.5359.71_win32.exe ./shared/work/chromedriver.exe
+          cp ../tools/chromedriver/108.0.5359.71/win32/chromedriver.exe ./shared/work/chromedriver.exe
           cp ../passwd.json ./shared/work
           cp -r ../node-v18.20.3-win-x64 ./shared/node
 
