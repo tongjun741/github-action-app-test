@@ -1,7 +1,7 @@
 const { productConfig, devConfig } = require('./config');
 const login = require('./include/login');
 const openSession = require('./include/openSession');
-const { feishuNotify, screenshot, showResultTable } = require('./include/tools');
+const { feishuNotify, screenshot, saveResult, showResultTable } = require('./include/tools');
 
 global.testData = {
   startTime: 0,
@@ -9,6 +9,8 @@ global.testData = {
   sessionScreenshotUrl: '',
   errorMsg: '',
 };
+
+let isDev = process.env.IN_DEV === "true";
 
 describe('Electron App Test', () => {
   it('should open Electron app and perform actions', async () => {
@@ -20,7 +22,7 @@ describe('Electron App Test', () => {
 
       let config = productConfig;
       let password = process.env.PRODUCT_WDIO_PASSWORD || "password";
-      if (process.env.IN_DEV === "true") {
+      if (isDev) {
         config = devConfig;
         password = process.env.DEV_WDIO_PASSWORD || "password";
       }
@@ -94,10 +96,12 @@ describe('Electron App Test', () => {
     let timeUse = (new Date().getTime() - startTime) / (60 * 1000);
     if (ipText) {
       msg = `打开会话测试完成！耗时${timeUse.toFixed(2)}分钟，当前IP地址是：${ipText}。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${appScreenshotUrl}`;
+      saveResult(isDev, process.env.E2E_PLATFORM || "--", ipText);
     } else {
       msg = `打开会话测试失败！耗时${timeUse.toFixed(2)}分钟。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${appScreenshotUrl}\n\n${errorMsg}` + `\n<at user_id=\"${process.env.FEISHU_ME}\">me</at>`;
+      saveResult(isDev, process.env.E2E_PLATFORM || "--", "Error");
     }
-    let rs = await showResultTable(ipText);
+    let rs = await showResultTable(isDev);
     msg += `${rs}`;
     console.log(msg);
     await feishuNotify(msg);

@@ -116,6 +116,7 @@ jobs:
       - name: E2E Test for Electron 🧪
         if: ${{ contains(inputs.do_wdio, 'true') }}
         env:
+          E2E_PLATFORM: "Windows 10"
           DEV_WDIO_PASSWORD: ${{ secrets.DEV_WDIO_PASSWORD }}
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
           DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}

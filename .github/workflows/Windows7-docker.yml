@@ -38,6 +38,7 @@ jobs:
           DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
         run: |
           echo '{
+            "E2E_PLATFORM": "'"Windows 7"'",
             "DEV_WDIO_PASSWORD": "'"${DEV_WDIO_PASSWORD}"'",
             "PRODUCT_WDIO_PASSWORD": "'"${PRODUCT_WDIO_PASSWORD}"'",
             "IN_DEV": "'"${IN_DEV}"'",
