@@ -108,6 +108,8 @@ jobs:
           cat win7/shared/done.log
           echo "测试结束"
 
+      - name: 上传前先同步代码
+        uses: actions/checkout@v4
       - name: 上传新的E2E测试结果
         uses: EndBug/add-and-commit@v9
         with:
