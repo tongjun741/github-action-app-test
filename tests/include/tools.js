@@ -161,7 +161,7 @@ const showResultTable = async (isDev) => {
         }).join('\n');
     }
 
-    return "\n\n"+str;
+    return `E2E测试记录汇总：\n${str}\n`;
 };
 
 module.exports = {
