@@ -62,7 +62,11 @@ async function main() {
   let screenshotUrl = "屏幕截图失败";
   try {
     // 屏幕截图
-    await desktopScreenshot({ filename: 'screenshot.png' })
+    let options = { filename: 'screenshot.png' };
+    if (process.env.E2E_PLATFORM === "Ubuntu") {
+      options.screen = 99
+    }
+    await desktopScreenshot(options)
       .then((imagePath) => {
         console.log('Screenshot saved at:', imagePath);
       })

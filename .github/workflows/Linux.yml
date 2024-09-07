@@ -83,6 +83,7 @@ jobs:
           if [ -f "/opt/花漾客户端/resources/app.asar" ]; then
             sudo chmod a+w /opt/花漾客户端/resources/app.asar
           fi
+          sudo apt install x11-xserver-utils
           sudo node modifyMain.js
           DISPLAY=:99 node tests/start.js e2e
 
