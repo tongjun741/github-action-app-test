@@ -59,6 +59,7 @@ jobs:
         run: |
           mkdir -p /tmp/chromedriver/linux-108/chromedriver-linux64
           cp tools/chromedriver/108.0.5359.71/linux64/chromedriver /tmp/chromedriver/linux-108/chromedriver-linux64/
+          chmod +x /tmp/chromedriver/linux-108/chromedriver-linux64/chromedriver
 
       - name: 自动创建工作目录
         run: |
