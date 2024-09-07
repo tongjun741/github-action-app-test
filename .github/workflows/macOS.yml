@@ -118,7 +118,7 @@ jobs:
           FEISHU_ME: ${{ secrets.FEISHU_ME }}
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
-        run: sudo node modifyMain.js && node tests\start.js e2e
+        run: sudo node modifyMain.js && node tests/start.js e2e
 
       - name: 上传前先同步代码
         uses: actions/checkout@v4

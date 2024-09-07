@@ -83,7 +83,7 @@ jobs:
             sudo chmod a+w /opt/花漾客户端/resources/app.asar
           fi
           sudo node modifyMain.js
-          DISPLAY=:99 node tests\start.js e2e
+          DISPLAY=:99 node tests/start.js e2e
 
       - name: 上传前先同步代码
         uses: actions/checkout@v4
