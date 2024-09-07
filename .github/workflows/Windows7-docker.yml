@@ -71,7 +71,7 @@ jobs:
           cp ../installer.exe ./shared/work
           cp ../tools/chromedriver/108.0.5359.71/win32/chromedriver.exe ./shared/work/chromedriver.exe
           cp ../passwd.json ./shared/work
-          cp -r ../node-v18.20.3-win-x64 ./shared/node
+          cp -r ./node-v18.20.3-win-x64 ./shared/node
 
       - name: 启动frpc
         run: |
