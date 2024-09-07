@@ -79,6 +79,7 @@ async function main() {
   let timeUse = (new Date().getTime() - startTime) / (60 * 1000);
   let msg = `${testResult}\n耗时${timeUse.toFixed(2)}分钟\n客户端截图：${appScreenshotUrl}\n屏幕截图：${screenshotUrl}\n\n${errorMsg}`;
   await feishuNotify(msg);
+  process.exit(0);
 }
 
 main();
