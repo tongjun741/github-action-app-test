@@ -3,6 +3,7 @@ const { ipTestConfig } = require('./config');
 const { sleep } = require('./include/tools');
 
 async function ipTest(browser) {
+  let errorMsg = "";
   console.log(`当前任务是IP测试`);
   await login(ipTestConfig, process.env.PRODUCT_IP_TEST_PASSWORD, browser);
     
