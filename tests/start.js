@@ -59,29 +59,37 @@ async function main() {
     console.error(e);
   }
 
-  let screenshotUrl = "屏幕截图失败";
-  try {
-    // 屏幕截图
-    let options = { filename: 'screenshot.png' };
-    if (process.env.E2E_PLATFORM === "Ubuntu") {
-      options.screen = 99
+  let screenshotUrl;
+  if (process.env.E2E_PLATFORM.indexOf('macOS') < 0) {
+    // macOS下无法截屏
+    try {
+      // 屏幕截图
+      let options = { filename: 'screenshot.png' };
+      if (process.env.E2E_PLATFORM === "Ubuntu") {
+        options.screen = 99
+      }
+      await desktopScreenshot(options)
+        .then(async (imagePath) => {
+          console.log('Screenshot saved at:', imagePath);
+          screenshotUrl = await uploadFile('screenshot.png');
+        })
+        .catch((err) => {
+          screenshotUrl = "屏幕截图失败";
+          console.error('Error taking screenshot:', err);
+        });
+    } catch (e) {
+      screenshotUrl = "屏幕截图失败";
+      errorMsg += e.message + '\n';
+      console.error(e);
     }
-    await desktopScreenshot(options)
-      .then((imagePath) => {
-        console.log('Screenshot saved at:', imagePath);
-      })
-      .catch((err) => {
-        console.error('Error taking screenshot:', err);
-      });
-
-    screenshotUrl = await uploadFile('screenshot.png');
-  } catch (e) {
-    errorMsg += e.message + '\n';
-    console.error(e);
   }
 
   let timeUse = (new Date().getTime() - startTime) / (60 * 1000);
-  let msg = `${testResult}\n耗时${timeUse.toFixed(2)}分钟\n客户端截图：${appScreenshotUrl}\n屏幕截图：${screenshotUrl}\n\n${errorMsg}`;
+  let msg = `${testResult}\n耗时${timeUse.toFixed(2)}分钟\n客户端截图：${appScreenshotUrl}`;
+  if (screenshotUrl) {
+    msg += `\n屏幕截图：${screenshotUrl}`;
+  }
+  msg += `\n\n${errorMsg}`;
   await feishuNotify(msg);
   process.exit(0);
 }
