@@ -106,9 +106,6 @@ jobs:
         run: |
           mkdir -p ~/Library/Application\ Support/HuaYoung
 
-      # - name: Setup tmate session
-      #   uses: mxschmitt/action-tmate@v3
-
       - name: E2E Test for Electron 🧪
         env:
           DEV_WDIO_PASSWORD: ${{ secrets.DEV_WDIO_PASSWORD }}
@@ -130,3 +127,6 @@ jobs:
           message: '自动上传新的E2E测试结果'
           add: '*.json --force'
           cwd: './e2eTestResult/'
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
