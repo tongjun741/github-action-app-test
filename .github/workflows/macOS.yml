@@ -87,7 +87,7 @@ jobs:
           else
             echo "Intel芯片下chromedirver路径是：/tmp/chromedriver/mac-108/chromedriver-mac-x64/chromedriver"
             mkdir -p /tmp/chromedriver/mac-108/chromedriver-mac-x64/
-            cp tools/chromedriver/108.0.5359.71/mac-x64/chromedriver /tmp/chromedriver/mac_arm-108/chromedriver-mac-x64/
+            cp tools/chromedriver/108.0.5359.71/mac-x64/chromedriver /tmp/chromedriver/mac-108/chromedriver-mac-x64/
             echo "E2E_PLATFORM=macOS-x64" >> $GITHUB_ENV
           fi
 
