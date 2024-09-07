@@ -68,10 +68,10 @@ jobs:
           unzip node-v18.20.3-win-x64.zip
           cd ../win7
           cp ../tools/Windows6.1-KB3080149-x64.msu ./shared
-          cp ../installer.exe ./shared/work
           cp ../tools/chromedriver/108.0.5359.71/win32/chromedriver.exe ./shared/work/chromedriver.exe
+          cp -r ../tools/node-v18.20.3-win-x64 ./shared/node
+          cp ../installer.exe ./shared/work
           cp ../passwd.json ./shared/work
-          cp -r ./node-v18.20.3-win-x64 ./shared/node
 
       - name: 启动frpc
         run: |
