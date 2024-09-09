@@ -127,18 +127,6 @@ jobs:
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: node modifyMain.js && node tests\start.js e2e
 
-      - name: 上传前先同步代码
-        uses: actions/checkout@v4
-        if: ${{ contains(inputs.do_wdio, 'true') }}
-        
-      - name: 上传新的E2E测试结果
-        uses: EndBug/add-and-commit@v9
-        if: ${{ contains(inputs.do_wdio, 'true') }}
-        with:
-          message: '自动上传新的E2E测试结果'
-          add: '*.json --force'
-          cwd: './e2eTestResult/'
-
       - name: IP测试
         if: ${{ !contains(inputs.do_ip_test, 'false') }}
         env:

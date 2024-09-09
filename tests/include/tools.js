@@ -1,8 +1,10 @@
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
+const { MongoClient, ServerApiVersion } = require('mongodb');
 
-const e2eResultFile = "e2eTestResult/lastResult.json";
+const e2eResultKey = "e2eTestResult";
+let mongoClient;
 
 const sleep = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
@@ -104,10 +106,14 @@ const screenshot = async (browser, fileName) => {
 
 const saveResult = async (isDev, platform, result) => {
     let rs = {};
+    let myColl;
     // 先取出上次保存的结果
     try {
-        rs = fs.readFileSync(e2eResultFile);
-        rs = JSON.parse(rs);
+        myColl = await getMongoConnect();
+        const documents = await myColl.find({
+            "key": e2eResultKey
+        }).toArray();
+        rs = documents[0];
         if (typeof rs !== "object") {
             rs = {};
         }
@@ -133,8 +139,14 @@ const saveResult = async (isDev, platform, result) => {
 
     // 保存新结果
     try {
-        rs = JSON.stringify(rs);
-        fs.writeFileSync(e2eResultFile, rs);
+        myColl = await getMongoConnect();
+        // 执行更新操作
+        let  r = await myColl.updateOne({
+            "key": e2eResultKey
+        }, {
+            $set: rs,
+        }, { upsert: true });
+        console.log(r);
     } catch (error) {
         console.error('保存E2E测试结果失败:', error);
     }
@@ -144,8 +156,11 @@ const showResultTable = async (isDev) => {
     let rs = {};
     // 先取出之前保存的测试结果
     try {
-        rs = fs.readFileSync(e2eResultFile);
-        rs = JSON.parse(rs);
+        let myColl = await getMongoConnect();
+        const documents = await myColl.find({
+            "key": e2eResultKey
+        }).toArray();
+        rs = documents[0] || {};
     } catch (e) {
         rs = {};
     }
@@ -163,6 +178,27 @@ const showResultTable = async (isDev) => {
 
     return `E2E测试记录汇总：\n${str}\n`;
 };
+
+const getMongoConnect = async () => {
+    let client;
+    if (!mongoClient) {
+        let uri = process.env.MONGODB_URI;
+        // Create a MongoClient with a MongoClientOptions object to set the Stable API version
+        client = new MongoClient(uri, {
+            serverApi: {
+                version: ServerApiVersion.v1,
+                strict: true,
+                deprecationErrors: true,
+            }
+        });
+
+        // Connect the client to the server	(optional starting in v4.7)
+        await client.connect();
+    }
+    const myDB = client.db("myDB");
+    const myColl = myDB.collection("pizzaMenu");
+    return myColl;
+}
 
 module.exports = {
     sleep, feishuNotify, screenshot, saveResult, showResultTable, uploadFile

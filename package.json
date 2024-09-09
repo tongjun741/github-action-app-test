@@ -31,6 +31,7 @@
   "dependencies": {
     "@electron/asar": "^3.2.10",
     "chromedriver": "^108.0.0",
+    "mongoose": "^8.6.1",
     "screenshot-desktop": "1.15.0"
   }
 }
