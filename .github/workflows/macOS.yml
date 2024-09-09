@@ -46,19 +46,8 @@ jobs:
           fi
           curl -o /tmp/HuaYoungApp_Mac_setup.dmg $download_url
 
-          # 提取链接中的文件名部分
-          filename=$(basename $download_url)
-
-          # 使用正则表达式提取版本号
-          version=""
-          if [[ $filename =~ [0-9]+\.[0-9]+\.[0-9]+ ]]; then
-              version=${BASH_REMATCH[0]}
-              echo "版本号: $version"
-          else
-              echo "无法解析版本号"
-          fi
-          
-          appDir="/Volumes/花漾客户端 ${version}/"
+          # 查找第一个以“花漾客户端”开头的目录
+          appDir=$(find /Volumes -maxdepth 1 -type d -name "花漾客户端*" | head -n 1)
           if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
             echo "M1芯片下appPath不一样"
             appDir="/Volumes/花漾客户端 ${version}-arm64/"
