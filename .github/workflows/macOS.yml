@@ -53,7 +53,7 @@ jobs:
           appDir=$(find /Volumes -maxdepth 1 -type d -name "花漾客户端*" | head -n 1)
           echo "appDir: $appDir"
 
-          sudo cp -R "${appDir}花漾客户端.app" /Applications/
+          sudo cp -R "${appDir}/花漾客户端.app" /Applications/
           hdiutil detach "${appDir}"
           if [ -f "/Applications/花漾客户端.app/Contents/Resources/app.asar" ]; then
             sudo chmod -f a+w /Applications/花漾客户端.app/Contents/Resources/app.asar
