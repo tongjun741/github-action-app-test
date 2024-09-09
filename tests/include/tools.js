@@ -141,7 +141,7 @@ const saveResult = async (isDev, platform, result) => {
     try {
         myColl = await getMongoConnect();
         // 执行更新操作
-        let  r = await myColl.updateOne({
+        let r = await myColl.updateOne({
             "key": e2eResultKey
         }, {
             $set: rs,
@@ -176,7 +176,7 @@ const showResultTable = async (isDev) => {
         }).join('\n');
     }
 
-    return `E2E测试记录汇总：\n${str}\n`;
+    return `【${isDev ? "测试环境" : "生产环境"}】E2E测试记录汇总：\n${str}\n`;
 };
 
 const getMongoConnect = async () => {
