@@ -21,6 +21,7 @@ if (os.platform() === 'darwin') {
 }
 
 async function main() {
+  let taskType = (process.argv.length > 1 && process.argv[2] === "e2e") ? "e2e" : "ipTest";
   const browser = await remote({
     capabilities: {
       browserName: 'chrome',
@@ -40,7 +41,7 @@ async function main() {
   let errorMsg = "";
 
   try {
-    if (process.argv[2] === "e2e") {
+    if (taskType === "e2e") {
       testResult = await e2eTest(browser);
     } else {
       testResult = await ipTest(browser);
@@ -60,7 +61,7 @@ async function main() {
   }
 
   let screenshotUrl;
-  if (process.env.E2E_PLATFORM.indexOf('macOS') < 0) {
+  if (taskType != "e2e" || process.env.E2E_PLATFORM.indexOf('macOS') < 0) {
     // macOS下无法截屏
     try {
       // 屏幕截图
