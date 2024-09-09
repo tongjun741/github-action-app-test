@@ -79,6 +79,7 @@ jobs:
           FEISHU_ME: ${{ secrets.FEISHU_ME }}
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: |
           if [ -f "/opt/花漾客户端/resources/app.asar" ]; then
             sudo chmod a+w /opt/花漾客户端/resources/app.asar
