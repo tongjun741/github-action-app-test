@@ -46,16 +46,13 @@ jobs:
           fi
           curl -o /tmp/HuaYoungApp_Mac_setup.dmg $download_url
 
+          # 挂载dmg
+          hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
+
           # 查找第一个以“花漾客户端”开头的目录
           appDir=$(find /Volumes -maxdepth 1 -type d -name "花漾客户端*" | head -n 1)
-          if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
-            echo "M1芯片下appPath不一样"
-            appDir="/Volumes/花漾客户端 ${version}-arm64/"
-          fi
-
           echo "appDir: $appDir"
 
-          hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
           sudo cp -R "${appDir}花漾客户端.app" /Applications/
           hdiutil detach "${appDir}"
           if [ -f "/Applications/花漾客户端.app/Contents/Resources/app.asar" ]; then
