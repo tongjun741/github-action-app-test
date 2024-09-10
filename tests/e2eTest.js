@@ -1,7 +1,7 @@
 const login = require('./include/login');
 const { productConfig, devConfig } = require('./config');
 const openSession = require('./include/openSession');
-const { saveResult, showResultTable, outputLog } = require('./include/tools');
+const { saveResult, showResultTable, outputLog, screenshot } = require('./include/tools');
 
 async function e2eTest(browser) {
   outputLog(`当前任务是E2E测试`);
@@ -59,6 +59,12 @@ async function e2eTest(browser) {
         await browser.$(`//span[text()="继续访问"]`).click();
       } catch (e) {
         outputLog(`等待继续访问按钮出现`);
+        try {
+          let url = await screenshot(browser, 'app-screenshot.png');
+          outputLog(`客户端截图${url}`);
+        } catch (e) {
+
+        }
       }
 
       try {
@@ -66,6 +72,12 @@ async function e2eTest(browser) {
         break;
       } catch (e) {
         outputLog(`等待正在访问按钮消失`);
+        try {
+          let url = await screenshot(browser, 'app-screenshot.png');
+          outputLog(`客户端截图${url}`);
+        } catch (e) {
+
+        }
       }
     }
 
