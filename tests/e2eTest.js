@@ -1,16 +1,16 @@
 const login = require('./include/login');
 const { productConfig, devConfig } = require('./config');
 const openSession = require('./include/openSession');
-const { saveResult, showResultTable } = require('./include/tools');
+const { saveResult, showResultTable, outputLog } = require('./include/tools');
 
 async function e2eTest(browser) {
-  console.log(`当前任务是E2E测试`);
+  outputLog(`当前任务是E2E测试`);
   let isDev = process.env.IN_DEV === "true";
   let ipText = '';
   let sessionScreenshotUrl = '';
   let errorMsg = '';
 
-  console.log(`E2E测试开始，当前时间是${new Date().toLocaleString()}`);
+  console.outputLog(`E2E测试开始`);
   try {
     let config = productConfig;
     let password = process.env.PRODUCT_WDIO_PASSWORD || "password";
@@ -18,10 +18,11 @@ async function e2eTest(browser) {
       config = devConfig;
       password = process.env.DEV_WDIO_PASSWORD || "password";
     }
-    console.log(`开始登录，当前时间是${new Date().toLocaleString()}`);
+    outputLog(`开始登录`);
     await login(config, password, browser);
 
     // 设置浏览器窗口大小
+    outputLog("设置浏览器窗口大小");
     await browser.execute(() => {
       window.resizeTo(1600, 1200);
     });
@@ -33,35 +34,42 @@ async function e2eTest(browser) {
     }
 
     // 进入分身列表页面
+    outputLog("进入分身列表页面");
     await browser.$(`.icon-chrome_outline`).waitForExist({ timeout: 10 * 1000 })
     await browser.$(`.icon-chrome_outline`).click();
 
+    outputLog("等待分身出现");
     await browser.$(`//a[text()="${shopName}"]`).waitForExist({ timeout: 10 * 1000 })
     title = await browser.getTitle();
-    console.log("标题是", title);
+    outputLog(`当前窗口标题是${title}`);
 
     // 进入分身详情页面
+    outputLog("进入分身详情页面");
     await browser.$(`//a[text()="${shopName}"]`).click();
     // 打开浏览器
+    outputLog(`打开浏览器`);
     await browser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 10 * 1000 });
     await browser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').click();
 
     // 处理有其他人在访问的情况
+    outputLog(`处理有其他人在访问的情况`);
     while (true) {
       try {
         await browser.$(`//span[text()="继续访问"]`).waitForExist({ timeout: 5 * 1000 })
         await browser.$(`//span[text()="继续访问"]`).click();
       } catch (e) {
+        outputLog(`等待继续访问按钮出现`);
       }
 
       try {
         await browser.$('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 5 * 1000 });
         break;
       } catch (e) {
+        outputLog(`等待正在访问按钮消失`);
       }
     }
 
-    console.log(`开始打开会话，当前时间是${new Date().toLocaleString()}`);
+    outputLog(`开始打开会话`);
     let rs = await openSession().catch(e => {
       errorMsg += e.message + '\n';
       console.error(e);
@@ -75,7 +83,7 @@ async function e2eTest(browser) {
     console.error(e);
   }
 
-  console.log(`E2E测试结束，当前时间是${new Date().toLocaleString()}`);
+  outputLog(`E2E测试结束：ipText=${ipText}`);
 
   let msg;
   if (ipText) {

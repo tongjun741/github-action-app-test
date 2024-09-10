@@ -10,7 +10,7 @@ TODO
 
 const os = require('os');
 const { remote } = require('webdriverio');
-const { sleep, screenshot } = require('./tools');
+const { sleep, screenshot, outputLog } = require('./tools');
 
 // 当前浏览器内核是125.0.6422.150，但没有这个版本的chromedriver，所以换个相近版本的
 let browserVersion = '125.0.6422.60';
@@ -18,12 +18,13 @@ if (process.env.IN_DEV === "true") {
   // 如果测试环境上了新内核可以改这个地方
   browserVersion = '125.0.6422.60';
 }
-console.log(`浏览器内核版本为${browserVersion}`);
+outputLog(`浏览器内核版本为${browserVersion}`);
 
 async function openSession() {
   let browser = null;
   let retry = 0;
   // 等待30秒让浏览器内核解压完成
+  outputLog("等待30秒让浏览器内核解压完成");
   await sleep(30 * 1000);
   while (true) {
     await sleep(10 * 1000);
@@ -50,23 +51,25 @@ async function openSession() {
       });
       await sleep(3 * 1000);
       let title = await browser.getTitle();
-      console.log("当前窗口标题是", title);
+      outputLog(`当前窗口标题是${title}`);
       if (browserVersion === "109") {
+        outputLog(`开始访问https://ipapi.co/`);
         await browser.url('https://ipapi.co/');
         await sleep(10 * 1000);
+        outputLog(`切换到ipapi.co`);
         await browser.switchWindow('ipapi.co');
         title = await browser.getTitle();
-        console.log("当前窗口标题是", title);
+        outputLog(`当前窗口标题是${title}`);
         if (!title) {
           throw new Error("窗口标题为空");
         }
       }
-      console.log("分身浏览器连接成功");
+      outputLog("分身浏览器连接成功");
     } catch (e) {
       console.log(e)
-      console.log("分身浏览器连接失败，3秒后重试");
+      outputLog("分身浏览器连接失败，3秒后重试");
       retry++;
-      if(retry>10){
+      if (retry > 10) {
         throw new Error('分身浏览器连接失败');
       }
       continue;
@@ -77,7 +80,7 @@ async function openSession() {
   await sleep(10 * 1000);
   // 验证页面标题
   let title = await browser.getTitle();
-  console.log("当前窗口标题是", title);
+  outputLog(`当前窗口标题是${title}`);
 
   // const windowSize = await browser.getWindowSize();
   // console.log("当前窗口大小是", windowSize);
@@ -95,6 +98,7 @@ async function openSession() {
   // await browser.$('//a[text()="定制浏览器首页"]').waitForExist({ timeout: 10 * 1000 });
 
   // 新开标签页，109中只能用url不能用newWindow
+  outputLog(`开始访问https://ipapi.co/`);
   await browser.newWindow('https://ipapi.co/');
   await sleep(10 * 1000);
   await browser.switchWindow('ipapi.co');
@@ -114,12 +118,14 @@ async function openSession() {
 
   // 验证页面标题
   title = await browser.getTitle();
-  console.log("分身标题是", title);
+  outputLog(`分身标题是${title}`);
   await browser.$('#jumbo-ip').waitForExist({ timeout: 60 * 1000 });
   let ipText = await browser.$('#jumbo-ip').getAttribute('data-ip');
   console.log(ipText);
+  outputLog(`ipText=${ipText}`);
 
   // 对分身浏览器截图
+  outputLog(`对分身浏览器截图`);
   let sessionScreenshotUrl = await screenshot(browser, 'session-screenshot.png');
 
   return { ipText, sessionScreenshotUrl };
