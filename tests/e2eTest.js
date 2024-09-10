@@ -10,7 +10,7 @@ async function e2eTest(browser) {
   let sessionScreenshotUrl = '';
   let errorMsg = '';
 
-  console.outputLog(`E2E测试开始`);
+  outputLog(`E2E测试开始`);
   try {
     let config = productConfig;
     let password = process.env.PRODUCT_WDIO_PASSWORD || "password";
