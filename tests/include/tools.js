@@ -150,6 +150,22 @@ const saveResult = async (isDev, platform, result) => {
     } catch (error) {
         console.error('保存E2E测试结果失败:', error);
     }
+
+    // 输出到日志服务器，方便查看
+    let data = `text=`;
+    data += await showResultTable(true);
+    data += await showResultTable(false);
+    await axios.post('http://ds.0728123.xyz:65080/e2eTestResult', data, {
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+    })
+        .then(response => {
+            console.log('Response:', response.data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
 };
 
 const showResultTable = async (isDev) => {
