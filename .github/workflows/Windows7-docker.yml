@@ -46,7 +46,7 @@ jobs:
             "FEISHU_ME": "'"${FEISHU_ME}"'",
             "LOGGER_SERVER": "'"${LOGGER_SERVER}"'",
             "TRANSITER_SH_SERVER": "'"${TRANSITER_SH_SERVER}"'",
-            "DOWNLOAD_URL": "'"${DOWNLOAD_URL}"'"
+            "DOWNLOAD_URL": "'"${DOWNLOAD_URL}"'",
             "MONGODB_URI": "'"${MONGODB_URI}"'"
           }' > passwd.json
       
