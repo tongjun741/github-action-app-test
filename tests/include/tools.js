@@ -8,6 +8,10 @@ let mongoClient;
 
 const sleep = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
+const outputLog = (msg) => {
+    console.log(`【${new Date().toUTCString()}】${msg}`);
+}
+
 const feishuNotify = async (msg) => {
     // 飞书机器人Webhook URL
     const webhookUrl = `https://open.feishu.cn/open-apis/bot/v2/hook/${process.env.FEISHU_TOKEN}`;
@@ -217,5 +221,5 @@ const getMongoConnect = async () => {
 }
 
 module.exports = {
-    sleep, feishuNotify, screenshot, saveResult, showResultTable, uploadFile
+    sleep, feishuNotify, screenshot, saveResult, showResultTable, uploadFile, outputLog
 };

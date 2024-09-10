@@ -2,7 +2,7 @@ const path = require('path');
 const os = require('os');
 const { e2eTest } = require('./e2eTest');
 const { ipTest } = require('./ipTest');
-const { feishuNotify, screenshot, uploadFile } = require('./include/tools');
+const { feishuNotify, screenshot, uploadFile, outputLog } = require('./include/tools');
 const { remote } = require('webdriverio');
 const desktopScreenshot = require('screenshot-desktop');
 
@@ -42,9 +42,14 @@ async function main() {
 
   try {
     if (taskType === "e2e") {
+      outputLog("开始进行E2E测试");
       testResult = await e2eTest(browser);
+      outputLog("E2E测试完成");
     } else {
+      outputLog("开始进行IP测试");
       testResult = await ipTest(browser);
+      outputLog("开始进行E2E测试");
+      outputLog("IP测试完成");
     }
   } catch (e) {
     errorMsg += e.message + '\n';
@@ -54,6 +59,7 @@ async function main() {
   let appScreenshotUrl = "客户端截图失败";
   try {
     // 对客户端截图
+    outputLog("对客户端截图");
     appScreenshotUrl = await screenshot(browser, 'app-screenshot.png');
   } catch (e) {
     errorMsg += e.message + '\n';
@@ -65,6 +71,7 @@ async function main() {
     // macOS下无法截屏
     try {
       // 屏幕截图
+    outputLog("对屏幕截图");
       let options = { filename: 'screenshot.png' };
       if (process.env.E2E_PLATFORM === "Ubuntu") {
         options.screen = 99
@@ -83,15 +90,20 @@ async function main() {
       errorMsg += e.message + '\n';
       console.error(e);
     }
+  }else{
+    outputLog("macOS下无法截屏");
   }
 
+  outputLog("整理汇总信息");
   let timeUse = (new Date().getTime() - startTime) / (60 * 1000);
   let msg = `${testResult}\n耗时${timeUse.toFixed(2)}分钟\n客户端截图：${appScreenshotUrl}`;
   if (screenshotUrl) {
     msg += `\n屏幕截图：${screenshotUrl}`;
   }
   msg += `\n\n${errorMsg}`;
+  outputLog("发送飞书消息");
   await feishuNotify(msg);
+  outputLog("发送飞书消息完成，退出流程");
   process.exit(0);
 }
 
