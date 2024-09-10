@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 触发自动测试
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const inDev = context.payload.inputs ? context.payload.inputs.in_dev : 'false';
