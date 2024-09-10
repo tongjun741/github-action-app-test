@@ -216,7 +216,7 @@ const getMongoConnect = async () => {
         await client.connect();
     }
     const myDB = client.db("myDB");
-    const myColl = myDB.collection("pizzaMenu");
+    const myColl = myDB.collection("e2e");
     return myColl;
 }
 
