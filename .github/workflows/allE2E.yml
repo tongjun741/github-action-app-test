@@ -31,7 +31,7 @@ jobs:
                     }
                 },
                 {
-                    event_type: "Windows7-docker.yml",
+                    workflow_id: "Windows7-docker.yml",
                     client_payload: {
                         software_download_url: 'https://dev.thinkoncloud.cn/downloads/win7_app_zh/HuaYoungApp_Win7_dev_zh_setup.exe',
                         in_dev: 'true',
@@ -39,7 +39,7 @@ jobs:
                     }
                 },
                 {
-                    event_type: "macOS.yml",
+                    workflow_id: "macOS.yml",
                     client_payload: {
                         software_download_url: 'https://dev.thinkoncloud.cn/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_dev_zh_setup.dmg',
                         in_dev: 'true',
@@ -47,7 +47,7 @@ jobs:
                     }
                 },
                 {
-                    event_type: "macOS.yml",
+                    workflow_id: "macOS.yml",
                     client_payload: {
                         software_download_url: 'https://dev.thinkoncloud.cn/downloads/mac_x64_app_zh/HuaYoungApp_Mac_x64_dev_zh_setup.dmg',
                         in_dev: 'true',
@@ -55,7 +55,7 @@ jobs:
                     }
                 },
                 {
-                    event_type: "Linux.yml",
+                    workflow_id: "Linux.yml",
                     client_payload: {
                         software_download_url: 'https://dev.thinkoncloud.cn/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_dev_zh_setup.deb',
                         in_dev: 'true'
