@@ -189,7 +189,7 @@ const showResultTable = async (isDev) => {
     let env = isDev ? 'dev' : 'product';
     let str = "";
     if (rs[env]) {
-        str = Object.keys(rs[env]).map((k) => {
+        str = Object.keys(rs[env]).sort().map((k) => {
             let v = rs[env][k];
             let t = v.slice(-3).join(',');
             return `${k}: ${t}`;
