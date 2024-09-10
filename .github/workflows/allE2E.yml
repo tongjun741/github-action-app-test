@@ -1,0 +1,51 @@
+name: allE2E
+
+on:
+  repository_dispatch:
+    types: [allE2E]
+    
+  workflow_dispatch:
+    inputs:
+      in_dev:
+        description: '是否是测试环境'
+        default: 'false'
+        
+  schedule:
+    - cron: '5 */2 * * *'  # 每天自动进行E2E测试
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 触发Windows 10自动测试
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const response = await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'win10-start',
+              client_payload: {
+                software_download_url: 'https://dev.thinkoncloud.cn/downloads/win10_app_zh/HuaYoungApp_Win10_dev_zh_setup.exe',
+                do_wdio: 'true',
+                in_dev: 'true',
+                do_ip_test: 'false',
+                debug: 'false'
+              }
+            });
+            console.log(response);
+
+      - name: 触发Ubuntu自动测试
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const response = await github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'linux-start',
+              client_payload: {
+                software_download_url: 'https://dev.thinkoncloud.cn/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_dev_zh_setup.deb',
+                in_dev: 'true'
+              }
+            });
+            console.log(response);
