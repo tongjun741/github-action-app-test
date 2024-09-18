@@ -122,6 +122,7 @@ const saveResult = async (isDev, platform, result) => {
             rs = {};
         }
     } catch (e) {
+        console.log(e);
         rs = {};
     }
 
@@ -182,6 +183,7 @@ const showResultTable = async (isDev) => {
         }).toArray();
         rs = documents[0] || {};
     } catch (e) {
+        console.log(e);
         rs = {};
     }
 
