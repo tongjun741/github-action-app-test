@@ -85,7 +85,7 @@ jobs:
                         workflow_id: "Windows7-docker.yml",
                         inputs: {
                             software_download_url: `https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_${data.windows7AppVersion}_zh_setup.exe`,
-                            in_dev: 'true',
+                            in_dev: 'false',
                             tmate: 'false'
                         }
                     },
@@ -93,7 +93,7 @@ jobs:
                         workflow_id: "macOS.yml",
                         inputs: {
                             software_download_url: `https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_${data.macArm64AppVersion}_zh_setup.dmg`,
-                            in_dev: 'true',
+                            in_dev: 'false',
                             runs_on: 'macos-latest'
                         }
                     },
@@ -101,7 +101,7 @@ jobs:
                         workflow_id: "macOS.yml",
                         inputs: {
                             software_download_url: `https://dl.szdamai.com/downloads/mac_x64_app_zh/HuaYoungApp_Mac_x64_${data.macX64AppVersion}_zh_setup.dmg`,
-                            in_dev: 'true',
+                            in_dev: 'false',
                             runs_on: 'macos-12'
                         }
                     },
@@ -109,7 +109,7 @@ jobs:
                         workflow_id: "Linux.yml",
                         inputs: {
                             software_download_url: `https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_${data.linuxAppVersion}_zh_setup.deb`,
-                            in_dev: 'true'
+                            in_dev: 'false'
                         }
                     }
                 ]
