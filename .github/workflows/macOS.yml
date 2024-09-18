@@ -79,10 +79,6 @@ jobs:
             echo "E2E_PLATFORM=macOS-x64" >> $GITHUB_ENV
           fi
 
-      - name: test env
-        run: |
-          echo $E2E_PLATFORM
-
       - name: Use Node.js 20
         uses: actions/setup-node@v4
         with:
