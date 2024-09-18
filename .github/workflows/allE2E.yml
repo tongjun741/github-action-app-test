@@ -72,5 +72,6 @@ jobs:
                     workflow_id: task.workflow_id,
                     inputs: task.inputs
                 });
-                console.log(response);
+                console.log(task.workflow_id, response);
             }
+            console.log(`共触发${taskList.length}个任务`)
