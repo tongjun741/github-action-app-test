@@ -119,6 +119,8 @@ async function openSession() {
   // 验证页面标题
   title = await browser.getTitle();
   outputLog(`分身标题是${title}`);
+  outputLog(`等待30秒让IP显示出来`);
+  await sleep(30*1000);
   await browser.$('#jumbo-ip').waitForExist({ timeout: 60 * 1000 });
   let ipText = await browser.$('#jumbo-ip').getAttribute('data-ip');
   console.log(ipText);
