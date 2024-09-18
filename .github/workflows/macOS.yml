@@ -70,14 +70,18 @@ jobs:
             mkdir -p /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/
             cp tools/chromedriver/108.0.5359.71/mac-arm64/chromedriver /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/
             chmod +x /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/chromedriver
-            echo "E2E_PLATFORM=\"macOS-arm64\"" >> $GITHUB_ENV
+            echo "E2E_PLATFORM=macOS-arm64" >> $GITHUB_ENV
           else
             echo "Intel芯片下chromedirver路径是：/tmp/chromedriver/mac-108/chromedriver-mac-x64/chromedriver"
             mkdir -p /tmp/chromedriver/mac-108/chromedriver-mac-x64/
             cp tools/chromedriver/108.0.5359.71/mac-x64/chromedriver /tmp/chromedriver/mac-108/chromedriver-mac-x64/
             chmod +x /tmp/chromedriver/mac-108/chromedriver-mac-x64/chromedriver
-            echo "E2E_PLATFORM=\"macOS-x64\"" >> $GITHUB_ENV
+            echo "E2E_PLATFORM=macOS-x64" >> $GITHUB_ENV
           fi
+
+      - name: test env
+        run: |
+          echo $E2E_PLATFORM
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4
