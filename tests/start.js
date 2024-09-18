@@ -22,6 +22,8 @@ if (os.platform() === 'darwin') {
 
 async function main() {
   let taskType = (process.argv.length > 1 && process.argv[2] === "e2e") ? "e2e" : "ipTest";
+  outputLog(`环境变量：${JSON.stringify(process.env)}`);
+  outputLog(`输入参数：${JSON.stringify(process.argv)}`);
   const browser = await remote({
     capabilities: {
       browserName: 'chrome',
