@@ -19,7 +19,7 @@ jobs:
         with:
           script: |
             const inDev = context.payload.inputs ? context.payload.inputs.in_dev : 'false';
-            const taskList = inDev === "true" ? [
+            let taskList = [
                 {
                     workflow_id: "Windows10.yml",
                     inputs: {
@@ -61,7 +61,60 @@ jobs:
                         in_dev: 'true'
                     }
                 }
-            ] : []
+            ]
+
+            if(inDev !== "true"){
+                const axios = require('axios');
+                const response = await axios.get('https://www.szdamai.com/static.config.json');
+                const data = response.data;
+
+                // 准备所有下载链接
+                taskList = [
+                    {
+                        workflow_id: "Windows10.yml",
+                        inputs: {
+                            software_download_url: `https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_${data.windows10AppVersion}_zh_setup.exe`,
+                            do_wdio: 'true',
+                            in_dev: 'false',
+                            do_ip_test: 'false',
+                            debug: 'false'
+                        }
+                    },
+                    {
+                        workflow_id: "Windows7-docker.yml",
+                        inputs: {
+                            software_download_url: `https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_${data.windows7AppVersion}_zh_setup.exe`,
+                            in_dev: 'true',
+                            tmate: 'false'
+                        }
+                    },
+                    {
+                        workflow_id: "macOS.yml",
+                        inputs: {
+                            software_download_url: `https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_${data.macArm64AppVersion}_zh_setup.dmg`,
+                            in_dev: 'true',
+                            runs_on: 'macos-latest'
+                        }
+                    },
+                    {
+                        workflow_id: "macOS.yml",
+                        inputs: {
+                            software_download_url: `https://dl.szdamai.com/downloads/mac_x64_app_zh/HuaYoungApp_Mac_x64_${data.macX64AppVersion}_zh_setup.dmg`,
+                            in_dev: 'true',
+                            runs_on: 'macos-12'
+                        }
+                    },
+                    {
+                        workflow_id: "Linux.yml",
+                        inputs: {
+                            software_download_url: `https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_${data.linuxAppVersion}_zh_setup.deb`,
+                            in_dev: 'true'
+                        }
+                    }
+                ]
+            }
+
+            console.log(taskList);
 
             for (let i = 0; i < taskList.length; i++) {
                 let task = taskList[i];
