@@ -36,6 +36,7 @@ jobs:
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
           DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: |
           echo '{
             "E2E_PLATFORM": "'"Windows 7"'",
