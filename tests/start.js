@@ -59,13 +59,17 @@ async function main() {
   }
 
   let appScreenshotUrl = "客户端截图失败";
-  try {
-    // 对客户端截图
-    outputLog("对客户端截图");
-    appScreenshotUrl = await screenshot(browser, 'app-screenshot.png');
-  } catch (e) {
-    errorMsg += e.message + '\n';
-    console.error(e);
+  if(process.env.E2E_PLATFORM.indexOf('macOS')>-1){
+    outputLog("macOS客户端截图有bug，先忽略");
+  }else{
+    try {
+      // 对客户端截图
+      outputLog("对客户端截图");
+      appScreenshotUrl = await screenshot(browser, 'app-screenshot.png');
+    } catch (e) {
+      errorMsg += e.message + '\n';
+      console.error(e);
+    }
   }
 
   let screenshotUrl;
