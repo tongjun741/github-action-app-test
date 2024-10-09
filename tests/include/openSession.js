@@ -70,6 +70,8 @@ async function openSession() {
       outputLog("分身浏览器连接失败，3秒后重试");
       retry++;
       if (retry > 10) {
+        // 调试打开会话失败的问题
+        await sleep(3600 * 1000);
         throw new Error('分身浏览器连接失败');
       }
       continue;
