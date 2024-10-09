@@ -99,7 +99,7 @@ jobs:
           (Get-Content macOS_VNC/frpc_15897721.ini) -replace "remote_port = .*", "remote_port = $env:FRPC_MAC_REMOTE_PORT" | Set-Content macOS_VNC/frpc_15897721.ini
           (Get-Content macOS_VNC/frpc_15897721.ini) -replace "local_port = .*", "local_port = 3389" | Set-Content macOS_VNC/frpc_15897721.ini
           Invoke-WebRequest -Uri "https://nya.globalslb.net/natfrp/client/frpc/0.51.0-sakura-8/frpc_windows_amd64.exe" -OutFile "frpc.exe"
-          ./frpc.exe -c macOS_VNC/frpc_15897721.ini
+          start ./frpc.exe -c macOS_VNC/frpc_15897721.ini
         env:
           FRPC_USER: ${{ secrets.FRPC_USER }}
           FRPC_MAC_REMOTE_PORT: ${{ secrets.FRPC_MAC_REMOTE_PORT }}
