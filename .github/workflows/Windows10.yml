@@ -9,7 +9,7 @@ on:
       software_download_url:
         description: 'Download url'
         required: true
-        default: 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.6.719_zh_setup.exe'
+        default: 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_11.0.751_zh_setup.exe'
       do_wdio:
         description: '是否执行 WDIO 测试'
         default: ''
@@ -50,7 +50,7 @@ jobs:
 
       - name: 安装客户端
         run: |
-          Invoke-WebRequest -Uri "${{ github.event.inputs.software_download_url || 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.6.719_zh_setup.exe' }}" -OutFile "$env:TEMP\your_software_installer.exe"
+          Invoke-WebRequest -Uri "${{ github.event.inputs.software_download_url || 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_11.0.751_zh_setup.exe' }}" -OutFile "$env:TEMP\your_software_installer.exe"
           Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait
           # 启动软件
           Start-Process -FilePath "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"
