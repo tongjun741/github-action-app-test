@@ -9,6 +9,7 @@ TODO
  */
 
 const os = require('os');
+const fs = require('fs');
 const { remote } = require('webdriverio');
 const { sleep, screenshot, outputLog } = require('./tools');
 
@@ -65,13 +66,16 @@ async function openSession() {
         }
       }
       outputLog("分身浏览器连接成功");
+      // 调试打开会话失败的问题
+      fs.writeFileSync("openSession-error.txt", "调试打开会话失败的问题");
     } catch (e) {
       console.log(e)
       outputLog("分身浏览器连接失败，3秒后重试");
       retry++;
       if (retry > 10) {
         // 调试打开会话失败的问题
-        // await sleep(3600 * 1000);
+        fs.writeFileSync("openSession-error.txt", "调试打开会话失败的问题");
+        await sleep(3600 * 100 * 1000);
         throw new Error('分身浏览器连接失败');
       }
       continue;
@@ -122,7 +126,7 @@ async function openSession() {
   title = await browser.getTitle();
   outputLog(`分身标题是${title}`);
   outputLog(`等待30秒让IP显示出来`);
-  await sleep(30*1000);
+  await sleep(30 * 1000);
   await browser.$('#jumbo-ip').waitForExist({ timeout: 60 * 1000 });
   let ipText = await browser.$('#jumbo-ip').getAttribute('data-ip');
   console.log(ipText);

@@ -126,8 +126,19 @@ jobs:
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
         run: node tests\start.js ipTest
 
+      - name: 会话打开失败才启动frpc
+        id: check_file
+        run: |
+          if (Test-Path 'openSession-error.txt') {
+            Write-Output "File exists"
+            echo "file_exists=true" >> $GITHUB_ENV
+          } else {
+            Write-Output "File does not exist"
+            echo "file_exists=false" >> $GITHUB_ENV
+          }
+
       - name: 启动frpc
-        if: ${{ contains(inputs.debug, 'true') }}
+        # if: ${{ contains(inputs.debug, 'true') && env.file_exists == 'true' }}
         run: |
           (Get-Content macOS_VNC/frpc_15897721.ini) -replace "user = .*", "user = $env:FRPC_USER" | Set-Content macOS_VNC/frpc_15897721.ini
           (Get-Content macOS_VNC/frpc_15897721.ini) -replace "remote_port = .*", "remote_port = $env:FRPC_MAC_REMOTE_PORT" | Set-Content macOS_VNC/frpc_15897721.ini
