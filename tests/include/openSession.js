@@ -25,7 +25,7 @@ async function openSession() {
   let browser = null;
   let retry = 0;
   // 等待30秒让浏览器内核解压完成
-  outputLog("等待30秒让浏览器内核解压完成");
+  // outputLog("等待30秒让浏览器内核解压完成");
   await sleep(30 * 1000);
   while (true) {
     await sleep(10 * 1000);
