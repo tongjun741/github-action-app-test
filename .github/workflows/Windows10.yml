@@ -138,7 +138,7 @@ jobs:
           }
 
       - name: 启动frpc
-        # if: ${{ contains(inputs.debug, 'true') && env.file_exists == 'true' }}
+        if: ${{ contains(inputs.debug, 'true') && env.file_exists == 'true' }}
         run: |
           (Get-Content macOS_VNC/frpc_15897721.ini) -replace "user = .*", "user = $env:FRPC_USER" | Set-Content macOS_VNC/frpc_15897721.ini
           (Get-Content macOS_VNC/frpc_15897721.ini) -replace "remote_port = .*", "remote_port = $env:FRPC_MAC_REMOTE_PORT" | Set-Content macOS_VNC/frpc_15897721.ini
