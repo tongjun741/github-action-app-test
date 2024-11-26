@@ -75,9 +75,9 @@ async function login(config, password, targetBrowser) {
 
   // 如果有弹出消息就点掉
   try {
-    await browser.$('.ant-modal-confirm').waitForExist({ timeout: 5 * 1000 });
+    await browser.$('.ant-modal-confirm .ant-btn-primary').waitForExist({ timeout: 5 * 1000 });
     outputLog(`点掉弹出消息`);
-    await browser.$(`//div[contains(concat(" ",normalize-space(@class)," ")," ant-btn-primary ")]//span[text()="我知道了"]`).click();
+    await browser.$(`.ant-modal-confirm .ant-btn-primary`).click();
   } catch (e) {
   }
 
