@@ -16,6 +16,7 @@ async function login(config, password, targetBrowser) {
     }
     await sleep(2 * 1000);
   }
+  outputLog("按标题切换到主窗口完成");
 
   await browser.$('div[class*=app-version]').waitForExist({ timeout: 100 * 1000 })
 
@@ -26,7 +27,7 @@ async function login(config, password, targetBrowser) {
   // expect(title).toBe('Your Electron App Title');
 
   const version = await browser.$('div[class*=app-version]').getText();
-  outputLog("版本号是：", version);
+  outputLog(`版本号是：${version}`);
 
   // 检查当前是登录页面还是团队选择界面
   outputLog("检查当前是登录页面还是团队选择界面");
