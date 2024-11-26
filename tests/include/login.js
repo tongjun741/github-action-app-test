@@ -39,21 +39,18 @@ async function login(config, password, targetBrowser) {
     interval: 500   // 检查间隔时间，单位：毫秒
   });
 
-  // 等待10s确认服务器是否可用
-  outputLog("等待10s确认服务器是否可用");
-  await sleep(10 * 1000);
-  // 服务器不可用，等待服务器恢复
-  while (await browser.$('//div[contains(concat(" ", normalize-space(@class), " "), " marquee-container ")]//span[contains(., "请检查您的网络是否通畅")]').isExisting()) {
-    outputLog("服务器不可用，等待服务器恢复")
-    await sleep(60 * 1000);
-  }
-
   // 当前是登录页面，开始登录
   if (await browser.$('//div[text()="邮箱登录"]').isExisting()) {
     outputLog("当前是登录页面，开始登录")
     await browser.$(`//div[text()="邮箱登录"]`).click();
     await browser.$('#account').setValue(config.username);
     await browser.$('#password').setValue(password);
+
+    // 服务器不可用，等待服务器恢复
+    while (await browser.$('//div[contains(concat(" ", normalize-space(@class), " "), " marquee-container ")]//span[contains(., "请检查您的网络是否通畅")]').isExisting()) {
+      outputLog("服务器不可用，等待服务器恢复")
+      await sleep(60 * 1000);
+    }
 
     await browser.$('.ant-btn-primary').click();
 
