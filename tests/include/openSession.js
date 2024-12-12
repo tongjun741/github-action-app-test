@@ -14,10 +14,11 @@ const { remote } = require('webdriverio');
 const { sleep, screenshot, outputLog } = require('./tools');
 
 // 当前浏览器内核是128.0.6613.45，但没有这个版本的chromedriver，所以换个相近版本的
-let browserVersion = '128.0.6613.137';
+// 版本列表128.0.6613.137  130.0.6723.116
+let browserVersion = '130.0.6723.116';
 if (process.env.IN_DEV === "true") {
   // 如果测试环境上了新内核可以改这个地方
-  browserVersion = '128.0.6613.137';
+  browserVersion = '130.0.6723.116';
 }
 outputLog(`浏览器内核版本为${browserVersion}`);
 
