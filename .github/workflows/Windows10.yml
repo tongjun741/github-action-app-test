@@ -49,7 +49,7 @@ jobs:
       - name: 安装客户端
         run: |
           # 检查是否提供了下载 URL
-          if ( -not "${{ github.event.inputs.software_download_url" }} ) {
+          if ( -not "${{ github.event.inputs.software_download_url }} ) {
             # 没有提供 URL，从 JSON 中获取版本号
             $url = "https://www.szdamai.com/static.config.json"  # 替换为实际的 JSON URL
             $response = Invoke-RestMethod -Uri $url
