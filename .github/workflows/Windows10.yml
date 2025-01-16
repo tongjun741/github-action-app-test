@@ -51,6 +51,7 @@ jobs:
           # 检查是否提供了下载 URL
           if ( -not "${{ github.event.inputs.software_download_url }} ) {
             # 没有提供 URL，从 JSON 中获取版本号
+
             $url = "https://www.szdamai.com/static.config.json"
             $response = Invoke-RestMethod -Uri $url
             $appVersion = $response.windows10AppVersion
