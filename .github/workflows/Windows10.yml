@@ -50,8 +50,28 @@ jobs:
 
       - name: 安装客户端
         run: |
-          Invoke-WebRequest -Uri "${{ github.event.inputs.software_download_url || 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_11.4.798_zh_setup.exe' }}" -OutFile "$env:TEMP\your_software_installer.exe"
+          # 检查是否提供了下载 URL
+          if ( ${{ inputs.software_download_url }} ) {
+            # 使用提供的下载 URL
+            $downloadUrl = ${{ inputs.software_download_url }}
+            Write-Host "Using provided download URL: $downloadUrl"
+          } else {
+            # 如果没有提供 URL，从 JSON 中获取版本号
+            $url = "https://www.szdamai.com/static.config.json"  # 替换为实际的 JSON URL
+            $response = Invoke-RestMethod -Uri $url
+            $appVersion = $response.windows10AppVersion
+
+            # 根据版本号构建下载 URL
+            $downloadUrl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_$(appVersion)_zh_setup.exe"
+            Write-Host "Generated download URL: $downloadUrl"
+          }
+
+          # 下载客户端安装包
+          Invoke-WebRequest -Uri $downloadUrl -OutFile "$env:TEMP\your_software_installer.exe"
+
+          # 安装客户端
           Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait
+
           # 启动软件
           Start-Process -FilePath "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"
 
