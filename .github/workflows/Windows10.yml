@@ -8,8 +8,6 @@ on:
     inputs:
       software_download_url:
         description: 'Download url'
-        required: true
-        default: 'https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_11.4.798_zh_setup.exe'
       do_wdio:
         description: '是否执行 WDIO 测试'
         default: ''
@@ -51,12 +49,8 @@ jobs:
       - name: 安装客户端
         run: |
           # 检查是否提供了下载 URL
-          if ( ${{ inputs.software_download_url }} ) {
-            # 使用提供的下载 URL
-            $downloadUrl = ${{ inputs.software_download_url }}
-            Write-Host "Using provided download URL: $downloadUrl"
-          } else {
-            # 如果没有提供 URL，从 JSON 中获取版本号
+          if ( -not "${{ inputs.software_download_url" }} ) {
+            # 没有提供 URL，从 JSON 中获取版本号
             $url = "https://www.szdamai.com/static.config.json"  # 替换为实际的 JSON URL
             $response = Invoke-RestMethod -Uri $url
             $appVersion = $response.windows10AppVersion
@@ -64,6 +58,10 @@ jobs:
             # 根据版本号构建下载 URL
             $downloadUrl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_$(appVersion)_zh_setup.exe"
             Write-Host "Generated download URL: $downloadUrl"
+          } else {
+            # 使用提供的下载 URL
+            $downloadUrl = ${{ inputs.software_download_url }}
+            Write-Host "Using provided download URL: $downloadUrl"
           }
 
           # 下载客户端安装包
