@@ -57,7 +57,7 @@ jobs:
             $appVersion = $response.windows10AppVersion
 
             # 根据版本号构建下载 URL
-            $downloadUrl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_$(appVersion)_zh_setup.exe"
+            $downloadUrl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_${appVersion}_zh_setup.exe"
             Write-Host "Generated download URL: $downloadUrl"
           } else {
             # 使用提供的下载 URL
