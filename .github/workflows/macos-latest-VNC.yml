@@ -29,6 +29,7 @@ jobs:
       run: |
         sed -i "" "s/user = .*/user = ${{ secrets.FRPC_USER }}/g" macOS_VNC/frpc_15897721.ini
         sed -i "" "s/remote_port = .*/remote_port = ${{ secrets.FRPC_MAC_REMOTE_PORT }}/g" macOS_VNC/frpc_15897721.ini
+        sed -i "" "s/local_port = .*/local_port = 5900/g" macOS_VNC/frpc_15897721.ini
         curl -Lo frpc https://nya.globalslb.net/natfrp/client/frpc/0.51.0-sakura-9.3/frpc_darwin_arm64
         chmod +x frpc
         ./frpc -c ./macOS_VNC/frpc_15897721.ini > /tmp/frpc.log 2>&1 &
