@@ -23,7 +23,7 @@ jobs:
     - name: Enable screen recording
       run: |
         sudo chmod +x ./macOS_VNC/modify_screensharing-14.sh
-        # sudo ./macOS_VNC/modify_screensharing-14.sh
+        sudo ./macOS_VNC/modify_screensharing-14.sh
 
     - name: 启动frpc
       run: |
