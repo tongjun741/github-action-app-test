@@ -4,7 +4,7 @@ on:
 jobs:
   build:
     name: Mac-latest_VNC
-    runs-on: macos-latest
+    runs-on: macos-13
     
     steps:     
     
@@ -24,8 +24,8 @@ jobs:
       run: |
         sudo chmod +x ./macOS_VNC/modify_screensharing-14.sh
         sudo ./macOS_VNC/modify_screensharing-14.sh
-        sudo chmod +x ./macOS_VNC/enable_vnc.sh
-        sudo ./macOS_VNC/enable_vnc.sh
+        # sudo chmod +x ./macOS_VNC/enable_vnc.sh
+        # sudo ./macOS_VNC/enable_vnc.sh
 
     - name: 启动frpc
       run: |
