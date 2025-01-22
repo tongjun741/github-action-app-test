@@ -40,7 +40,7 @@
 
 set -eux -o pipefail
 
-db_path="/Users/tcv/Library/Application Support/com.apple.TCC/TCC.db"
+db_path="/Library/Application Support/com.apple.TCC/TCC.db"
 
 sanity_checks() {
   os_ver_major="$(sw_vers -productVersion | awk -F'.' '{print $1}')"
@@ -68,6 +68,8 @@ disable_screensharing() {
 
 enable_screensharing() {
   launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
+  
+  sqlite3 "${db_path}" "PRAGMA table_info(access);"
 
   epoch="$(date +%s)"
   sqlite3 "${db_path}" \
