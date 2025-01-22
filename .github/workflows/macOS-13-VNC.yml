@@ -1,4 +1,4 @@
-name: MacVNC
+name: macOS-13-VNC
 on: 
   workflow_dispatch:
 jobs:
