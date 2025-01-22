@@ -1,6 +1,7 @@
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const e2eResultKey = "e2eTestResult";
@@ -99,7 +100,11 @@ const screenshot = async (browser, fileName) => {
     // 截图
     const filePath = path.join(__dirname, fileName);
     try {
-        await browser.saveScreenshot(filePath);
+        if (process.env.E2E_PLATFORM.indexOf('macOS') > -1) {
+            execSync(`screencapture ${filePath}`);
+        } else {
+            await browser.saveScreenshot(filePath);
+        }
     } catch (e) {
         return `截图失败：${e.message}`;
     }
