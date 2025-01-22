@@ -101,6 +101,7 @@ const screenshot = async (browser, fileName) => {
     const filePath = path.join(__dirname, fileName);
     try {
         if (process.env.E2E_PLATFORM.indexOf('macOS') > -1) {
+            console.log("macOS下换用screencapture命令进行截图", filePath);
             execSync(`screencapture ${filePath}`);
         } else {
             await browser.saveScreenshot(filePath);

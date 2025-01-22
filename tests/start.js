@@ -69,31 +69,33 @@ async function main() {
   }
 
   let screenshotUrl;
-  if (taskType != "e2e" || process.env.E2E_PLATFORM.indexOf('macOS') < 0) {
+  if (taskType != "e2e") {
     // macOS下无法截屏
     try {
       // 屏幕截图
-    outputLog("对屏幕截图");
+      outputLog("对屏幕截图");
       let options = { filename: 'screenshot.png' };
       if (process.env.E2E_PLATFORM === "Ubuntu") {
         options.screen = 99
       }
-      await desktopScreenshot(options)
-        .then(async (imagePath) => {
-          console.log('Screenshot saved at:', imagePath);
-          screenshotUrl = await uploadFile('screenshot.png');
-        })
-        .catch((err) => {
-          screenshotUrl = "屏幕截图失败";
-          console.error('Error taking screenshot:', err);
-        });
+      if (process.env.E2E_PLATFORM.indexOf('macOS') > -1) {
+        screenshotUrl = await screenshot(browser, 'screenshot.png');
+      } else {
+        await desktopScreenshot(options)
+          .then(async (imagePath) => {
+            console.log('Screenshot saved at:', imagePath);
+            screenshotUrl = await uploadFile('screenshot.png');
+          })
+          .catch((err) => {
+            screenshotUrl = "屏幕截图失败";
+            console.error('Error taking screenshot:', err);
+          });
+      }
     } catch (e) {
       screenshotUrl = "屏幕截图失败";
       errorMsg += e.message + '\n';
       console.error(e);
     }
-  }else{
-    outputLog("macOS下无法截屏");
   }
 
   outputLog("整理汇总信息");
