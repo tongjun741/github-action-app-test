@@ -40,7 +40,7 @@
 
 set -eux -o pipefail
 
-db_path="/Library/Application Support/com.apple.TCC/TCC.db"
+db_path="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
 
 sanity_checks() {
   os_ver_major="$(sw_vers -productVersion | awk -F'.' '{print $1}')"
