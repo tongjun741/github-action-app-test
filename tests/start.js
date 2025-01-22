@@ -59,7 +59,7 @@ async function main() {
   }
 
   let appScreenshotUrl = "客户端截图失败";
-  if(process.env.E2E_PLATFORM && (1||process.env.E2E_PLATFORM.indexOf('macOS')>-1)){
+  if(process.env.E2E_PLATFORM && (false && process.env.E2E_PLATFORM.indexOf('macOS')>-1)){
     outputLog("macOS客户端截图有bug，先忽略");
     appScreenshotUrl = "macOS客户端截图有bug，先忽略";
   }else{
