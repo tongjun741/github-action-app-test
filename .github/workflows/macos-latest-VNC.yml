@@ -24,6 +24,7 @@ jobs:
       run: |
         sudo chmod +x ./macOS_VNC/modify_screensharing-14.sh
         sudo ./macOS_VNC/modify_screensharing-14.sh
+        sudo ./macOS_VNC/enable_vnc.sh
 
     - name: 启动frpc
       run: |
