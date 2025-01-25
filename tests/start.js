@@ -78,7 +78,7 @@ async function main() {
       if (process.env.E2E_PLATFORM === "Ubuntu") {
         options.screen = 99
       }
-      if (process.env.E2E_PLATFORM.indexOf('macOS') > -1) {
+      if (process.env.E2E_PLATFORM?.indexOf('macOS') > -1) {
         screenshotUrl = await screenshot(browser, 'screenshot.png');
       } else {
         await desktopScreenshot(options)
