@@ -93,6 +93,8 @@ function sendHttpLog(logText) {
 
     // 结束请求
     req.end();
+  }).catch(e => {
+    console.error(e);
   });
 }
 
@@ -140,7 +142,7 @@ async function main() {
       fs.mkdirSync(directoryPath, { recursive: true });
       console.log('目录创建成功:', directoryPath);
     } catch (err) {
-      console.error('创建目录'+directoryPath+'失败:', err);
+      console.error('创建目录' + directoryPath + '失败:', err);
     }
 
     await sendHttpLog('修改main.js...');
