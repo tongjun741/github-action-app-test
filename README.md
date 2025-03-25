@@ -24,6 +24,11 @@ set "PRODUCT_WDIO_PASSWORD=xxxx"
 node yarn wdio
 ```
 
+## Win7的docker镜像参数只能是7u
+win7x64及以下版本会被识别成mido版本，没有sp1
+  "7" | "7e" | "win7" | "win7e" | "windows7" | "windows 7" 
+  下面的版本用的是en_windows_7_with_sp1_x64.iso
+  "7u" | "win7u" | "windows7u" | "windows 7u" 
 
 ## 执行IP测试脚本
 完成Win 10 的前两条配置后执行下面的脚本：
