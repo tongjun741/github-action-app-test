@@ -52,7 +52,7 @@ const executeCommand = async (command, args) => {
 function sendHttpLog(logText) {
   return new Promise((resolve, reject) => {
     // 获取当前时间并格式化为 "HHMMSS" 格式
-    const currentTime = new Date().toLocaleString();
+    const currentTime = new Date().toISOString();
 
     // 获取 Node.js 版本
     const nodeVersion = process.version;
