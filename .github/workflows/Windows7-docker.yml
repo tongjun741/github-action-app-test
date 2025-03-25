@@ -51,7 +51,7 @@ jobs:
             "MONGODB_URI": "'"${MONGODB_URI}"'"
           }' > passwd.json
 
-      - uses: mxschmitt/action-tmate@v3
+      # - uses: mxschmitt/action-tmate@v3
       
       - name: 下载客户端
         run: |

@@ -3,7 +3,8 @@ services:
     image: dockurr/windows
     container_name: windows
     environment:
-      VERSION: "win7x64"
+      # 7e和win7x64会被识别成mido版本，没有sp1
+      VERSION: "7u"
       RAM_SIZE: "8G"
       CPU_CORES: "4"
     devices:
