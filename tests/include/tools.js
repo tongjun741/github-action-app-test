@@ -141,7 +141,7 @@ const saveResult = async (isDev, platform, result) => {
     if (!rs[env][platform]) {
         rs[env][platform] = [];
     }
-    rs[env][platform].push(result);
+    rs[env][platform].push(`${result}[${new Date().toISOString()}]`);
     // 最多保留10个结果
     let maxLength = 10;
     if (rs[env][platform].length > maxLength) {
