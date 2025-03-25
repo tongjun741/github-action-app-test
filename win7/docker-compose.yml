@@ -3,7 +3,7 @@ services:
     image: dockurr/windows
     container_name: windows
     environment:
-      VERSION: "7e"
+      VERSION: "win7x64"
       RAM_SIZE: "8G"
       CPU_CORES: "4"
     devices:
