@@ -99,7 +99,7 @@ describe('Electron App Test', () => {
       saveResult(isDev, process.env.E2E_PLATFORM || "--", ipText);
     } else {
       msg = `打开会话测试失败！耗时${timeUse.toFixed(2)}分钟。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n客户端截图：${appScreenshotUrl}\n\n${errorMsg}` + `\n<at user_id=\"${process.env.FEISHU_ME}\">me</at>`;
-      saveResult(isDev, process.env.E2E_PLATFORM || "--", "Error");
+      saveResult(isDev, process.env.E2E_PLATFORM || "--", `Error|${process.env.DOWNLOAD_URL.split('/').slice(-1)[0]}`);
     }
     let rs = await showResultTable(isDev);
     msg += `${rs}`;
