@@ -5,7 +5,8 @@ async function login(config, password, targetBrowser) {
     browser = targetBrowser;
   }
 
-  while (true) {
+  let retryTimes = 0;
+  while (retryTimes<100) {
     try {
       // 按标题切换到主窗口
       // 兼容有首页和默认只有分身页的情况
@@ -15,6 +16,7 @@ async function login(config, password, targetBrowser) {
     } catch (e) {
     }
     await sleep(2 * 1000);
+    retryTimes++;
   }
   outputLog("按标题切换到主窗口完成");
 
