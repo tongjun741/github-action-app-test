@@ -104,7 +104,7 @@ jobs:
         run: |
           while [ ! -f "win7/shared/done.log" ]; do
               sleep 60
-              curl --upload-file win7/shared/start.log ${TRANSITER_SH_SERVER}/hello.log
+              curl --upload-file win7/shared/start.log ${TRANSITER_SH_SERVER}/hello.log || echo "上传start.log到${TRANSITER_SH_SERVER}失败"
               cat win7/shared/start.log
           done
           echo "File win7/shared/done.log found!"
