@@ -4,7 +4,7 @@ on:
 jobs:
   build:
     name: Mac-latest_VNC
-    runs-on: macos-latest
+    runs-on: macos-15
     
     steps:     
     
