@@ -14,7 +14,8 @@ on:
         description: '是否是测试环境'
         default: 'false'
       runs_on:
-        description: 'macos-14(arm64)还是macos-13(x64)'
+        # https://docs.github.com/zh/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories
+        description: 'macos-14(arm64)、macos-15(arm64)还是macos-13(x64)'
         default: 'macos-latest'
 
 jobs:
