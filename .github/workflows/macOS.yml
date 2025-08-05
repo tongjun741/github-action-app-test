@@ -14,7 +14,7 @@ on:
         description: '是否是测试环境'
         default: 'false'
       runs_on:
-        description: 'macos-latest(arm64)还是macos-12(x64)'
+        description: 'macos-14(arm64)还是macos-13(x64)'
         default: 'macos-latest'
 
 jobs:
