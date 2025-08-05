@@ -44,7 +44,7 @@ db_path="/Library/Application Support/com.apple.TCC/TCC.db"
 
 sanity_checks() {
   os_ver_major="$(sw_vers -productVersion | awk -F'.' '{print $1}')"
-  if [[ "${os_ver_major}" -ne 14 ]]; then
+  if [[ "${os_ver_major}" -ne 15 ]]; then
     echo "This script is only tested valid on macOS 14, and we detected this system runs version ${os_ver_major}. Exiting."
     exit 1
   fi
@@ -70,6 +70,21 @@ enable_screensharing() {
   launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
   
   sqlite3 "${db_path}" "PRAGMA table_info(access);"
+
+  # 0|service|TEXT|1||1
+  # 1|client|TEXT|1||2
+  # 2|client_type|INTEGER|1||3
+  # 3|auth_value|INTEGER|1||0
+  # 4|auth_reason|INTEGER|1||0
+  # 5|auth_version|INTEGER|1||0
+  # 6|csreq|BLOB|0||0
+  # 7|policy_id|INTEGER|0||0
+  # 8|indirect_object_identifier_type|INTEGER|0||0
+  # 9|indirect_object_identifier|TEXT|1|'UNUSED'|4
+  # 10|indirect_object_code_identity|BLOB|0||0
+  # 11|flags|INTEGER|0||0
+  # 12|last_modified|INTEGER|1|CAST(strftime('%s','now') AS INTEGER)|0
+  # 13|pid|INTEGER|0||0
 
   epoch="$(date +%s)"
   sqlite3 "${db_path}" \
