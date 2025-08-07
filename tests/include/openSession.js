@@ -70,13 +70,16 @@ async function openSession() {
       // 调试打开会话失败的问题
       fs.writeFileSync("openSession-error.txt", "调试打开会话失败的问题");
     } catch (e) {
-      console.log(e)
-      outputLog("分身浏览器连接失败，3秒后重试");
+      console.log(e);
       retry++;
+      outputLog(`分身浏览器连接失败，3秒后重试第${retry}次`);
       if (retry > 10) {
         // 调试打开会话失败的问题
-        fs.writeFileSync("openSession-error.txt", "调试打开会话失败的问题");
-        await sleep(3600 * 100 * 1000);
+        if (false) {
+          outputLog("调试打开会话失败的问题");
+          fs.writeFileSync("openSession-error.txt", "调试打开会话失败的问题");
+          await sleep(3600 * 100 * 1000);
+        }
         throw new Error('分身浏览器连接失败');
       }
       continue;
