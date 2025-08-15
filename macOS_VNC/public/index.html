@@ -798,6 +798,85 @@
             fullscreenContainer.addEventListener('mouseup', sendMouseUp);
             fullscreenContainer.addEventListener('mousemove', sendMouseMove);
 
+            // 双击事件相关变量
+            let lastClickTime = 0;
+            const DOUBLE_CLICK_THRESHOLD = 300; // 双击时间阈值(毫秒)
+            let lastClickPosition = { x: 0, y: 0 };
+            const DOUBLE_CLICK_POSITION_THRESHOLD = 5; // 双击位置阈值(像素)
+
+            /**
+             * 处理双击事件
+             * @param {Event} event 鼠标事件
+             */
+            function sendDoubleClick(event) {
+                event.preventDefault();
+                if (!isConnected()) return;
+
+                const { x, y } = getOriginalCoordinates(event);
+                if (x === null || y === null) return;
+
+                // 显示鼠标信息
+                showMouseInfo(x, y);
+
+                // 发送双击事件到服务器
+                sendMessage({
+                    type: 'mouseDoubleClick',
+                    x, y,
+                    timestamp: Date.now()
+                });
+
+                console.log(`双击事件: (${x}, ${y})`);
+            }
+
+            // 增强单击事件处理，用于检测双击
+            screenContainer.addEventListener('click', function (event) {
+                const currentTime = Date.now();
+                const { x, y } = getOriginalCoordinates(event) || { x: 0, y: 0 };
+
+                // 计算两次点击的时间差和位置差
+                const timeDiff = currentTime - lastClickTime;
+                const posDiffX = Math.abs(x - lastClickPosition.x);
+                const posDiffY = Math.abs(y - lastClickPosition.y);
+
+                // 判断是否为双击
+                if (timeDiff < DOUBLE_CLICK_THRESHOLD &&
+                    posDiffX < DOUBLE_CLICK_POSITION_THRESHOLD &&
+                    posDiffY < DOUBLE_CLICK_POSITION_THRESHOLD) {
+                    // 触发双击事件
+                    sendDoubleClick(event);
+                    // 重置点击跟踪，避免 triple click 被误判
+                    lastClickTime = 0;
+                    lastClickPosition = { x: 0, y: 0 };
+                    return;
+                }
+
+                // 更新上次点击信息
+                lastClickTime = currentTime;
+                lastClickPosition = { x, y };
+            });
+
+            // 为全屏容器也添加相同的双击处理
+            fullscreenContainer.addEventListener('click', function (event) {
+                const currentTime = Date.now();
+                const { x, y } = getOriginalCoordinates(event) || { x: 0, y: 0 };
+
+                const timeDiff = currentTime - lastClickTime;
+                const posDiffX = Math.abs(x - lastClickPosition.x);
+                const posDiffY = Math.abs(y - lastClickPosition.y);
+
+                if (timeDiff < DOUBLE_CLICK_THRESHOLD &&
+                    posDiffX < DOUBLE_CLICK_POSITION_THRESHOLD &&
+                    posDiffY < DOUBLE_CLICK_POSITION_THRESHOLD) {
+                    sendDoubleClick(event);
+                    lastClickTime = 0;
+                    lastClickPosition = { x: 0, y: 0 };
+                    return;
+                }
+
+                lastClickTime = currentTime;
+                lastClickPosition = { x, y };
+            });
+
             document.addEventListener('keydown', sendKeyEvent);
             document.addEventListener('keyup', sendKeyEvent);
 

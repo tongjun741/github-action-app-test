@@ -77,6 +77,23 @@ function simulateClick(x, y) {
     });
 }
 
+// 执行鼠标双击命令
+function simulateMouseDoubleClick(x, y) {
+    const command = `cliclick dc:${x},${y}`;
+
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`执行双击命令失败: ${error.message}`);
+            return;
+        }
+        if (stderr) {
+            console.error(`命令错误输出: ${stderr}`);
+            return;
+        }
+        console.log(`已在位置 (${x}, ${y}) 执行双击`);
+    });
+}
+
 // 执行鼠标按下命令 (开始拖拽)
 function simulateMouseDown(x, y) {
     isDragging = true;
@@ -388,6 +405,13 @@ wss.on('connection', (ws) => {
                 const { x, y } = message;
                 if (typeof x === 'number' && typeof y === 'number') {
                     simulateClick(x, y);
+                }
+            }
+            // 处理鼠标双击事件
+            else if (message.type === 'mouseDoubleClick') {
+                const { x, y } = message;
+                if (typeof x === 'number' && typeof y === 'number') {
+                    simulateMouseDoubleClick(x, y);
                 }
             }
             // 处理鼠标按下事件（开始拖拽）
