@@ -53,10 +53,59 @@ jobs:
       run: |
         sed -i "" "s/user = .*/user = ${{ secrets.FRPC_USER }}/g" macOS_VNC/frpc_15897721.ini
         sed -i "" "s/remote_port = .*/remote_port = ${{ secrets.FRPC_MAC_REMOTE_PORT }}/g" macOS_VNC/frpc_15897721.ini
-        sed -i "" "s/local_port = .*/local_port = 5900/g" macOS_VNC/frpc_15897721.ini
+        sed -i "" "s/local_port = .*/local_port = 8080/g" macOS_VNC/frpc_15897721.ini
         curl -Lo frpc https://nya.globalslb.net/natfrp/client/frpc/0.51.0-sakura-9.3/frpc_darwin_amd64
         chmod +x frpc
         ./frpc -c ./macOS_VNC/frpc_15897721.ini > /tmp/frpc.log 2>&1 &
+          
+    - name: Install node dependencies 👨🏻‍💻
+      run: yarn add ws express sharp pngjs
+
+    - name: Install cliclick
+      run: brew install cliclick
+
+    - name: 启动ws远程桌面
+      run: |
+        node ./macOS_VNC/screenShareServer.js
+
+    - name: Install AnyDesk
+      run: |
+        #!/bin/bash
+        
+        echo "开始安装 AnyDesk..."
+        
+        # 下载 AnyDesk
+        echo "正在下载 AnyDesk..."
+        ANYDESK_DMG="anydesk.dmg"
+        curl -L -o "$ANYDESK_DMG" "https://download.anydesk.com/anydesk.dmg"
+        
+        # 挂载 DMG
+        echo "挂载 DMG 文件..."
+        VOLUME_PATH=$(hdiutil attach "$ANYDESK_DMG" | grep -o '/Volumes/.*' | head -n 1)
+        
+        # 安装到 Applications
+        echo "正在安装..."
+        sudo cp -R "$VOLUME_PATH/AnyDesk.app" /Applications/
+        
+        # 卸载 DMG
+        echo "卸载 DMG..."
+        hdiutil detach "$VOLUME_PATH"
+        
+        # 清理临时文件
+        rm "$ANYDESK_DMG"
+        
+        # 验证安装
+        echo "验证安装..."
+        if [ -d "/Applications/AnyDesk.app" ]; then
+          echo "✅ AnyDesk 安装成功！"
+          echo "应用程序位置: /Applications/AnyDesk.app"
+        else
+          echo "❌ 安装失败！"
+          exit 1
+        fi
+        
+        echo "启动 AnyDesk..."
+        open -a AnyDesk
 
     - name: MacOS System running...
       uses: mxschmitt/action-tmate@v2

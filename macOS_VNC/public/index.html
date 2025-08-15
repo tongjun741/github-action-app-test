@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>远程桌面客户端</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .screen-container {
+                @apply relative bg-gray-900 rounded-lg overflow-hidden shadow-2xl transition-all duration-300;
+            }
+            .dragging-indicator {
+                @apply absolute top-2 right-2 bg-orange-500 bg-opacity-80 text-white px-2 py-1 rounded text-sm;
+            }
+            .fullscreen-overlay {
+                @apply fixed inset-0 z-50 bg-black flex items-center justify-center;
+            }
+            .fullscreen-exit {
+                @apply absolute top-4 right-4 bg-red-600 hover:bg-red-700 text-white p-2 rounded-full transition-all duration-300;
+            }
+            .reconnecting-indicator {
+                @apply absolute top-2 left-1/2 transform -translate-x-1/2 bg-yellow-500 bg-opacity-80 text-white px-3 py-1 rounded text-sm;
+            }
+            .debug-info {
+                @apply fixed bottom-4 left-4 bg-black bg-opacity-70 text-white px-3 py-2 rounded text-xs max-w-xs;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+    <header class="bg-gray-800 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold flex items-center">
+                <i class="fa fa-desktop mr-3"></i>远程桌面客户端
+            </h1>
+            <div id="connectionInfo" class="flex items-center">
+                <span id="statusText" class="mr-2">未连接</span>
+                <span id="statusIndicator" class="w-3 h-3 rounded-full bg-red-500"></span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow container mx-auto p-4 md:p-6 flex flex-col items-center justify-center">
+        <div class="w-full max-w-5xl">
+            <div class="screen-container w-full" style="min-height: 400px;" id="screenContainer">
+                <img id="screenDisplay" class="w-full h-auto" alt="远程屏幕显示" />
+                <div id="loadingIndicator" class="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+                    <div class="text-white text-center">
+                        <i class="fa fa-circle-o-notch fa-spin text-4xl mb-3"></i>
+                        <p>等待连接...</p>
+                    </div>
+                </div>
+                <div id="mouseInfo" class="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm hidden">
+                    鼠标位置: (x, y)
+                </div>
+                <div id="draggingIndicator" class="dragging-indicator hidden">
+                    <i class="fa fa-arrows mr-1"></i>拖拽中...
+                </div>
+                <div id="reconnectingIndicator" class="reconnecting-indicator hidden">
+                    <i class="fa fa-refresh fa-spin mr-1"></i>尝试重连...
+                </div>
+            </div>
+
+            <div class="mt-6 flex flex-wrap gap-3">
+                <button id="connectBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+                    <i class="fa fa-plug mr-2"></i>连接服务器
+                </button>
+                <button id="disconnectBtn" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center" disabled>
+                    <i class="fa fa-unplug mr-2"></i>断开连接
+                </button>
+                <button id="fullscreenBtn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center" disabled>
+                    <i class="fa fa-expand mr-2"></i>全屏模式
+                </button>
+                <button id="toggleDebugBtn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center">
+                    <i class="fa fa-bug mr-2"></i>调试信息
+                </button>
+                <div class="ml-auto flex items-center">
+                    <label for="serverUrl" class="mr-2 text-gray-700">服务器地址:</label>
+                    <input type="text" id="serverUrl" value="" 
+                           class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+            </div>
+
+            <div id="connectionError" class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg hidden">
+                <h3 class="font-semibold text-red-800 flex items-center">
+                    <i class="fa fa-exclamation-circle mr-2"></i>连接失败
+                </h3>
+                <p id="errorMessage" class="text-red-700 text-sm mt-2">无法连接到服务器，请检查地址是否正确</p>
+                <div id="errorDetails" class="text-red-600 text-xs mt-1 hidden">错误详情: </div>
+            </div>
+
+            <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 class="font-semibold text-blue-800 flex items-center">
+                    <i class="fa fa-info-circle mr-2"></i>使用说明
+                </h3>
+                <ul class="text-blue-700 text-sm mt-2 list-disc pl-5">
+                    <li>移动鼠标控制远程电脑鼠标</li>
+                    <li>单击左键执行远程点击</li>
+                    <li>按住左键并移动实现远程拖放</li>
+                    <li>键盘输入将直接发送到远程电脑</li>
+                    <li>点击"全屏模式"可进入全屏控制，按ESC退出</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <!-- 全屏模式容器 -->
+    <div id="fullscreenContainer" class="fullscreen-overlay hidden">
+        <img id="fullscreenDisplay" class="max-w-full max-h-full object-contain" alt="远程屏幕全屏显示" />
+        <button id="exitFullscreenBtn" class="fullscreen-exit">
+            <i class="fa fa-compress"></i>
+        </button>
+    </div>
+
+    <!-- 调试信息面板 -->
+    <div id="debugPanel" class="debug-info hidden" style="z-index: 1000;">
+        <p><strong>调试信息:</strong></p>
+        <p>原始分辨率: <span id="originalRes">0x0</span></p>
+        <p>显示尺寸: <span id="displaySize">0x0</span></p>
+        <p>缩放比例: <span id="scaleRatio">0x0</span></p>
+        <p>点击坐标: <span id="clickCoords">0,0</span></p>
+        <p>转换后坐标: <span id="convertedCoords">0,0</span></p>
+    </div>
+
+    <footer class="bg-gray-800 text-white p-4 mt-6">
+        <div class="container mx-auto text-center text-sm">
+            <p>远程桌面客户端 &copy; 2023</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let ws;
+            let originalScreenWidth = 0;
+            let originalScreenHeight = 0;
+            let mouseMoveThrottle = null;
+            const MOVE_DELAY = 30;
+            let isDragging = false;
+            let lastMousePosition = { x: 0, y: 0 };
+            let connectionTimeout = null;
+            const CONNECTION_TIMEOUT_MS = 10000;
+            let isFullscreen = false;
+            let reconnectAttempts = 0;
+            const MAX_RECONNECT_ATTEMPTS = 5;
+            let reconnectTimeout = null;
+            let heartbeatInterval = null;
+            let lastHeartbeatTime = 0;
+            const HEARTBEAT_TIMEOUT = 45000;
+            let debugMode = false;
+
+            // 获取DOM元素
+            const screenDisplay = document.getElementById('screenDisplay');
+            const fullscreenDisplay = document.getElementById('fullscreenDisplay');
+            const fullscreenContainer = document.getElementById('fullscreenContainer');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const fullscreenBtn = document.getElementById('fullscreenBtn');
+            const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
+            const serverUrlInput = document.getElementById('serverUrl');
+            const statusText = document.getElementById('statusText');
+            const statusIndicator = document.getElementById('statusIndicator');
+            const mouseInfo = document.getElementById('mouseInfo');
+            const draggingIndicator = document.getElementById('draggingIndicator');
+            const screenContainer = document.getElementById('screenContainer');
+            const connectionError = document.getElementById('connectionError');
+            const errorMessage = document.getElementById('errorMessage');
+            const errorDetails = document.getElementById('errorDetails');
+            const reconnectingIndicator = document.getElementById('reconnectingIndicator');
+            const toggleDebugBtn = document.getElementById('toggleDebugBtn');
+            const debugPanel = document.getElementById('debugPanel');
+            const originalRes = document.getElementById('originalRes');
+            const displaySize = document.getElementById('displaySize');
+            const scaleRatio = document.getElementById('scaleRatio');
+            const clickCoords = document.getElementById('clickCoords');
+            const convertedCoords = document.getElementById('convertedCoords');
+
+            // 检查必要元素是否存在
+            if (!screenContainer) {
+                console.error('未找到screenContainer元素，请检查HTML结构');
+                return;
+            }
+
+            // 页面加载时自动设置WebSocket地址
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const defaultWsUrl = `${protocol}//${window.location.host}`;
+            serverUrlInput.value = defaultWsUrl;
+            setTimeout(connect, 500);
+
+            // 更新连接状态
+            function updateConnectionStatus(connected, errorMsg = '', details = '') {
+                if (connectionTimeout) {
+                    clearTimeout(connectionTimeout);
+                    connectionTimeout = null;
+                }
+                
+                connectionError.classList.toggle('hidden', !errorMsg);
+                if (errorMsg) {
+                    errorMessage.textContent = errorMsg;
+                    if (details) {
+                        errorDetails.textContent = `错误详情: ${details}`;
+                        errorDetails.classList.remove('hidden');
+                    } else {
+                        errorDetails.classList.add('hidden');
+                    }
+                }
+                
+                if (connected) {
+                    statusText.textContent = '已连接';
+                    statusIndicator.className = 'w-3 h-3 rounded-full bg-green-500';
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    fullscreenBtn.disabled = false;
+                    loadingIndicator.innerHTML = '<div class="text-white text-center"><i class="fa fa-circle-o-notch fa-spin text-4xl mb-3"></i><p>接收屏幕数据中...</p></div>';
+                    reconnectingIndicator.classList.add('hidden');
+                    reconnectAttempts = 0;
+                } else {
+                    statusText.textContent = '未连接';
+                    statusIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    fullscreenBtn.disabled = true;
+                    
+                    if (errorMsg) {
+                        loadingIndicator.innerHTML = '<div class="text-white text-center"><i class="fa fa-exclamation-triangle text-4xl mb-3"></i><p>连接失败</p></div>';
+                    } else {
+                        loadingIndicator.innerHTML = '<div class="text-white text-center"><i class="fa fa-circle-o-notch fa-spin text-4xl mb-3"></i><p>等待连接...</p></div>';
+                    }
+                    
+                    screenDisplay.src = '';
+                    fullscreenDisplay.src = '';
+                    resetDragState();
+                }
+            }
+
+            // 重置拖拽状态
+            function resetDragState() {
+                isDragging = false;
+                draggingIndicator.classList.add('hidden');
+                originalScreenWidth = 0;
+                originalScreenHeight = 0;
+            }
+
+            // 全屏功能实现
+            function enterFullscreen() {
+                fullscreenContainer.style.display = 'block';
+                isFullscreen = true;
+                
+                // 延迟更新尺寸信息，确保全屏已生效
+                setTimeout(updateDebugInfo, 500);
+            }
+
+            function exitFullscreen() {
+                // 隐藏元素
+                fullscreenContainer.style.display = 'none';
+                isFullscreen = false;
+                
+                // 更新调试信息
+                updateDebugInfo();
+            }
+
+            // 切换调试模式
+            function toggleDebugMode() {
+                debugMode = !debugMode;
+                debugPanel.classList.toggle('hidden', !debugMode);
+                toggleDebugBtn.classList.toggle('bg-red-500', debugMode);
+                toggleDebugBtn.classList.toggle('bg-gray-500', !debugMode);
+                
+                if (debugMode) {
+                    updateDebugInfo();
+                }
+            }
+
+            // 更新调试信息
+            function updateDebugInfo() {
+                if (!debugMode) return;
+                
+                // 显示原始分辨率
+                originalRes.textContent = `${originalScreenWidth}x${originalScreenHeight}`;
+                
+                // 获取当前显示元素
+                const displayElement = isFullscreen ? fullscreenDisplay : screenDisplay;
+                const rect = displayElement.getBoundingClientRect();
+                
+                // 显示显示尺寸
+                displaySize.textContent = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+                
+                // 计算并显示缩放比例
+                const scaleX = originalScreenWidth > 0 ? originalScreenWidth / rect.width : 0;
+                const scaleY = originalScreenHeight > 0 ? originalScreenHeight / rect.height : 0;
+                scaleRatio.textContent = `${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`;
+            }
+
+            // 自动重连功能
+            function scheduleReconnect() {
+                if (reconnectTimeout) {
+                    clearTimeout(reconnectTimeout);
+                    reconnectTimeout = null;
+                }
+                
+                if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+                    updateConnectionStatus(false, `已尝试${MAX_RECONNECT_ATTEMPTS}次连接均失败，请检查服务器状态后手动重试`);
+                    return;
+                }
+                
+                const delay = 1000 * Math.pow(2, reconnectAttempts);
+                reconnectAttempts++;
+                
+                reconnectingIndicator.textContent = `<i class="fa fa-refresh fa-spin mr-1"></i>尝试重连(${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`;
+                reconnectingIndicator.classList.remove('hidden');
+                
+                reconnectTimeout = setTimeout(() => {
+                    console.log(`第${reconnectAttempts}次重连...`);
+                    connect();
+                }, delay);
+            }
+
+            // 鼠标事件处理
+            function sendMouseClick(event) {
+                event.preventDefault();
+                if (!isConnected()) return;
+
+                const { x, y, clientX, clientY } = getOriginalCoordinates(event);
+                if (x === null || y === null) return;
+
+                // 更新调试信息中的点击坐标
+                if (debugMode) {
+                    clickCoords.textContent = `${Math.round(clientX)},${Math.round(clientY)}`;
+                    convertedCoords.textContent = `${x},${y}`;
+                }
+
+                showMouseInfo(x, y);
+                sendMessage({
+                    type: 'mouseClick',
+                    x, y,
+                    timestamp: Date.now()
+                });
+            }
+
+            function sendMouseDown(event) {
+                event.preventDefault();
+                if (!isConnected()) return;
+
+                const { x, y } = getOriginalCoordinates(event);
+                if (x === null || y === null) return;
+
+                isDragging = true;
+                draggingIndicator.classList.remove('hidden');
+                showMouseInfo(x, y);
+                sendMessage({
+                    type: 'mouseDown',
+                    x, y,
+                    timestamp: Date.now()
+                });
+            }
+
+            function sendMouseUp(event) {
+                event.preventDefault();
+                if (!isConnected() || !isDragging) return;
+
+                const { x, y } = getOriginalCoordinates(event);
+                if (x === null || y === null) return;
+
+                isDragging = false;
+                draggingIndicator.classList.add('hidden');
+                showMouseInfo(x, y);
+                sendMessage({
+                    type: 'mouseUp',
+                    x, y,
+                    timestamp: Date.now()
+                });
+            }
+
+            function sendMouseMove(event) {
+                if (!isConnected()) return;
+
+                if (mouseMoveThrottle) return;
+                
+                mouseMoveThrottle = setTimeout(() => {
+                    mouseMoveThrottle = null;
+                    const { x, y, rect } = getOriginalCoordinates(event, true);
+                    
+                    // 检查鼠标是否在图像区域内
+                    if (!rect || event.clientX < rect.left || event.clientX > rect.right ||
+                        event.clientY < rect.top || event.clientY > rect.bottom) {
+                        return;
+                    }
+
+                    if (x === null || y === null) return;
+                    
+                    lastMousePosition = { x, y };
+
+                    if (isDragging || shouldSendMoveEvent(x, y)) {
+                        showMouseInfo(x, y);
+                        sendMessage({
+                            type: 'mouseMove',
+                            x, y,
+                            timestamp: Date.now()
+                        });
+                    }
+                }, MOVE_DELAY);
+            }
+
+            // 键盘事件处理
+            function sendKeyEvent(event) {
+                // 按ESC键退出全屏
+                if (event.key === 'Escape' && isFullscreen) {
+                    exitFullscreen();
+                    event.preventDefault();
+                    return;
+                }
+                
+                if (!isConnected()) return;
+                
+                if (event.metaKey && event.key === 'Tab') return;
+                
+                sendMessage({
+                    type: 'keyEvent',
+                    key: event.key,
+                    isDown: event.type === 'keydown',
+                    timestamp: Date.now()
+                });
+            }
+
+            // 辅助函数：判断是否需要发送移动事件
+            function shouldSendMoveEvent(x, y) {
+                const distance = Math.sqrt(
+                    Math.pow(x - lastMousePosition.x, 2) + 
+                    Math.pow(y - lastMousePosition.y, 2)
+                );
+                return distance > 2;
+            }
+
+            /**
+             * 修复后的坐标转换函数
+             * 正确处理全屏和普通模式下的坐标转换
+             * @param {Event} event 鼠标事件
+             * @param {boolean} returnRect 是否返回边界矩形
+             * @returns {Object} 包含原始坐标和客户端坐标的对象
+             */
+            function getOriginalCoordinates(event, returnRect = false) {
+                // 确保我们有原始屏幕尺寸
+                if (originalScreenWidth === 0 || originalScreenHeight === 0) {
+                    return returnRect ? { x: null, y: null, rect: null } : { x: null, y: null };
+                }
+
+                // 根据当前模式选择正确的显示元素
+                const displayElement = isFullscreen ? fullscreenDisplay : screenDisplay;
+                
+                // 获取元素在视口中的位置和尺寸（关键修复点）
+                const rect = displayElement.getBoundingClientRect();
+                
+                // 计算鼠标在元素内的相对位置（关键修复点）
+                const mouseX = event.clientX - rect.left;
+                const mouseY = event.clientY - rect.top;
+                
+                // 计算缩放比例（关键修复点）
+                const scaleX = originalScreenWidth / rect.width;
+                const scaleY = originalScreenHeight / rect.height;
+                
+                // 计算原始坐标并取整
+                const originalX = Math.round(mouseX * scaleX);
+                const originalY = Math.round(mouseY * scaleY);
+                
+                // 调试日志
+                if (debugMode) {
+                    console.log(`坐标转换 - 全屏: ${isFullscreen}`);
+                    console.log(`元素尺寸: ${rect.width}x${rect.height}`);
+                    console.log(`鼠标相对位置: ${mouseX.toFixed(0)},${mouseY.toFixed(0)}`);
+                    console.log(`缩放比例: ${scaleX.toFixed(2)},${scaleY.toFixed(2)}`);
+                    console.log(`转换后坐标: ${originalX},${originalY}`);
+                }
+                
+                // 返回结果
+                if (returnRect) {
+                    return {
+                        x: originalX,
+                        y: originalY,
+                        clientX: mouseX,
+                        clientY: mouseY,
+                        rect: rect
+                    };
+                } else {
+                    return {
+                        x: originalX,
+                        y: originalY,
+                        clientX: mouseX,
+                        clientY: mouseY
+                    };
+                }
+            }
+
+            function isConnected() {
+                return ws && ws.readyState === WebSocket.OPEN;
+            }
+
+            function sendMessage(data) {
+                if (isConnected()) {
+                    try {
+                        ws.send(JSON.stringify(data));
+                    } catch (error) {
+                        console.error('发送消息失败:', error);
+                        handleConnectionError(error);
+                    }
+                }
+            }
+
+            function showMouseInfo(x, y) {
+                mouseInfo.textContent = `鼠标位置: (${x}, ${y})`;
+                mouseInfo.classList.remove('hidden');
+            }
+
+            // 处理连接错误
+            function handleConnectionError(error) {
+                console.error('连接错误:', error);
+                updateConnectionStatus(false, '连接发生错误', error.message || error.toString());
+                
+                if (ws) {
+                    const wasClean = ws.readyState === WebSocket.CLOSED && error.wasClean;
+                    if (!wasClean) {
+                        scheduleReconnect();
+                    }
+                }
+            }
+
+            // 连接管理
+            function connect() {
+                const serverUrl = serverUrlInput.value.trim();
+                if (!serverUrl) {
+                    updateConnectionStatus(false, '请输入服务器地址');
+                    return;
+                }
+                
+                updateConnectionStatus(false);
+                loadingIndicator.innerHTML = '<div class="text-white text-center"><i class="fa fa-circle-o-notch fa-spin text-4xl mb-3"></i><p>正在建立连接...</p></div>';
+                connectBtn.disabled = true;
+                reconnectingIndicator.classList.add('hidden');
+                
+                try {
+                    if (ws) {
+                        ws.close(1000, '重新连接');
+                    }
+
+                    ws = new WebSocket(serverUrl);
+                    
+                    connectionTimeout = setTimeout(() => {
+                        if (ws.readyState !== WebSocket.OPEN) {
+                            ws.close(1006, '连接超时');
+                            updateConnectionStatus(false, `连接超时 (${CONNECTION_TIMEOUT_MS/1000}秒)`, '服务器无响应，请检查是否运行');
+                            scheduleReconnect();
+                        }
+                    }, CONNECTION_TIMEOUT_MS);
+                    
+                    ws.onopen = () => {
+                        console.log('已连接到服务器');
+                        updateConnectionStatus(true);
+                        
+                        if (heartbeatInterval) {
+                            clearInterval(heartbeatInterval);
+                        }
+                        heartbeatInterval = setInterval(() => {
+                            const now = Date.now();
+                            if (now - lastHeartbeatTime > HEARTBEAT_TIMEOUT) {
+                                console.error('心跳超时，连接可能已断开');
+                                ws.close(1006, '心跳超时');
+                                handleConnectionError(new Error('心跳超时'));
+                            }
+                        }, 5000);
+                    };
+                    
+                    ws.onmessage = (event) => {
+                        try {
+                            const message = JSON.parse(event.data);
+                            
+                            if (message.type === 'heartbeat') {
+                                lastHeartbeatTime = Date.now();
+                                return;
+                            }
+                            
+                            if (message.type === 'screenshot' && message.data) {
+                                screenDisplay.src = `data:image/webp;base64,${message.data}`;
+                                fullscreenDisplay.src = `data:image/webp;base64,${message.data}`;
+                                loadingIndicator.style.display = 'none';
+                                
+                                screenDisplay.onload = () => {
+                                    // 获取原始图像尺寸（关键修复点）
+                                    originalScreenWidth = screenDisplay.naturalWidth;
+                                    originalScreenHeight = screenDisplay.naturalHeight;
+                                    
+                                    // 更新调试信息
+                                    updateDebugInfo();
+                                };
+                            }
+                        } catch (error) {
+                            console.error('处理图像数据失败:', error);
+                        }
+                    };
+                    
+                    ws.onclose = (event) => {
+                        console.log('连接已关闭', event);
+                        
+                        if (heartbeatInterval) {
+                            clearInterval(heartbeatInterval);
+                            heartbeatInterval = null;
+                        }
+                        
+                        let errorMsg = '';
+                        if (event.code !== 1000) {
+                            errorMsg = `连接已断开 (代码: ${event.code})`;
+                        }
+                        
+                        updateConnectionStatus(false, errorMsg, event.reason);
+                        
+                        if (event.code !== 1000) {
+                            scheduleReconnect();
+                        }
+                    };
+                    
+                    ws.onerror = (error) => {
+                        handleConnectionError(error);
+                    };
+                } catch (error) {
+                    console.error('连接失败:', error);
+                    updateConnectionStatus(false, '无法连接到服务器', error.message);
+                    scheduleReconnect();
+                }
+            }
+
+            function disconnect() {
+                if (isFullscreen) {
+                    exitFullscreen();
+                }
+                
+                if (reconnectTimeout) {
+                    clearTimeout(reconnectTimeout);
+                    reconnectTimeout = null;
+                }
+                
+                if (heartbeatInterval) {
+                    clearInterval(heartbeatInterval);
+                    heartbeatInterval = null;
+                }
+                
+                if (ws) {
+                    ws.close(1000, '用户主动断开连接');
+                    ws = null;
+                }
+                updateConnectionStatus(false);
+            }
+
+            // 事件绑定
+            screenContainer.addEventListener('click', sendMouseClick);
+            screenContainer.addEventListener('mousedown', sendMouseDown);
+            screenContainer.addEventListener('mouseup', sendMouseUp);
+            screenContainer.addEventListener('mousemove', sendMouseMove);
+            
+            fullscreenContainer.addEventListener('click', sendMouseClick);
+            fullscreenContainer.addEventListener('mousedown', sendMouseDown);
+            fullscreenContainer.addEventListener('mouseup', sendMouseUp);
+            fullscreenContainer.addEventListener('mousemove', sendMouseMove);
+            
+            document.addEventListener('keydown', sendKeyEvent);
+            document.addEventListener('keyup', sendKeyEvent);
+            
+            fullscreenBtn.addEventListener('click', enterFullscreen);
+            exitFullscreenBtn.addEventListener('click', exitFullscreen);
+            toggleDebugBtn.addEventListener('click', toggleDebugMode);
+            
+            document.addEventListener('fullscreenchange', () => {
+                if (!document.fullscreenElement) {
+                    fullscreenContainer.classList.add('hidden');
+                    isFullscreen = false;
+                    updateDebugInfo();
+                }
+            });
+            
+            window.addEventListener('blur', () => {
+                if (isDragging) {
+                    sendMessage({
+                        type: 'mouseUp',
+                        x: lastMousePosition.x || 0,
+                        y: lastMousePosition.y || 0,
+                        timestamp: Date.now()
+                    });
+                    resetDragState();
+                }
+            });
+
+            connectBtn.addEventListener('click', connect);
+            disconnectBtn.addEventListener('click', disconnect);
+
+            // 初始化
+            updateConnectionStatus(false);
+        });
+    </script>
+</body>
+</html>
+    
