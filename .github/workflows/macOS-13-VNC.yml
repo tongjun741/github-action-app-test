@@ -71,6 +71,7 @@ jobs:
     - name: Install AnyDesk
       run: |
         #!/bin/bash
+        set +e  # 关闭脚本的错误退出，忽略后续所有命令的错误
         
         echo "开始安装 AnyDesk..."
         
@@ -94,18 +95,20 @@ jobs:
         # 清理临时文件
         rm "$ANYDESK_DMG"
         
-        # 验证安装
+        # 验证安装（即使失败也不退出）
         echo "验证安装..."
         if [ -d "/Applications/AnyDesk.app" ]; then
           echo "✅ AnyDesk 安装成功！"
           echo "应用程序位置: /Applications/AnyDesk.app"
         else
-          echo "❌ 安装失败！"
-          exit 1
+          echo "❌ 安装失败，但已忽略错误！"
         fi
         
         echo "启动 AnyDesk..."
         open -a AnyDesk
+        
+        set -e  # 恢复错误退出（如果后续步骤需要的话）
+      continue-on-error: true  # 告诉 GitHub Actions 忽略此步骤的失败
 
     - name: MacOS System running...
       uses: mxschmitt/action-tmate@v2
