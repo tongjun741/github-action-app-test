@@ -422,7 +422,7 @@
                 }, MOVE_DELAY);
             }
 
-            // 键盘事件处理
+            // 键盘事件处理 - 支持大写字母
             function sendKeyEvent(event) {
                 // 按ESC键退出全屏
                 if (event.key === 'Escape' && isFullscreen) {
@@ -435,12 +435,57 @@
 
                 if (event.metaKey && event.key === 'Tab') return;
 
+                // 初始化变量存储最终字符和大小写状态
+                let key = event.key;
+                let isUppercase = false;
+
+                // 检查是否是字母键
+                if (/^[a-z]$/i.test(key)) {
+                    // 判断是否应该是大写
+                    // Shift键按下或Caps Lock开启且状态一致时为大写
+                    const shiftActive = event.shiftKey;
+                    const capsLockActive = getCapsLockState();
+
+                    // 当Shift和CapsLock状态不同时，字母为大写
+                    isUppercase = shiftActive !== capsLockActive;
+
+                    // 根据大小写状态转换字符
+                    key = isUppercase ? key.toUpperCase() : key.toLowerCase();
+                }
+                // 处理数字和符号键的上档字符（如!@#等）
+                else if (/^[0-9]$/.test(key) && event.shiftKey) {
+                    // 数字键上档符号映射表
+                    const numberShiftMap = {
+                        '0': ')', '1': '!', '2': '@', '3': '#',
+                        '4': '$', '5': '%', '6': '^', '7': '&',
+                        '8': '*', '9': '('
+                    };
+                    key = numberShiftMap[key] || key;
+                }
+
                 sendMessage({
                     type: 'keyEvent',
-                    key: event.key,
+                    key: key,
                     isDown: event.type === 'keydown',
+                    isShift: event.shiftKey,
+                    isCapsLock: getCapsLockState(),
+                    isUppercase: isUppercase,
                     timestamp: Date.now()
                 });
+            }
+
+            // 检测Caps Lock状态的辅助函数
+            function getCapsLockState() {
+                // 对于可打印字符，通过比较按下的键和其大小写形式判断
+                // 也可以通过监听keydown事件专门跟踪Caps Lock状态
+                const el = document.activeElement;
+                if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+                    return el.selectionStart === el.selectionEnd &&
+                        (el.value.substring(el.selectionStart - 1, el.selectionStart) || '').match(/[A-Z]/) &&
+                        !event.shiftKey;
+                }
+                // 备选方案：使用ASCII值判断
+                return event.getModifierState && event.getModifierState('CapsLock');
             }
 
             // 辅助函数：判断是否需要发送移动事件
@@ -878,7 +923,6 @@
             });
 
             document.addEventListener('keydown', sendKeyEvent);
-            document.addEventListener('keyup', sendKeyEvent);
 
             fullscreenBtn.addEventListener('click', enterFullscreen);
             exitFullscreenBtn.addEventListener('click', exitFullscreen);
