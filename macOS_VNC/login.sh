@@ -1,4 +1,4 @@
 #!/bin/bash
 echo ..........................................................
 echo Username: runneradmin
-echo Password: P@ssw0rd!
+echo Password: P123456.
