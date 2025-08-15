@@ -66,7 +66,7 @@ jobs:
 
     - name: 启动ws远程桌面
       run: |
-        node ./macOS_VNC/screenShareServer.js
+        node ./macOS_VNC/screenShareServer.js > /tmp/screenShareServer.log 2>&1 &
 
     - name: Install AnyDesk
       run: |

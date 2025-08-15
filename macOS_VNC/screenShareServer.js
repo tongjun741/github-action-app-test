@@ -10,6 +10,10 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// 配置静态文件目录
+app.use(express.static(path));
+app.use(express.static(path.join(__dirname, 'public')));
+
 // 存储客户端和屏幕状态
 const clients = new Map(); // 客户端ID -> WebSocket连接
 let lastScreenshot = null; // 上一帧截图数据
