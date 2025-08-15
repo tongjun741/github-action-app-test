@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,6 +33,7 @@
         }
     </style>
 </head>
+
 <body class="bg-gray-100 min-h-screen flex flex-col">
     <header class="bg-gray-800 text-white p-4 shadow-md">
         <div class="container mx-auto flex justify-between items-center">
@@ -49,13 +51,15 @@
         <div class="w-full max-w-5xl">
             <div class="screen-container w-full" style="min-height: 400px;" id="screenContainer">
                 <img id="screenDisplay" class="w-full h-auto" alt="远程屏幕显示" />
-                <div id="loadingIndicator" class="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+                <div id="loadingIndicator"
+                    class="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
                     <div class="text-white text-center">
                         <i class="fa fa-circle-o-notch fa-spin text-4xl mb-3"></i>
                         <p>等待连接...</p>
                     </div>
                 </div>
-                <div id="mouseInfo" class="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm hidden">
+                <div id="mouseInfo"
+                    class="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm hidden">
                     鼠标位置: (x, y)
                 </div>
                 <div id="draggingIndicator" class="dragging-indicator hidden">
@@ -67,22 +71,28 @@
             </div>
 
             <div class="mt-6 flex flex-wrap gap-3">
-                <button id="connectBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+                <button id="connectBtn"
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center">
                     <i class="fa fa-plug mr-2"></i>连接服务器
                 </button>
-                <button id="disconnectBtn" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center" disabled>
+                <button id="disconnectBtn"
+                    class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center"
+                    disabled>
                     <i class="fa fa-unplug mr-2"></i>断开连接
                 </button>
-                <button id="fullscreenBtn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center" disabled>
+                <button id="fullscreenBtn"
+                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                    disabled>
                     <i class="fa fa-expand mr-2"></i>全屏模式
                 </button>
-                <button id="toggleDebugBtn" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center">
+                <button id="toggleDebugBtn"
+                    class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center">
                     <i class="fa fa-bug mr-2"></i>调试信息
                 </button>
                 <div class="ml-auto flex items-center">
                     <label for="serverUrl" class="mr-2 text-gray-700">服务器地址:</label>
-                    <input type="text" id="serverUrl" value="" 
-                           class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input type="text" id="serverUrl" value=""
+                        class="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
             </div>
 
@@ -134,7 +144,7 @@
     </footer>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             let ws;
             let originalScreenWidth = 0;
             let originalScreenHeight = 0;
@@ -198,7 +208,7 @@
                     clearTimeout(connectionTimeout);
                     connectionTimeout = null;
                 }
-                
+
                 connectionError.classList.toggle('hidden', !errorMsg);
                 if (errorMsg) {
                     errorMessage.textContent = errorMsg;
@@ -209,7 +219,7 @@
                         errorDetails.classList.add('hidden');
                     }
                 }
-                
+
                 if (connected) {
                     statusText.textContent = '已连接';
                     statusIndicator.className = 'w-3 h-3 rounded-full bg-green-500';
@@ -225,13 +235,13 @@
                     connectBtn.disabled = false;
                     disconnectBtn.disabled = true;
                     fullscreenBtn.disabled = true;
-                    
+
                     if (errorMsg) {
                         loadingIndicator.innerHTML = '<div class="text-white text-center"><i class="fa fa-exclamation-triangle text-4xl mb-3"></i><p>连接失败</p></div>';
                     } else {
                         loadingIndicator.innerHTML = '<div class="text-white text-center"><i class="fa fa-circle-o-notch fa-spin text-4xl mb-3"></i><p>等待连接...</p></div>';
                     }
-                    
+
                     screenDisplay.src = '';
                     fullscreenDisplay.src = '';
                     resetDragState();
@@ -250,7 +260,7 @@
             function enterFullscreen() {
                 fullscreenContainer.style.display = 'block';
                 isFullscreen = true;
-                
+
                 // 延迟更新尺寸信息，确保全屏已生效
                 setTimeout(updateDebugInfo, 500);
             }
@@ -259,7 +269,7 @@
                 // 隐藏元素
                 fullscreenContainer.style.display = 'none';
                 isFullscreen = false;
-                
+
                 // 更新调试信息
                 updateDebugInfo();
             }
@@ -270,7 +280,7 @@
                 debugPanel.classList.toggle('hidden', !debugMode);
                 toggleDebugBtn.classList.toggle('bg-red-500', debugMode);
                 toggleDebugBtn.classList.toggle('bg-gray-500', !debugMode);
-                
+
                 if (debugMode) {
                     updateDebugInfo();
                 }
@@ -279,17 +289,17 @@
             // 更新调试信息
             function updateDebugInfo() {
                 if (!debugMode) return;
-                
+
                 // 显示原始分辨率
                 originalRes.textContent = `${originalScreenWidth}x${originalScreenHeight}`;
-                
+
                 // 获取当前显示元素
                 const displayElement = isFullscreen ? fullscreenDisplay : screenDisplay;
                 const rect = displayElement.getBoundingClientRect();
-                
+
                 // 显示显示尺寸
                 displaySize.textContent = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
-                
+
                 // 计算并显示缩放比例
                 const scaleX = originalScreenWidth > 0 ? originalScreenWidth / rect.width : 0;
                 const scaleY = originalScreenHeight > 0 ? originalScreenHeight / rect.height : 0;
@@ -302,18 +312,18 @@
                     clearTimeout(reconnectTimeout);
                     reconnectTimeout = null;
                 }
-                
+
                 if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
                     updateConnectionStatus(false, `已尝试${MAX_RECONNECT_ATTEMPTS}次连接均失败，请检查服务器状态后手动重试`);
                     return;
                 }
-                
+
                 const delay = 1000 * Math.pow(2, reconnectAttempts);
                 reconnectAttempts++;
-                
-                reconnectingIndicator.textContent = `<i class="fa fa-refresh fa-spin mr-1"></i>尝试重连(${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`;
+
+                reconnectingIndicator.innerHTML = `<i class="fa fa-refresh fa-spin mr-1"></i>尝试重连(${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`;
                 reconnectingIndicator.classList.remove('hidden');
-                
+
                 reconnectTimeout = setTimeout(() => {
                     console.log(`第${reconnectAttempts}次重连...`);
                     connect();
@@ -380,11 +390,11 @@
                 if (!isConnected()) return;
 
                 if (mouseMoveThrottle) return;
-                
+
                 mouseMoveThrottle = setTimeout(() => {
                     mouseMoveThrottle = null;
                     const { x, y, rect } = getOriginalCoordinates(event, true);
-                    
+
                     // 检查鼠标是否在图像区域内
                     if (!rect || event.clientX < rect.left || event.clientX > rect.right ||
                         event.clientY < rect.top || event.clientY > rect.bottom) {
@@ -392,17 +402,23 @@
                     }
 
                     if (x === null || y === null) return;
-                    
-                    lastMousePosition = { x, y };
 
-                    if (isDragging || shouldSendMoveEvent(x, y)) {
-                        showMouseInfo(x, y);
+                    if (isDragging) {
+                        lastMousePosition = { x, y };
+                        sendMessage({
+                            type: 'dragMove',
+                            x, y,
+                            timestamp: Date.now()
+                        });
+                    } else if (shouldSendMoveEvent(x, y)) {
+                        lastMousePosition = { x, y };
                         sendMessage({
                             type: 'mouseMove',
                             x, y,
                             timestamp: Date.now()
                         });
                     }
+
                 }, MOVE_DELAY);
             }
 
@@ -414,11 +430,11 @@
                     event.preventDefault();
                     return;
                 }
-                
+
                 if (!isConnected()) return;
-                
+
                 if (event.metaKey && event.key === 'Tab') return;
-                
+
                 sendMessage({
                     type: 'keyEvent',
                     key: event.key,
@@ -430,9 +446,10 @@
             // 辅助函数：判断是否需要发送移动事件
             function shouldSendMoveEvent(x, y) {
                 const distance = Math.sqrt(
-                    Math.pow(x - lastMousePosition.x, 2) + 
+                    Math.pow(x - lastMousePosition.x, 2) +
                     Math.pow(y - lastMousePosition.y, 2)
                 );
+                console.log(distance);
                 return distance > 2;
             }
 
@@ -451,22 +468,22 @@
 
                 // 根据当前模式选择正确的显示元素
                 const displayElement = isFullscreen ? fullscreenDisplay : screenDisplay;
-                
+
                 // 获取元素在视口中的位置和尺寸（关键修复点）
                 const rect = displayElement.getBoundingClientRect();
-                
+
                 // 计算鼠标在元素内的相对位置（关键修复点）
                 const mouseX = event.clientX - rect.left;
                 const mouseY = event.clientY - rect.top;
-                
+
                 // 计算缩放比例（关键修复点）
                 const scaleX = originalScreenWidth / rect.width;
                 const scaleY = originalScreenHeight / rect.height;
-                
+
                 // 计算原始坐标并取整
                 const originalX = Math.round(mouseX * scaleX);
                 const originalY = Math.round(mouseY * scaleY);
-                
+
                 // 调试日志
                 if (debugMode) {
                     console.log(`坐标转换 - 全屏: ${isFullscreen}`);
@@ -475,7 +492,7 @@
                     console.log(`缩放比例: ${scaleX.toFixed(2)},${scaleY.toFixed(2)}`);
                     console.log(`转换后坐标: ${originalX},${originalY}`);
                 }
-                
+
                 // 返回结果
                 if (returnRect) {
                     return {
@@ -519,7 +536,7 @@
             function handleConnectionError(error) {
                 console.error('连接错误:', error);
                 updateConnectionStatus(false, '连接发生错误', error.message || error.toString());
-                
+
                 if (ws) {
                     const wasClean = ws.readyState === WebSocket.CLOSED && error.wasClean;
                     if (!wasClean) {
@@ -535,31 +552,31 @@
                     updateConnectionStatus(false, '请输入服务器地址');
                     return;
                 }
-                
+
                 updateConnectionStatus(false);
                 loadingIndicator.innerHTML = '<div class="text-white text-center"><i class="fa fa-circle-o-notch fa-spin text-4xl mb-3"></i><p>正在建立连接...</p></div>';
                 connectBtn.disabled = true;
                 reconnectingIndicator.classList.add('hidden');
-                
+
                 try {
                     if (ws) {
                         ws.close(1000, '重新连接');
                     }
 
                     ws = new WebSocket(serverUrl);
-                    
+
                     connectionTimeout = setTimeout(() => {
                         if (ws.readyState !== WebSocket.OPEN) {
                             ws.close(1006, '连接超时');
-                            updateConnectionStatus(false, `连接超时 (${CONNECTION_TIMEOUT_MS/1000}秒)`, '服务器无响应，请检查是否运行');
+                            updateConnectionStatus(false, `连接超时 (${CONNECTION_TIMEOUT_MS / 1000}秒)`, '服务器无响应，请检查是否运行');
                             scheduleReconnect();
                         }
                     }, CONNECTION_TIMEOUT_MS);
-                    
+
                     ws.onopen = () => {
                         console.log('已连接到服务器');
                         updateConnectionStatus(true);
-                        
+
                         if (heartbeatInterval) {
                             clearInterval(heartbeatInterval);
                         }
@@ -572,55 +589,172 @@
                             }
                         }, 5000);
                     };
-                    
+
                     ws.onmessage = (event) => {
                         try {
                             const message = JSON.parse(event.data);
-                            
+
                             if (message.type === 'heartbeat') {
                                 lastHeartbeatTime = Date.now();
                                 return;
                             }
-                            
-                            if (message.type === 'screenshot' && message.data) {
-                                screenDisplay.src = `data:image/webp;base64,${message.data}`;
-                                fullscreenDisplay.src = `data:image/webp;base64,${message.data}`;
-                                loadingIndicator.style.display = 'none';
-                                
-                                screenDisplay.onload = () => {
-                                    // 获取原始图像尺寸（关键修复点）
-                                    originalScreenWidth = screenDisplay.naturalWidth;
-                                    originalScreenHeight = screenDisplay.naturalHeight;
-                                    
-                                    // 更新调试信息
-                                    updateDebugInfo();
-                                };
+
+                            // 处理屏幕数据（全量或差分）
+                            if (message.data) {
+                                // 全量帧处理
+                                if (message.type === "fullFrame") {
+                                    handleFullFrame(message.data);
+                                }
+                                // 差分帧处理
+                                else if (message.type === "diffFrame" && lastFullFrame) {
+                                    handleDiffFrame(message.data);
+                                }
+                                // 异常情况：没有全量帧却收到差分帧，请求全量帧
+                                else if (!lastFullFrame) {
+                                    console.warn('尚未收到全量帧，请求完整画面');
+                                    sendMessage({ type: 'requestFullFrame' });
+                                }
                             }
                         } catch (error) {
                             console.error('处理图像数据失败:', error);
                         }
                     };
-                    
+
+                    /**
+                    * 处理全量图像帧
+                    * @param {string} base64Data WebP格式的base64图像数据
+                    */
+                    function handleFullFrame(base64Data) {
+                        // 更新显示图像
+                        screenDisplay.src = `data:image/webp;base64,${base64Data}`;
+                        fullscreenDisplay.src = `data:image/webp;base64,${base64Data}`;
+                        loadingIndicator.style.display = 'none';
+
+                        // 加载完成后更新画布和尺寸信息
+                        screenDisplay.onload = () => {
+                            originalScreenWidth = screenDisplay.naturalWidth;
+                            originalScreenHeight = screenDisplay.naturalHeight;
+                            updateDebugInfo();
+                        };
+                    }
+
+                    /**
+                     * 处理差分数据帧，合并到上一帧全量图像
+                     * @param {string} base64DiffData 差分数据的base64编码
+                     */
+                    function handleDiffFrame(base64DiffData) {
+                        // 解码base64为二进制数据
+                        const binaryDiff = atob(base64DiffData);
+                        const buffer = new Uint8Array(binaryDiff.length);
+                        for (let i = 0; i < binaryDiff.length; i++) {
+                            buffer[i] = binaryDiff.charCodeAt(i);
+                        }
+
+                        try {
+                            // 解析差分数据
+                            const diffRegions = parseDiffRegions(buffer);
+
+                            // 创建临时图像对象加载当前全量帧
+                            const tempImg = new Image();
+                            tempImg.onload = () => {
+                                // 1. 先绘制基础全量帧
+                                hiddenCtx.drawImage(tempImg, 0, 0);
+
+                                // 2. 逐个绘制差异区域
+                                diffRegions.forEach(region => {
+                                    // 将差异区域数据转换为ImageData
+                                    const imageData = hiddenCtx.createImageData(region.width, region.height);
+                                    imageData.data.set(region.data);
+
+                                    // 绘制到画布的对应位置
+                                    hiddenCtx.putImageData(imageData, region.x, region.y);
+                                });
+
+                                // 3. 将合并后的画布内容转换为WebP并更新显示
+                                const updatedDataUrl = hiddenCanvas.toDataURL('image/webp', 0.8);
+                                screenDisplay.src = updatedDataUrl;
+                                fullscreenDisplay.src = updatedDataUrl;
+
+                                updateDebugInfo();
+                            };
+
+                            // 使用当前显示的图像作为基础帧
+                            tempImg.src = screenDisplay.src;
+
+                        } catch (error) {
+                            console.error('处理差分帧失败:', error);
+                            // 出错时请求全量帧恢复
+                            sendMessage({ type: 'requestFullFrame' });
+                        }
+                    }
+
+                    /**
+                     * 解析二进制差分数据为差异区域数组
+                     * @param {Uint8Array} buffer 差分数据缓冲区
+                     * @returns {Array} 差异区域数组
+                     */
+                    function parseDiffRegions(buffer) {
+                        const regions = [];
+                        let offset = 0;
+                        const dataView = new DataView(buffer.buffer);
+
+                        // 读取区域数量（4字节无符号整数）
+                        const regionCount = dataView.getUint32(offset, false); // false表示大端序
+                        offset += 4;
+
+                        // 解析每个差异区域
+                        for (let i = 0; i < regionCount; i++) {
+                            // 读取区域元数据（每个字段4字节）
+                            const x = dataView.getUint32(offset, false);
+                            offset += 4;
+
+                            const y = dataView.getUint32(offset, false);
+                            offset += 4;
+
+                            const width = dataView.getUint32(offset, false);
+                            offset += 4;
+
+                            const height = dataView.getUint32(offset, false);
+                            offset += 4;
+
+                            const dataLength = dataView.getUint32(offset, false);
+                            offset += 4;
+
+                            // 验证数据长度是否合理
+                            if (offset + dataLength > buffer.length) {
+                                throw new Error(`差分区域数据不完整，区域${i}需要${dataLength}字节，实际剩余${buffer.length - offset}字节`);
+                            }
+
+                            // 提取区域像素数据（RGBA格式）
+                            const regionData = buffer.slice(offset, offset + dataLength);
+                            offset += dataLength;
+
+                            regions.push({ x, y, width, height, data: regionData });
+                        }
+
+                        return regions;
+                    }
+
                     ws.onclose = (event) => {
                         console.log('连接已关闭', event);
-                        
+
                         if (heartbeatInterval) {
                             clearInterval(heartbeatInterval);
                             heartbeatInterval = null;
                         }
-                        
+
                         let errorMsg = '';
                         if (event.code !== 1000) {
                             errorMsg = `连接已断开 (代码: ${event.code})`;
                         }
-                        
+
                         updateConnectionStatus(false, errorMsg, event.reason);
-                        
+
                         if (event.code !== 1000) {
                             scheduleReconnect();
                         }
                     };
-                    
+
                     ws.onerror = (error) => {
                         handleConnectionError(error);
                     };
@@ -635,17 +769,17 @@
                 if (isFullscreen) {
                     exitFullscreen();
                 }
-                
+
                 if (reconnectTimeout) {
                     clearTimeout(reconnectTimeout);
                     reconnectTimeout = null;
                 }
-                
+
                 if (heartbeatInterval) {
                     clearInterval(heartbeatInterval);
                     heartbeatInterval = null;
                 }
-                
+
                 if (ws) {
                     ws.close(1000, '用户主动断开连接');
                     ws = null;
@@ -658,19 +792,19 @@
             screenContainer.addEventListener('mousedown', sendMouseDown);
             screenContainer.addEventListener('mouseup', sendMouseUp);
             screenContainer.addEventListener('mousemove', sendMouseMove);
-            
+
             fullscreenContainer.addEventListener('click', sendMouseClick);
             fullscreenContainer.addEventListener('mousedown', sendMouseDown);
             fullscreenContainer.addEventListener('mouseup', sendMouseUp);
             fullscreenContainer.addEventListener('mousemove', sendMouseMove);
-            
+
             document.addEventListener('keydown', sendKeyEvent);
             document.addEventListener('keyup', sendKeyEvent);
-            
+
             fullscreenBtn.addEventListener('click', enterFullscreen);
             exitFullscreenBtn.addEventListener('click', exitFullscreen);
             toggleDebugBtn.addEventListener('click', toggleDebugMode);
-            
+
             document.addEventListener('fullscreenchange', () => {
                 if (!document.fullscreenElement) {
                     fullscreenContainer.classList.add('hidden');
@@ -678,7 +812,7 @@
                     updateDebugInfo();
                 }
             });
-            
+
             window.addEventListener('blur', () => {
                 if (isDragging) {
                     sendMessage({
@@ -699,5 +833,5 @@
         });
     </script>
 </body>
+
 </html>
-    
