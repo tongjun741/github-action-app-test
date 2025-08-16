@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const { exec } = require('child_process');
+const os = require('os');
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp'); // 用于图像处理
@@ -329,7 +330,8 @@ let frameIndex = 0;
 setInterval(async () => {
     try {
         frameIndex++;
-        const tempPath = path.join(__dirname, `screenshot-${Date.now()}.png`);
+        // 使用系统临时目录保存截屏
+        const tempPath = path.join(os.tmpdir(), `screenshot-${Date.now()}.png`);
 
         // 截取屏幕（macOS示例，Windows/Linux需替换命令）
         await new Promise((resolve, reject) => {
