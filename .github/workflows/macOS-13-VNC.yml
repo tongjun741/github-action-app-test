@@ -103,8 +103,8 @@ jobs:
           echo "❌ 安装失败，但已忽略错误！"
         fi
         
-        # echo "启动 AnyDesk..."
-        # open /Applications/AnyDesk.app
+        echo "启动 AnyDesk..."
+        open /Applications/AnyDesk.app
       continue-on-error: true  # 告诉 GitHub Actions 忽略此步骤的失败
 
     - name: MacOS System running...
