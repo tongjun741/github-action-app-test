@@ -6,32 +6,7 @@ jobs:
     name: macOS-13-VNC
     runs-on: macos-13
     
-    steps:                 
-    # - name: Enabling Remote Access
-    #   env:
-    #     NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-    #   run: |
-    #       curl -s -o start.sh -L "https://raw.githubusercontent.com/JohnnyNetsec/github-vm/main/mac/start.sh"
-    #       chmod +x start.sh
-    #       bash start.sh "$NGROK_AUTH_TOKEN"
-          
-    # - name: Log In Details To VNC Server
-    #   run: |
-    #      chmod +x login.sh
-    #      bash login.sh
-          
-    # - name: Enable screen recording
-    #   run: |
-    #     curl -s -o /tmp/modify_screensharing.sh -L "https://gist.githubusercontent.com/timsutton/31344ef60dbd4d64aca5b3287c0644e8/raw/e1fb343f3fc9ac30cea5f4ee14ba7a1384499d5e/modify_screensharing.sh"
-    #     sudo chmod +x /tmp/modify_screensharing.sh
-    #     sudo /tmp/modify_screensharing.sh
-          
-    # - name: Download IE11 - Win7
-    #   run: |
-    #     wget https://ia601000.us.archive.org/20/items/ie11.win7.virtualbox/IE11.Win7.VirtualBox.zip
-    #     unzip IE11.Win7.VirtualBox.zip
-    #     sudo mv "IE11 - Win7.ova" /Users/tcv/Desktop/
-
+    steps:
     - uses: actions/checkout@v4 
 
     - name: Enabling Remote Access
