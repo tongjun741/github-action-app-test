@@ -39,6 +39,17 @@ async function openSession() {
         console.log(`当前操作系统是 Windows 7，浏览器内核版本为109，需要手工指定browserVersion为${browserVersion}，chromedriver的路径：${chromeOptions.binary}`);
       }
 
+      // 如果当前时macOS，则执行命令find ~/Library -name "chrome*" -exec ls -l {} +
+      if (os.platform() === 'darwin') { 
+        await executeCommand('find ~/Library -name "chrome*" -exec ls -l {} +')
+          .then((output) => {
+            console.log('find命令执行结果：', output);
+          })
+          .catch((error) => {
+            console.error('find命令执行出错：', error);
+          });
+      }
+
       browser = await remote({
         capabilities: {
           browserName: 'chrome',
