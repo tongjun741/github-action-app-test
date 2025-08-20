@@ -22,6 +22,26 @@ if (process.env.IN_DEV === "true") {
 }
 outputLog(`浏览器内核版本为${browserVersion}`);
 
+async function executeCommand(command, args) {
+  return new Promise((resolve, reject) => {
+    console.log(`命令【${command} ${JSON.stringify({ args })}】开始执行`);
+    const childProcess = spawn(command, args);
+    let stdout = '';
+    childProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    childProcess.on('close', (code) => {
+      console.log(`命令【${command} ${JSON.stringify({ args })}】执行结束，退出码：${code}`);
+      resolve(stdout);
+    });
+    childProcess.on('error', (error) => {
+      reject(error);
+    });
+    childProcess.stdin.end();
+    return childProcess;
+  });
+}
+
 async function openSession() {
   let browser = null;
   let retry = 0;
@@ -41,7 +61,7 @@ async function openSession() {
 
       // 如果当前时macOS，则执行命令find ~/Library -name "chrome*" -exec ls -l {} +
       outputLog('当前操作系统是：' + os.platform());
-      if (os.platform() === 'darwin') { 
+      if (os.platform() === 'darwin') {
         await executeCommand('find ~/Library -name "chrome*" -exec ls -l {} +')
           .then((output) => {
             console.log('find命令执行结果：', output);
