@@ -26,7 +26,7 @@ async function openSession() {
   let browser = null;
   let retry = 0;
   // 等待30秒让浏览器内核解压完成
-  // outputLog("等待30秒让浏览器内核解压完成");
+  outputLog("等待30秒让浏览器内核解压完成");
   await sleep(30 * 1000);
   while (true) {
     await sleep(10 * 1000);
@@ -40,6 +40,7 @@ async function openSession() {
       }
 
       // 如果当前时macOS，则执行命令find ~/Library -name "chrome*" -exec ls -l {} +
+      outputLog('当前操作系统是：' + os.platform());
       if (os.platform() === 'darwin') { 
         await executeCommand('find ~/Library -name "chrome*" -exec ls -l {} +')
           .then((output) => {
