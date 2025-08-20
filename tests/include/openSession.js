@@ -11,6 +11,7 @@ TODO
 const os = require('os');
 const fs = require('fs');
 const { remote } = require('webdriverio');
+const { spawn } = require('child_process');
 const { sleep, screenshot, outputLog } = require('./tools');
 
 // 当前浏览器内核是128.0.6613.45，但没有这个版本的chromedriver，所以换个相近版本的
