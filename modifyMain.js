@@ -13,7 +13,8 @@ async function main() {
         mainJsPath = "/opt/花漾客户端/resources/app/main.js";
     } else {
         asarFilePath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', 'resources', 'app.asar');
-        mainJsPath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', 'resources', 'app', 'main.js');
+        mainJsPath = 'C:\\Program Files\\HuaYoung\\resources\\app\\main.js';
+        // mainJsPath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', 'resources', 'app', 'main.js');
     }
 
     if (fs.existsSync(asarFilePath)) {
