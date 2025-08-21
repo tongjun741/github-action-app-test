@@ -71,10 +71,33 @@ jobs:
           # 安装客户端
           Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait -Verb RunAs
 
-          # 启动软件
-          # Start-Process -FilePath "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"
-          # exe的路径已经变了
-          Start-Process -FilePath "C:\Program Files\HuaYoung\花漾客户端.exe"
+          $filePath = "C:\Program Files\HuaYoung\花漾客户端.exe"
+          $timeoutMinutes = 5  # 最大等待时间（分钟）
+          $checkIntervalSeconds = 10  # 检查间隔（秒）
+          $endTime = (Get-Date).AddMinutes($timeoutMinutes)
+          
+          Write-Host "等待文件出现: $filePath"
+          Write-Host "最大等待时间: $timeoutMinutes 分钟"
+          
+          while ((Get-Date) -lt $endTime) {
+              if (Test-Path -Path $filePath -PathType Leaf) {
+                  Write-Host "文件已找到: $filePath"
+
+                  # 启动软件
+                  # Start-Process -FilePath "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"
+                  # exe的路径已经变了
+                  Start-Process -FilePath "$filePath"
+                  exit 0
+              }
+              
+              $remainingTime = $endTime - (Get-Date)
+              $remainingMinutes = [math]::Round($remainingTime.TotalMinutes, 1)
+              Write-Host "文件未找到，剩余等待时间: $remainingMinutes 分钟，将在 $checkIntervalSeconds 秒后再次检查..."
+              Start-Sleep -Seconds $checkIntervalSeconds
+          }
+          
+          Write-Error "超时错误: 在 $timeoutMinutes 分钟内未找到文件 $filePath"
+          exit 1
 
 
       - name: 检查安装目录是否存在
