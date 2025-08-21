@@ -17,7 +17,7 @@ if (os.platform() === 'darwin') {
 } else if (os.platform() === 'linux') {
   exePath = "/opt/花漾客户端/huayoung";
 } else {
-  exePath = path.join(process.env.USERPROFILE, 'AppData', 'Local', 'Programs', 'HuaYoung', '花漾客户端.exe');
+  exePath = 'C:\\Program Files\\HuaYoung\\花漾客户端.exe';
 }
 
 async function main() {
