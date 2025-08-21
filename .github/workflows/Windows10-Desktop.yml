@@ -1,6 +1,8 @@
 name: Windows10-Desktop
 
 on:
+  workflow_dispatch:
+  
   repository_dispatch:
     types: [win10-desktop]
 
