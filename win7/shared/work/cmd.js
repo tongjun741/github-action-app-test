@@ -105,7 +105,9 @@ async function main() {
     sendHttpLog(logText);
 
     const exeName = 'installer.exe';
-    const shortcutPath = 'C:\\Users\\Docker\\Desktop\\花漾客户端.lnk';
+    // const shortcutPath = 'C:\\Users\\Docker\\Desktop\\花漾客户端.lnk';
+    // 12.1开始快捷方式放在公共目录
+    const shortcutPath = 'C:\\Users\\Public\\Public Desktop\\花漾客户端.lnk';
 
     // 安装.exe文件
     while (true) {
