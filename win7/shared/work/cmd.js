@@ -107,7 +107,7 @@ async function main() {
     const exeName = 'installer.exe';
     // const shortcutPath = 'C:\\Users\\Docker\\Desktop\\花漾客户端.lnk';
     // 12.1开始快捷方式放在公共目录
-    const shortcutPath = 'C:\\Users\\Public\\Public Desktop\\花漾客户端.lnk';
+    const shortcutPath = 'C:\\Users\\Public\\Desktop\\花漾客户端.lnk';
 
     // 安装.exe文件
     while (true) {
@@ -140,7 +140,7 @@ async function main() {
         // 检查C:\\Users\\Docker\\Desktop目录下的所有文件
         let desktopFiles = fs.readdirSync(`C:\\Users\\Docker\\Desktop\\`);
         await sendHttpLog(`当前用户桌面上的文件列表：${JSON.stringify(desktopFiles)}`);
-        desktopFiles = fs.readdirSync(`C:\\Users\\Public\\Public Desktop\\`);
+        desktopFiles = fs.readdirSync(`C:\\Users\\Public\\Desktop\\`);
         await sendHttpLog(`公共桌面上的文件列表：${JSON.stringify(desktopFiles)}`);
         await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
       }
