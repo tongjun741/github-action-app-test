@@ -133,6 +133,7 @@ async function main() {
           shortcutExist = true;
           break;
         }
+        await sendHttpLog('桌面没有花漾客户端.lnk，等待10秒再检查');
         await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
       }
       if (shortcutExist) {
