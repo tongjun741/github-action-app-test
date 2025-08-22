@@ -105,10 +105,11 @@ async function main() {
     sendHttpLog(logText);
 
     const exeName = 'installer.exe';
+    const shortcutPath = 'C:\\Users\\Docker\\Desktop\\花漾客户端.lnk';
 
     // 安装.exe文件
     while (true) {
-      if (fs.existsSync('C:\\Users\\Docker\\Desktop\\花漾客户端.lnk')) {
+      if (fs.existsSync(shortcutPath)) {
         await sendHttpLog('桌面有花漾客户端.lnk，安装成功');
         break;
       }
@@ -116,11 +117,27 @@ async function main() {
       await executeCommand(exeName, [`/S`, ` 2>NUL`])
         .then((output) => {
           console.log('安装命令执行结果：', output);
+          return sendHttpLog(`安装命令执行结果：${JSON.stringify(output)}`);
         })
         .catch((error) => {
           console.error('安装命令执行出错：', error);
+          return sendHttpLog('安装.exe文件失败，重试');
         });
-      await sendHttpLog('安装.exe文件失败，重试');
+
+      // 等待桌面上的快捷方式出现
+      let i = 0;
+      let shortcutExist = false;
+      while (i < 5) {
+        if (fs.existsSync(shortcutPath)) {
+          await sendHttpLog('桌面有花漾客户端.lnk，安装成功');
+          shortcutExist = true;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
+      }
+      if (shortcutExist) {
+        break;
+      }
     }
 
     // npm install
