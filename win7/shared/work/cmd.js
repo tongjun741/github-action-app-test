@@ -127,13 +127,17 @@ async function main() {
       // 等待桌面上的快捷方式出现
       let i = 0;
       let shortcutExist = false;
-      while (i < 5) {
+      // 最多等待10分钟
+      while (i < 6 * 10) {
         if (fs.existsSync(shortcutPath)) {
           await sendHttpLog('桌面有花漾客户端.lnk，安装成功');
           shortcutExist = true;
           break;
         }
         await sendHttpLog('桌面没有花漾客户端.lnk，等待10秒再检查');
+        // 检查C:\\Users\\Docker\\Desktop目录下的所有文件
+        const files = fs.readdirSync(`C:\\Users\\Docker\\Desktop\\`);
+        await sendHttpLog(`桌面上的文件列表：${JSON.stringify(files)}`);
         await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
       }
       if (shortcutExist) {
