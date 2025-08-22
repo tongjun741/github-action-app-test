@@ -138,8 +138,10 @@ async function main() {
         }
         await sendHttpLog('桌面没有花漾客户端.lnk，等待10秒再检查');
         // 检查C:\\Users\\Docker\\Desktop目录下的所有文件
-        const files = fs.readdirSync(`C:\\Users\\Docker\\Desktop\\`);
-        await sendHttpLog(`桌面上的文件列表：${JSON.stringify(files)}`);
+        let desktopFiles = fs.readdirSync(`C:\\Users\\Docker\\Desktop\\`);
+        await sendHttpLog(`当前用户桌面上的文件列表：${JSON.stringify(desktopFiles)}`);
+        desktopFiles = fs.readdirSync(`C:\\Users\\Public\\Public Desktop\\`);
+        await sendHttpLog(`公共桌面上的文件列表：${JSON.stringify(desktopFiles)}`);
         await new Promise((resolve) => setTimeout(resolve, 10 * 1000));
       }
       if (shortcutExist) {
