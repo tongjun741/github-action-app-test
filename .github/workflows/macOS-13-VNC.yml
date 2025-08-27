@@ -21,19 +21,18 @@ jobs:
         sed -i "" "s/local_port = .*/local_port = 8080/g" macOS_VNC/frpc_15897721.ini
 
         # 从https://www.natfrp.com/cgi/v4/system/clients提取最新的下载链接
-        brew install jq
         # 1. 下载 Natfrp 客户端 JSON 数据
         echo "🔍 正在下载 JSON 数据..."
         curl -sSfL "https://www.natfrp.com/cgi/v4/system/clients" -o natfrp_clients.json \
           || { echo "❌ 下载失败！请检查网络或链接有效性"; exit 1; }
 
-        # 2. 解析 frpc.darwin_arm64.url
+        # 2. 解析
         echo "📊 正在解析 URL..."
-        FRPC_URL=$(jq -r '.frpc.archs.darwin_arm64.url' natfrp_clients.json)
+        FRPC_URL=$(jq -r '.frpc.archs.darwin_amd64.url' natfrp_clients.json)
 
         # 3. 验证解析结果
         if [ -z "$FRPC_URL" ] || [ "$FRPC_URL" == "null" ]; then
-          echo "❌ 解析失败！未找到 frpc.archs.darwin_arm64.url（可能 API 结构变更）";
+          echo "❌ 解析失败！未找到对应的 URL";
           rm -f natfrp_clients.json  # 清理临时文件
           exit 1;
         fi

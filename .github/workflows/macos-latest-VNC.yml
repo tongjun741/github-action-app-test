@@ -20,7 +20,28 @@ jobs:
         sed -i "" "s/user = .*/user = ${{ secrets.FRPC_USER }}/g" macOS_VNC/frpc_15897721.ini
         sed -i "" "s/remote_port = .*/remote_port = ${{ secrets.FRPC_MAC_REMOTE_PORT }}/g" macOS_VNC/frpc_15897721.ini
         sed -i "" "s/local_port = .*/local_port = 8080/g" macOS_VNC/frpc_15897721.ini
-        curl -Lo frpc https://nya.globalslb.net/natfrp/client/frpc/0.51.0-sakura-9.3/frpc_darwin_amd64
+
+        # 从https://www.natfrp.com/cgi/v4/system/clients提取最新的下载链接
+        # 1. 下载 Natfrp 客户端 JSON 数据
+        echo "🔍 正在下载 JSON 数据..."
+        curl -sSfL "https://www.natfrp.com/cgi/v4/system/clients" -o natfrp_clients.json \
+          || { echo "❌ 下载失败！请检查网络或链接有效性"; exit 1; }
+
+        # 2. 解析 frpc.darwin_arm64.url
+        echo "📊 正在解析 URL..."
+        FRPC_URL=$(jq -r '.frpc.archs.darwin_arm64.url' natfrp_clients.json)
+
+        # 3. 验证解析结果
+        if [ -z "$FRPC_URL" ] || [ "$FRPC_URL" == "null" ]; then
+          echo "❌ 解析失败！未找到 frpc.archs.darwin_arm64.url（可能 API 结构变更）";
+          rm -f natfrp_clients.json  # 清理临时文件
+          exit 1;
+        fi
+
+        # 4. 输出结果并验证 URL 可访问性
+        echo -e "\n✅ 成功提取 URL：\n$FRPC_URL"
+
+        curl -Lo frpc "$FRPC_URL"
         chmod +x frpc
         ./frpc -c ./macOS_VNC/frpc_15897721.ini > /tmp/frpc.log 2>&1 &
           
