@@ -13,16 +13,6 @@ jobs:
       run: |
           chmod +x ./macOS_VNC/start.sh
           sudo ./macOS_VNC/start.sh
-          
-    - name: Log In Details To VNC Server
-      run: |
-         chmod +x ./macOS_VNC/login.sh
-         sudo ./macOS_VNC/login.sh
-          
-    - name: Enable screen recording
-      run: |
-        sudo chmod +x ./macOS_VNC/modify_screensharing-13.sh
-        sudo ./macOS_VNC/modify_screensharing-13.sh
 
     - name: 启动frpc
       run: |
