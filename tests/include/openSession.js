@@ -16,10 +16,10 @@ const { sleep, screenshot, outputLog } = require('./tools');
 
 // 当前浏览器内核是128.0.6613.45，但没有这个版本的chromedriver，所以换个相近版本的
 // 版本列表128.0.6613.137  130.0.6723.116 136.0.7103.80
-let browserVersion = '136.0.7103.80';
+let browserVersion = '138.0.7204.142';
 if (process.env.IN_DEV === "true") {
   // 如果测试环境上了新内核可以改这个地方
-  browserVersion = '136.0.7103.80';
+  browserVersion = '138.0.7204.142';
 }
 outputLog(`浏览器内核版本为${browserVersion}`);
 
