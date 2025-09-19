@@ -1,6 +1,7 @@
 ## 指定驱动Electron的chromedirver目录
 Windows:
 C:\Users\<Username>\AppData\Local\Temp
+C:\Users\<Username>\AppData\Local\Temp\chromedriver\win64-108\chromedriver-win64\chromedriver.exe
 Ubuntu:
 /tmp
 macOS:
