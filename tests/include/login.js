@@ -6,7 +6,7 @@ async function login(config, password, targetBrowser) {
   }
 
   let retryTimes = 0;
-  while (retryTimes<100) {
+  while (retryTimes < 100) {
     try {
       // 按标题切换到主窗口
       // 兼容有首页和默认只有分身页的情况
@@ -47,6 +47,25 @@ async function login(config, password, targetBrowser) {
     await browser.$(`//div[text()="邮箱登录"]`).click();
     await browser.$('#account').setValue(config.username);
     await browser.$('#password').setValue(password);
+
+    while (true) {
+      try {
+        // 发送请求测试服务器是否可用
+        let url = 'https://api.szdamai.com/api/msg-center/broadcasts';
+        if (process.env.IN_DEV === "true") {
+          url = "https://dev.thinkoncloud.cn/api/msg-center/broadcasts";
+        }
+        await browser.request({
+          method: 'GET',
+          url,
+          timeout: 10000 // 10秒超时
+        });
+        break;
+      } catch (e) {
+        outputLog(`服务器不可用，等待服务器恢复：${url}`)
+        await sleep(60 * 1000);
+      }
+    }
 
     // 服务器不可用，等待服务器恢复
     while (await browser.$('//div[contains(concat(" ", normalize-space(@class), " "), " marquee-container ")]//span[contains(., "请检查您的网络是否通畅")]').isExisting()) {
