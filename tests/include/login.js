@@ -49,12 +49,12 @@ async function login(config, password, targetBrowser) {
     await browser.$('#password').setValue(password);
 
     while (true) {
+      let url = 'https://api.szdamai.com/api/msg-center/broadcasts';
+      if (process.env.IN_DEV === "true") {
+        url = "https://dev.thinkoncloud.cn/api/msg-center/broadcasts";
+      }
       try {
         // 发送请求测试服务器是否可用
-        let url = 'https://api.szdamai.com/api/msg-center/broadcasts';
-        if (process.env.IN_DEV === "true") {
-          url = "https://dev.thinkoncloud.cn/api/msg-center/broadcasts";
-        }
         await browser.request({
           method: 'GET',
           url,
