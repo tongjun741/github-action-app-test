@@ -46,50 +46,63 @@ const uploadFile = async (filePath) => {
 
     // 发起请求
     url = "截图上传失败";
-    await axios({
-        method: 'put',
-        url: uploadUrl,
-        data: fileStream,
-        headers: {
-            'Content-Type': 'image/jpeg' // 设置文件类型
-        }
-    }).then((response) => {
-        // 检查响应状态
-        if (response.status === 200) {
-            console.log("File uploaded successfully.");
-        } else {
-            console.log("Error occurred:", response.status);
-        }
+    // 重试3次
+    let retryCount = 0;
+    let uploadSuccess = false;
+    while (retryCount < 3) {
+        try {
+            await axios({
+                method: 'put',
+                url: uploadUrl,
+                data: fileStream,
+                headers: {
+                    'Content-Type': 'image/jpeg' // 设置文件类型
+                },
+                timeout: 15000, // 15秒超时
+            }).then((response) => {
+                // 检查响应状态
+                if (response.status === 200) {
+                    console.log("File uploaded successfully.");
+                } else {
+                    console.log("Error occurred:", response.status);
+                }
 
-        // 输出完整的响应头
-        console.log("Response Headers:");
-        for (const [header, value] of Object.entries(response.headers)) {
-            console.log(`${header}: ${value}`);
-        }
+                // 输出完整的响应头
+                console.log("Response Headers:");
+                for (const [header, value] of Object.entries(response.headers)) {
+                    console.log(`${header}: ${value}`);
+                }
 
-        // 输出响应体
-        console.log("\nResponse Body:");
-        console.log(response.data);
+                // 输出响应体
+                console.log("\nResponse Body:");
+                console.log(response.data);
 
-        // 使用正则表达式解析 URL
-        const match = response.data.match(/(?<protocol>http[s]?:\/\/)(?<domain>.*?)(\/(?<path>.*))/);
+                // 使用正则表达式解析 URL
+                const match = response.data.match(/(?<protocol>http[s]?:\/\/)(?<domain>.*?)(\/(?<path>.*))/);
 
-        if (match) {
-            // 提取匹配到的各部分
-            const { protocol, domain, path } = match.groups;
+                if (match) {
+                    // 提取匹配到的各部分
+                    const { protocol, domain, path } = match.groups;
 
-            // 在路径之前添加 inline
-            url = `${protocol}${domain}/inline/${path}`;
+                    // 在路径之前添加 inline
+                    url = `${protocol}${domain}/inline/${path}`;
+                    uploadSuccess = true;
 
-            console.log("预览地址:", url);
-        } else {
-            console.log("URL parsing failed.");
-        }
-    })
-        .catch((error) => {
+                    console.log("预览地址:", url);
+                } else {
+                    console.log("URL parsing failed.");
+                }
+            });
+            break; // 如果成功，跳出循环
+        } catch (error) {
+            retryCount++;
+            console.error(`Upload attempt ${retryCount} failed:`, error.message);
             url = `截图上传失败：${error.message}`;
-            console.error("Error occurred:", error.message);
-        });
+        }
+    }
+    if (!uploadSuccess) {
+        console.error("All upload attempts failed.");
+    }
 
     return url;
 }
