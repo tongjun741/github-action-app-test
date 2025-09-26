@@ -1,3 +1,4 @@
+const axios = require('axios');
 const { sleep, outputLog } = require('./tools');
 
 async function login(config, password, targetBrowser) {
@@ -48,20 +49,18 @@ async function login(config, password, targetBrowser) {
     await browser.$('#account').setValue(config.username);
     await browser.$('#password').setValue(password);
 
+    // 发送请求测试服务器是否可用
+    let url = 'https://api.szdamai.com/api/msg-center/broadcasts';
+    if (process.env.IN_DEV === "true") {
+      url = "https://dev.thinkoncloud.cn/api/msg-center/broadcasts";
+    }
     while (true) {
-      let url = 'https://api.szdamai.com/api/msg-center/broadcasts';
-      if (process.env.IN_DEV === "true") {
-        url = "https://dev.thinkoncloud.cn/api/msg-center/broadcasts";
-      }
       try {
-        // 发送请求测试服务器是否可用
-        await browser.request({
-          method: 'GET',
-          url,
-          timeout: 10000 // 10秒超时
-        });
+        let response = await axios.get(url, { timeout: 10000 });
+        outputLog(`服务器状态正常：${response.status}`);
         break;
       } catch (e) {
+        console.error(e.message);
         outputLog(`服务器不可用，等待服务器恢复：${url}`)
         await sleep(60 * 1000);
       }
