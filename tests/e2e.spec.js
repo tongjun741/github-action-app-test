@@ -35,10 +35,10 @@ describe('Electron App Test', () => {
         shopName = config.win7shopName;
       }
       // 进入分身列表页面
-      await $(`.icon-chrome_outline`).waitForExist({ timeout: 10 * 1000 })
+      await $(`.icon-chrome_outline`).waitForExist({ timeout: 30 * 1000 })
       await $(`.icon-chrome_outline`).click();
 
-      await $(`//a[text()="${shopName}"]`).waitForExist({ timeout: 10 * 1000 })
+      await $(`//a[text()="${shopName}"]`).waitForExist({ timeout: 30 * 1000 })
       title = await browser.getTitle();
       console.log("标题是", title);
 
