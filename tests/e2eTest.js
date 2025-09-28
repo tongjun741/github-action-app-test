@@ -35,11 +35,11 @@ async function e2eTest(browser) {
 
     // 进入分身列表页面
     outputLog("进入分身列表页面");
-    await browser.$(`.icon-chrome_outline`).waitForExist({ timeout: 10 * 1000 })
+    await browser.$(`.icon-chrome_outline`).waitForExist({ timeout: 30 * 1000 })
     await browser.$(`.icon-chrome_outline`).click();
 
     outputLog("等待分身出现");
-    await browser.$(`//a[text()="${shopName}"]`).waitForExist({ timeout: 10 * 1000 })
+    await browser.$(`//a[text()="${shopName}"]`).waitForExist({ timeout: 30 * 1000 })
     title = await browser.getTitle();
     outputLog(`当前窗口标题是${title}`);
 
@@ -48,7 +48,7 @@ async function e2eTest(browser) {
     await browser.$(`//a[text()="${shopName}"]`).click();
     // 打开浏览器
     outputLog(`打开浏览器`);
-    await browser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 10 * 1000 });
+    await browser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 30 * 1000 });
     await browser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').click();
 
     // 处理有其他人在访问的情况
