@@ -51,7 +51,7 @@ jobs:
           }
 
           # 下载文件到临时目录
-          Invoke-WebRequest -Uri ${{ env.downloadUrl }} -OutFile "$env:TEMP\crx.zip"
+          Invoke-WebRequest -Uri $downloadUrl -OutFile "$env:TEMP\crx.zip"
           
           # 解压到当前工作目录（GitHub Actions 中默认是仓库根目录）
           Expand-Archive -Path "$env:TEMP\crx.zip" -DestinationPath . -Force
