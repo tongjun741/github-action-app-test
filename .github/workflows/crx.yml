@@ -99,4 +99,4 @@ jobs:
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
-        run: npm run tests\crxTest.js
+        run: node tests\crxTest.js
