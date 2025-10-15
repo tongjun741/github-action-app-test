@@ -1,0 +1,102 @@
+name: CrxTest
+
+on:
+  repository_dispatch:
+    types: [crx-test]
+    
+  workflow_dispatch:
+    inputs:
+      crx_download_url:
+        description: 'Download url'
+      in_dev:
+        description: '是否是测试环境'
+        default: 'false'
+      debug:
+        description: '是否开启调试'
+        default: 'false'
+
+jobs:
+
+  Windows10:
+    runs-on: windows-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'yarn'
+
+      - uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: 141
+          install-chromedriver: true
+          
+      - name: Install dependencies 👨🏻‍💻
+        run: yarn
+
+      - name: 安装插件
+        run: |
+          # 检查是否提供了下载 URL
+          if ( -not "${{ github.event.inputs.software_download_url }}" ) {
+            # 没有提供 URL，使用固定的链接
+            $downloadUrl = "https://dl.szdamai.com/downloads/files/tkshop-crx-1.5.6.zip"
+            Write-Host "Generated download URL: $downloadUrl"
+          } else {
+            # 使用提供的下载 URL
+            $downloadUrl = "${{ github.event.inputs.crx_download_url }}"
+            Write-Host "Using provided download URL: $downloadUrl"
+          }
+
+          # 下载文件到临时目录
+          Invoke-WebRequest -Uri ${{ env.downloadUrl }} -OutFile "$env:TEMP\crx.zip"
+          
+          # 解压到当前工作目录（GitHub Actions 中默认是仓库根目录）
+          Expand-Archive -Path "$env:TEMP\crx.zip" -DestinationPath . -Force
+          
+          # 打印当前目录路径
+          Write-Host "当前目录路径: $(Get-Location)"
+          
+          # 打印当前目录下的所有文件和文件夹
+          Write-Host "`n当前目录下的文件列表:"
+          Get-ChildItem -Path . | Format-Table -AutoSize
+
+      - name: Enable TS
+        if: ${{ contains(inputs.debug, 'true') }}
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server'-name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+          Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
+
+      - name: 修改分辨率为1920*1080
+        run: |
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
+
+      - name: 启动frpc
+        if: ${{ contains(inputs.debug, 'true') }}
+        run: |
+          (Get-Content macOS_VNC/frpc_15897721.ini) -replace "user = .*", "user = $env:FRPC_USER" | Set-Content macOS_VNC/frpc_15897721.ini
+          (Get-Content macOS_VNC/frpc_15897721.ini) -replace "remote_port = .*", "remote_port = $env:FRPC_MAC_REMOTE_PORT" | Set-Content macOS_VNC/frpc_15897721.ini
+          (Get-Content macOS_VNC/frpc_15897721.ini) -replace "local_port = .*", "local_port = 3389" | Set-Content macOS_VNC/frpc_15897721.ini
+          Invoke-WebRequest -Uri "https://nya.globalslb.net/natfrp/client/frpc/0.51.0-sakura-12.3/frpc_windows_amd64.exe" -OutFile "frpc.exe"
+          ./frpc.exe -c macOS_VNC/frpc_15897721.ini
+        env:
+          FRPC_USER: ${{ secrets.FRPC_USER }}
+          FRPC_MAC_REMOTE_PORT: ${{ secrets.FRPC_MAC_REMOTE_PORT }}
+
+      - name: 执行测试
+        env:
+          E2E_PLATFORM: "Windows 10"
+          DEV_WDIO_PASSWORD: ${{ secrets.DEV_WDIO_PASSWORD }}
+          PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          DOWNLOAD_URL: ${{ github.event.inputs.crx_download_url }}
+          IN_DEV: ${{ github.event.inputs.in_dev }}
+          FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
+          FEISHU_ME: ${{ secrets.FEISHU_ME }}
+          LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
+          TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run tests\crxTest.js
