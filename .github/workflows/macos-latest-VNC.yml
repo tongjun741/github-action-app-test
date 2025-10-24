@@ -64,7 +64,8 @@ jobs:
         # 下载 AnyDesk
         echo "正在下载 AnyDesk..."
         ANYDESK_DMG="anydesk.dmg"
-        curl -L -o "$ANYDESK_DMG" "https://download.anydesk.com/anydesk.dmg"
+        # curl -L -o "$ANYDESK_DMG" "https://download.anydesk.com/anydesk.dmg"
+        curl -L -o "$ANYDESK_DMG" "https://pub-4c94dc4f05df416398c28b7e7c8b6d53.r2.dev/others/anydesk.dmg"
         
         # 挂载 DMG
         echo "挂载 DMG 文件..."
