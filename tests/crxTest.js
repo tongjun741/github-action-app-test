@@ -4,7 +4,7 @@ const { join } = require('path');
 const { feishuNotify, screenshot, uploadFile, outputLog } = require('./include/tools');
 
 const EXTENSION_NAME = "花漾TK";
-const EXTENSION_PATH = join(__dirname, '..', 'tkshop-crx-1.5.6');
+const EXTENSION_PATH = join(__dirname, '..', 'tkshop-crx');
 
 async function main() {
   outputLog(`环境变量：${JSON.stringify(process.env)}`);

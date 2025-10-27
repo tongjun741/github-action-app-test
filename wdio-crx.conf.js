@@ -5,7 +5,7 @@ const { browser } = require('@wdio/globals');
 // 扩展名称 - 根据你的实际扩展名称修改
 const EXTENSION_NAME = 'My Web Extension';
 // 扩展编译后目录 - 根据实际路径修改
-const EXTENSION_PATH = join(__dirname, 'tkshop-crx-1.5.6');
+const EXTENSION_PATH = join(__dirname, 'tkshop-crx');
 console.log('扩展路径:', EXTENSION_PATH);
 
 // 自定义命令：打开扩展弹出窗口

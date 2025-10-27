@@ -28,11 +28,6 @@ jobs:
         with:
           node-version: 22
           cache: 'yarn'
-
-      - uses: browser-actions/setup-chrome@v2
-        with:
-          chrome-version: 141
-          install-chromedriver: true
           
       - name: Install dependencies 👨🏻‍💻
         run: yarn
@@ -54,7 +49,7 @@ jobs:
           Invoke-WebRequest -Uri $downloadUrl -OutFile "$env:TEMP\crx.zip"
           
           # 解压到当前工作目录（GitHub Actions 中默认是仓库根目录）
-          Expand-Archive -Path "$env:TEMP\crx.zip" -DestinationPath . -Force
+          Expand-Archive -Path "$env:TEMP\crx.zip" -DestinationPath "tkshop-crx" -Force
           
           # 打印当前目录路径
           Write-Host "当前目录路径: $(Get-Location)"
@@ -99,4 +94,6 @@ jobs:
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
-        run: node tests\crxTest.js
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          CLOUDINARY_MASK: ${{ secrets.CLOUDINARY_MASK }}
+        run: yarn add chromedriver@141 --dev && node tests\crxTest.js
