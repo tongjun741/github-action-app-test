@@ -182,4 +182,5 @@ jobs:
           FEISHU_ME: ${{ secrets.FEISHU_ME }}
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
         run: node tests\start.js ipTest
