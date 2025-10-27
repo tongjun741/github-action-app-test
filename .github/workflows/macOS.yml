@@ -104,6 +104,7 @@ jobs:
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
         run: sudo node modifyMain.js && node tests/start.js e2e
 
       # - name: Setup tmate session
