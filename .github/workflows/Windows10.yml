@@ -172,6 +172,7 @@ jobs:
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          CLOUDINARY_MASK: ${{ secrets.CLOUDINARY_MASK }}
         run: node modifyMain.js && node tests\start.js e2e
 
       - name: IP测试
@@ -183,4 +184,5 @@ jobs:
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          CLOUDINARY_MASK: ${{ secrets.CLOUDINARY_MASK }}
         run: node tests\start.js ipTest
