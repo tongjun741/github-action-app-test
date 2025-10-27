@@ -1,7 +1,7 @@
 const axios = require('axios');
 const { sleep, outputLog } = require('./tools');
 
-async function login(config, password, targetBrowser) {
+async function login(config, password, targetBrowser, isClient = true) {
   if (targetBrowser) {
     browser = targetBrowser;
   }
@@ -12,7 +12,8 @@ async function login(config, password, targetBrowser) {
       // 按标题切换到主窗口
       // 兼容有首页和默认只有分身页的情况
       outputLog("按标题切换到主窗口，兼容有首页和默认只有分身页的情况");
-      await browser.switchWindow(/ - HuaYoung| - 花漾灵动/);
+      let titleReg = isClient ? / - HuaYoung| - 花漾灵动/ : /花漾TK/;
+      await browser.switchWindow(titleReg);
       break;
     } catch (e) {
     }
@@ -21,7 +22,9 @@ async function login(config, password, targetBrowser) {
   }
   outputLog("按标题切换到主窗口完成");
 
-  await browser.$('div[class*=app-version]').waitForExist({ timeout: 100 * 1000 })
+  if (isClient) {
+    await browser.$('div[class*=app-version]').waitForExist({ timeout: 100 * 1000 });
+  }
 
   // 验证页面标题
   outputLog("验证页面标题");
@@ -29,8 +32,10 @@ async function login(config, password, targetBrowser) {
   outputLog(`当前窗口标题是${title}`);
   // expect(title).toBe('Your Electron App Title');
 
-  const version = await browser.$('div[class*=app-version]').getText();
-  outputLog(`版本号是：${version}`);
+  if (isClient) {
+    const version = await browser.$('div[class*=app-version]').getText();
+    outputLog(`版本号是：${version}`);
+  }
 
   // 检查当前是登录页面还是团队选择界面
   outputLog("检查当前是登录页面还是团队选择界面");
@@ -74,21 +79,30 @@ async function login(config, password, targetBrowser) {
 
     await browser.$('.ant-btn-primary').click();
 
-    await browser.$(`//span[text()="${config.teamName}"]`).waitForExist({ timeout: 100 * 1000 })
-  }
-  await browser.$(`//span[text()="${config.teamName}"]`).click();
-
-  while (true) {
-    await sleep(5 * 1000);
-
-    try {
-      // 按标题切换到主窗口
-      outputLog("按标题切换到主窗口")
-      // 兼容有首页和默认只有分身页的情况
-      await browser.switchWindow(' - 花漾灵动');
-      break;
-    } catch (e) {
+    if (isClient) {
+      await browser.$(`//span[text()="${config.teamName}"]`).waitForExist({ timeout: 100 * 1000 });
+    } else {
+      await browser.$(`//div[text()="花漾TK登录成功"]`).waitForExist({ timeout: 30 * 1000 });
     }
+  }
+  if (isClient) {
+    await browser.$(`//span[text()="${config.teamName}"]`).click();
+
+    while (true) {
+      await sleep(5 * 1000);
+
+      try {
+        // 按标题切换到主窗口
+        outputLog("按标题切换到主窗口")
+        // 兼容有首页和默认只有分身页的情况
+        await browser.switchWindow(' - 花漾灵动');
+        break;
+      } catch (e) {
+      }
+    }
+  } else {
+    // 按url切换窗口
+    await browser.switchWindow('src/side-panel/index.html');
   }
 
   // 如果有弹出消息就点掉

@@ -2,13 +2,22 @@ const desktopScreenshot = require('screenshot-desktop');
 const { remote } = require('webdriverio');
 const { join } = require('path');
 const { feishuNotify, screenshot, uploadFile, outputLog } = require('./include/tools');
+const { productCrxTestConfig, devCrxTestConfig } = require('./config');
+const login = require('./include/login');
 
 const EXTENSION_NAME = "花漾TK";
 const EXTENSION_PATH = join(__dirname, '..', 'tkshop-crx');
 
 async function main() {
-  outputLog(`环境变量：${JSON.stringify(process.env)}`);
-  outputLog(`输入参数：${JSON.stringify(process.argv)}`);
+  let isDev = process.env.IN_DEV === "true";
+
+  let config = productCrxTestConfig;
+  let password = process.env.PRODUCT_WDIO_PASSWORD || "password";
+  if (isDev) {
+    config = devCrxTestConfig;
+    password = process.env.DEV_WDIO_PASSWORD || "password";
+  }
+
   let screenshotUrl;
   let appScreenshotUrl = "截图失败";
   let startTime = new Date().getTime();
@@ -53,6 +62,19 @@ async function main() {
 
     // 可选：点击按钮并验证结果
     await popupButton.click();
+
+    // 等待2秒打开新标签页
+    await browser.pause(2000);
+
+    // 切换到新打开的标签页（如果有）
+    const handles = await browser.getWindowHandles();
+    if (handles.length > 1) {
+      await browser.switchToWindow(handles[1]);
+
+      outputLog(`开始登录`);
+      await login(config, password, browser, false);
+    }
+
     // 这里可以添加更多验证逻辑
     testResult = "启动插件成功";
   } catch (e) {

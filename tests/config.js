@@ -19,6 +19,14 @@ let ipTestConfig = {
     shopName: 'demo-1',
 };
 
+let devCrxTestConfig = {
+    username: '74dc8891867e@drmail.in',
+};
+
+let productCrxTestConfig = {
+    username: 'd5972c511557@drmail.in',
+};
+
 module.exports = {
-    devConfig, productConfig, ipTestConfig
+    devConfig, productConfig, ipTestConfig, devCrxTestConfig, productCrxTestConfig
 };
