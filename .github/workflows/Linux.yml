@@ -81,6 +81,7 @@ jobs:
           TRANSITER_SH_SERVER: ${{ secrets.TRANSITER_SH_SERVER }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          CLOUDINARY_MASK: ${{ secrets.CLOUDINARY_MASK }}
         run: |
           if [ -f "/opt/花漾客户端/resources/app.asar" ]; then
             sudo chmod a+w /opt/花漾客户端/resources/app.asar

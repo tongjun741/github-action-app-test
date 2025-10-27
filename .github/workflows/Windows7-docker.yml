@@ -38,6 +38,7 @@ jobs:
           DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          CLOUDINARY_MASK: ${{ secrets.CLOUDINARY_MASK }}
         run: |
           echo '{
             "E2E_PLATFORM": "'"Windows 7"'",
@@ -50,7 +51,8 @@ jobs:
             "TRANSITER_SH_SERVER": "'"${TRANSITER_SH_SERVER}"'",
             "DOWNLOAD_URL": "'"${DOWNLOAD_URL}"'",
             "MONGODB_URI": "'"${MONGODB_URI}"'",
-            "CLOUDINARY_URL": "'"${CLOUDINARY_URL}"'"
+            "CLOUDINARY_URL": "'"${CLOUDINARY_URL}"'",
+            "CLOUDINARY_MASK": "'"${CLOUDINARY_MASK}"'"
           }' > passwd.json
 
       # - uses: mxschmitt/action-tmate@v3
