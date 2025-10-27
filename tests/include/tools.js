@@ -3,6 +3,12 @@ const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
 const { MongoClient, ServerApiVersion } = require('mongodb');
+const cloudinary = require('cloudinary').v2;
+
+// Return "https" URLs by setting secure: true
+cloudinary.config({
+  secure: true
+});
 
 const e2eResultKey = "e2eTestResult";
 let mongoClient;
@@ -37,6 +43,43 @@ const feishuNotify = async (msg) => {
 }
 
 const uploadFile = async (filePath) => {
+    // 发起请求
+    let url = "截图上传失败";
+    // 重试3次
+    let retryCount = 0;
+    let uploadSuccess = false;
+    while (retryCount < 3) {
+        try {
+            const options = {
+                asset_folder: 'e2eTest',
+                use_filename: false,
+                unique_filename: false,
+            };
+
+            try {
+                // Upload the image
+                const result = await cloudinary.uploader.upload(filePath, options);
+                // console.log(result);
+                url = result.url;
+                uploadSuccess = true;
+            } catch (error) {
+                console.error(error);
+            }
+            break; // 如果成功，跳出循环
+        } catch (error) {
+            retryCount++;
+            console.error(`Upload attempt ${retryCount} failed:`, error.message);
+            url = `截图上传失败：${error.message}`;
+        }
+    }
+    if (!uploadSuccess) {
+        console.error("All upload attempts failed.");
+    }
+
+    return url;
+}
+
+const uploadFile_ds = async (filePath) => {
     let fileName = path.basename(filePath);
     // 读取要上传的文件
     const fileStream = fs.createReadStream(filePath);
