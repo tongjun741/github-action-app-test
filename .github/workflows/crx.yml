@@ -32,6 +32,10 @@ jobs:
       - name: Install dependencies 👨🏻‍💻
         run: yarn
 
+      - uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: 141
+
       - name: 安装插件
         run: |
           # 检查是否提供了下载 URL
