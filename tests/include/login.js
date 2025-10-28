@@ -100,17 +100,18 @@ async function login(config, password, targetBrowser, isClient = true) {
       } catch (e) {
       }
     }
+
+    // 如果有弹出消息就点掉
+    try {
+      await browser.$('.ant-modal-confirm .ant-btn-primary').waitForExist({ timeout: 5 * 1000 });
+      outputLog(`点掉弹出消息`);
+      await browser.$(`.ant-modal-confirm .ant-btn-primary`).click();
+    } catch (e) {
+    }
   } else {
     // 按url切换窗口
+    outputLog("按url切换窗口到插件页面")
     await browser.switchWindow('src/side-panel/index.html');
-  }
-
-  // 如果有弹出消息就点掉
-  try {
-    await browser.$('.ant-modal-confirm .ant-btn-primary').waitForExist({ timeout: 5 * 1000 });
-    outputLog(`点掉弹出消息`);
-    await browser.$(`.ant-modal-confirm .ant-btn-primary`).click();
-  } catch (e) {
   }
 
   title = await browser.getTitle();

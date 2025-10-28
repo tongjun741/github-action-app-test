@@ -1,9 +1,11 @@
 const desktopScreenshot = require('screenshot-desktop');
+const WebdriverAjax = require('wdio-intercept-service').default;
 const { remote } = require('webdriverio');
 const { join } = require('path');
 const { feishuNotify, screenshot, uploadFile, outputLog } = require('./include/tools');
 const { productCrxTestConfig, devCrxTestConfig } = require('./config');
 const login = require('./include/login');
+const buy = require('./crx/buy');
 
 const EXTENSION_NAME = "花漾TK";
 const EXTENSION_PATH = join(__dirname, '..', 'tkshop-crx');
@@ -36,7 +38,7 @@ async function main() {
           excludeSwitches: ['enable-automation']
         }
       },
-      services: ['chromedriver'] // 使用 chromedriver 服务
+      services: ['chromedriver', [WebdriverAjax]] // 使用 chromedriver 服务
     };
 
     // 初始化浏览器实例
@@ -73,6 +75,8 @@ async function main() {
 
       outputLog(`开始登录`);
       await login(config, password, browser, false);
+
+      await buy(browser, config);
     }
 
     // 这里可以添加更多验证逻辑

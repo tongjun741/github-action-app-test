@@ -31,7 +31,8 @@
     "@wdio/spec-reporter": "8.38.2",
     "chai": "^4.3.7",
     "eslint": "^9.36.0",
-    "globals": "^16.4.0"
+    "globals": "^16.4.0",
+    "wdio-intercept-service": "^4.4.1"
   },
   "dependencies": {
     "@electron/asar": "^3.2.10",

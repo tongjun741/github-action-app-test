@@ -7,7 +7,7 @@ const cloudinary = require('cloudinary').v2;
 
 // Return "https" URLs by setting secure: true
 cloudinary.config({
-  secure: true
+    secure: true
 });
 
 const e2eResultKey = "e2eTestResult";
@@ -15,8 +15,33 @@ let mongoClient;
 
 const sleep = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 
+const dateFormat = (date, format = 'yyyy-MM-dd hh:mm:ss') => {
+    let string = format;
+    const o = {
+        'M+': date.getMonth() + 1, // month
+        'd+': date.getDate(), // day
+        'h+': date.getHours(), // hour
+        'm+': date.getMinutes(), // minute
+        's+': date.getSeconds(), // second
+        'q+': Math.floor((date.getMonth() + 3) / 3), // quarter
+        S: date.getMilliseconds(), // millisecond
+    };
+    if (/(y+)/.test(string)) {
+        string = string.replace(RegExp.$1, `${date.getFullYear()}`.substr(4 - RegExp.$1.length));
+    }
+    Object.keys(o).forEach((key) => {
+        if (new RegExp(`(${key})`).test(string)) {
+            string = string.replaceAll(
+                RegExp.$1,
+                RegExp.$1.length === 1 ? o[key] : `00${o[key]}`.substr(`${o[key]}`.length),
+            );
+        }
+    });
+    return string;
+};
+
 const outputLog = (msg) => {
-    console.log(`【${new Date().toUTCString()}】${msg}`);
+    console.log(`【${dateFormat(new Date())}】${msg}`);
 }
 
 const feishuNotify = async (msg) => {
@@ -285,5 +310,5 @@ const getMongoConnect = async () => {
 }
 
 module.exports = {
-    sleep, feishuNotify, screenshot, saveResult, showResultTable, uploadFile, outputLog
+    sleep, feishuNotify, screenshot, saveResult, showResultTable, uploadFile, outputLog, dateFormat
 };
