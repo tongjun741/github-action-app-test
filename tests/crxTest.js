@@ -6,6 +6,7 @@ const { feishuNotify, screenshot, uploadFile, outputLog } = require('./include/t
 const { productCrxTestConfig, devCrxTestConfig } = require('./config');
 const login = require('./include/login');
 const buy = require('./crx/buy');
+const addShop = require('./crx/addShop');
 
 const EXTENSION_NAME = "花漾TK";
 const EXTENSION_PATH = join(__dirname, '..', 'tkshop-crx');
@@ -24,7 +25,7 @@ async function main() {
   let appScreenshotUrl = "截图失败";
   let startTime = new Date().getTime();
   let errorMsg = "";
-  let testResult = "";
+  let testResult = "插件测试未完成";
   let browser;
   try {
     // 配置 Chrome 浏览器选项
@@ -76,11 +77,25 @@ async function main() {
       outputLog(`开始登录`);
       await login(config, password, browser, false);
 
-      await buy(browser, config);
-    }
+      // let {teamId, teamName}=await buy(browser, config);
 
-    // 这里可以添加更多验证逻辑
-    testResult = "启动插件成功";
+      // 添加店铺，绑定IP，导入cookie
+      let teamName = "crxTest-2025-10-28 13:39:27";
+      await addShop(browser, teamName);
+
+      // TODO 执行店铺信息同步流程
+
+      // TODO 执行定向邀约流程
+
+      // TODO 执行站内消息流程
+
+      // TODO 等待所有流程执行完成后检查历史任务是否有失败的
+
+      testResult = "启动插件成功";
+    } else {
+      testResult = "未打开新标签页，插件可能未正常工作";
+      errorMsg += "未打开新标签页，插件可能未正常工作\n";
+    }
   } catch (e) {
     errorMsg += e.message + '\n';
     console.error(e);

@@ -92,8 +92,12 @@ async function buy(targetBrowser) {
     await browser.url(`https://${domain}/team/${teamId}/shop`);
     await browser.$(`#teamName`).waitForExist({ timeout: 30 * 1000 });
     await browser.$(`#teamName`).click();
-    await browser.$('#teamName').setValue(`crxTest-${dateFormat(new Date())}`);
+    let teamName=`crxTest-${dateFormat(new Date())}`;
+    await browser.$('#teamName').setValue(teamName);
     await browser.$(`.react-draggable .ant-btn-primary`).click();
+    return {
+        orderId, teamId, teamName
+    }
 };
 
 module.exports = buy;
