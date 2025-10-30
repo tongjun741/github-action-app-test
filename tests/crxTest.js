@@ -2,6 +2,8 @@ const desktopScreenshot = require('screenshot-desktop');
 const WebdriverAjax = require('wdio-intercept-service').default;
 const { remote } = require('webdriverio');
 const { join } = require('path');
+const { Client } = require('ssh2');
+const socks = require('socksv5');
 const { feishuNotify, screenshot, uploadFile, outputLog } = require('./include/tools');
 const { productCrxTestConfig, devCrxTestConfig } = require('./config');
 const login = require('./include/login');
@@ -11,7 +13,61 @@ const addShop = require('./crx/addShop');
 const EXTENSION_NAME = "花漾TK";
 const EXTENSION_PATH = join(__dirname, '..', 'tkshop-crx');
 
+// SOCKS5 代理本地端口
+const SOCKS_PORT = 5080;
+
+// 创建 SSH 隧道
+async function createSSHTunnel() {
+
+  return new Promise((resolve, reject) => {
+    const sshConfig = {
+      host: process.env.SSH_PROXY_HOST,
+      port: process.env.SSH_PROXY_PORT,
+      username: process.env.SSH_PROXY_USER,
+      password: process.env.SSH_PROXY_PASSWORD
+    };
+
+    socks.createServer((info, accept, deny) => {
+      // NOTE: you could just use one ssh2 client connection for all forwards, but
+      // you could run into server-imposed limits if you have too many forwards open
+      // at any given time
+      const conn = new Client();
+      conn.on('ready', () => {
+        conn.forwardOut(info.srcAddr,
+          info.srcPort,
+          info.dstAddr,
+          info.dstPort,
+          (err, stream) => {
+            if (err) {
+              conn.end();
+              return deny();
+            }
+
+            const clientSocket = accept(true);
+            if (clientSocket) {
+              stream.pipe(clientSocket).pipe(stream).on('close', () => {
+                conn.end();
+              });
+            } else {
+              conn.end();
+            }
+          });
+      }).on('close', () => {
+        console.log('Client disconnected');
+        reject();
+      }).on('error', (err) => {
+        dereny();
+        reject(err);
+      }).connect(sshConfig);
+    }).listen(SOCKS_PORT, 'localhost', () => {
+      console.log(`SOCKSv5 proxy server started on port ${SOCKS_PORT}`);
+      resolve(true);
+    }).useAuth(socks.auth.None());
+  });
+}
+
 async function main() {
+  let sshConnection = null;
   let isDev = process.env.IN_DEV === "true";
 
   let config = productCrxTestConfig;
@@ -28,13 +84,36 @@ async function main() {
   let testResult = "插件测试未完成";
   let browser;
   try {
+    // 创建 SSH 隧道
+    try {
+      sshConnection = await createSSHTunnel();
+      if (sshConnection) {
+        outputLog('SSH 隧道已建立，等待2秒以确保连接稳定');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    } catch (sshErr) {
+      outputLog(`SSH 隧道创建失败，继续不使用代理: ${sshErr.message}`);
+    }
+
     // 配置 Chrome 浏览器选项
+    const chromeArgs = [
+      `--load-extension=${EXTENSION_PATH}`,
+      '--disable-features=DisableLoadExtensionCommandLineSwitch'
+    ];
+
+    // 如果 SSH 隧道已建立，添加代理配置
+    if (sshConnection) {
+      chromeArgs.push(`--proxy-server=socks5://localhost:${SOCKS_PORT}`);
+      chromeArgs.push(`--host-resolver-rules="MAP * 0.0.0.0"`);
+      outputLog(`Chrome 将使用 SOCKS5 代理: localhost:${SOCKS_PORT}`);
+    }
+
     const chromeOptions = {
       capabilities: {
         browserName: 'chrome',
         'goog:chromeOptions': {
           // 加载扩展
-          args: [`--load-extension=${EXTENSION_PATH}`, '--disable-features=DisableLoadExtensionCommandLineSwitch'],
+          args: chromeArgs,
           // 可选：禁用自动化控制提示
           excludeSwitches: ['enable-automation']
         }
@@ -52,6 +131,50 @@ async function main() {
       timeout: 5000,
       timeoutMsg: '浏览器启动超时'
     });
+
+    // 验证代理是否生效
+    if (sshConnection) {
+      outputLog('开始验证代理是否生效...');
+      let proxyVerificationSuccess = false;
+
+      try {
+        // 验证1：使用 ipify.org
+        outputLog('验证1: 访问 ipify.org...');
+        await browser.url('https://api.ipify.org?format=json');
+        await browser.pause(3000); // 等待页面完全加载
+
+        const bodyText = await browser.$('body').getText();
+        outputLog(`ipify.org 响应: ${bodyText}`);
+
+        let currentIP = null;
+        try {
+          const ipData = JSON.parse(bodyText);
+          currentIP = ipData.ip;
+          outputLog(`✅ 验证1成功 - 代理IP: ${currentIP}`);
+          proxyVerificationSuccess = true;
+        } catch (parseErr) {
+          outputLog(`❌ 验证1失败 - JSON解析错误: ${parseErr.message}`);
+          outputLog(`原始响应: ${bodyText}`);
+        }
+
+        // 总结验证结果
+        if (proxyVerificationSuccess && currentIP === process.env.SSH_PROXY_HOST) {
+          outputLog('🎉 代理验证成功！所有网络请求都通过SSH代理');
+          testResult += " (代理验证成功)";
+        } else {
+          outputLog('⚠️ 代理验证部分失败，但测试继续');
+          errorMsg += '代理验证部分失败\n';
+          throw new Error("代理验证失败");
+        }
+      } catch (ipErr) {
+        outputLog(`❌ 代理验证完全失败: ${ipErr.message}`);
+        errorMsg += `代理验证失败: ${ipErr.message}\n`;
+        testResult += " (代理验证失败)";
+        throw new Error("代理不通");
+      }
+    } else {
+      outputLog('未启用SSH代理，跳过代理验证');
+    }
 
     // 测试1：验证扩展是否成功加载
     await browser.url('chrome://extensions/');
@@ -141,6 +264,13 @@ async function main() {
   outputLog("发送飞书消息");
   await feishuNotify(msg);
   outputLog("发送飞书消息完成，退出流程");
+
+  // 关闭 SSH 连接
+  if (sshConnection) {
+    outputLog("关闭 SSH 连接");
+    sshConnection.end();
+  }
+
   process.exit(0);
 }
 

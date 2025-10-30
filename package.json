@@ -8,7 +8,10 @@
     "start": "electron .",
     "test": "xvfb-maybe -- playwright test",
     "wdio": "wdio run ./wdio.conf.js",
-    "crx": "wdio run ./wdio-crx.conf.js"
+    "crx": "wdio run ./wdio-crx.conf.js",
+    "test-local": "node test-local.js",
+    "test-ssh": "node test-ssh.js",
+    "debug-ssh": "node debug-ssh.js"
   },
   "repository": "https://github.com/electron/electron-quick-start",
   "keywords": [
@@ -38,8 +41,11 @@
     "@electron/asar": "^3.2.10",
     "chromedriver": "^108.0.0",
     "cloudinary": "^2.8.0",
+    "dotenv": "^17.2.3",
     "mongoose": "^8.6.1",
     "screenshot-desktop": "1.15.0",
+    "socksv5": "^0.0.6",
+    "ssh2": "^1.15.0",
     "wdio-chromedriver-service": "^8.1.1"
   }
 }

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(yarn add ssh2@^1.15.0)",
+      "Bash(yarn add dotenv)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

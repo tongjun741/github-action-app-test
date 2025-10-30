@@ -14,6 +14,9 @@ on:
       debug:
         description: '是否开启调试'
         default: 'false'
+      enable_ssh_proxy:
+        description: '是否启用 SSH 代理'
+        default: 'false'
 
 jobs:
 
@@ -100,4 +103,8 @@ jobs:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
           CLOUDINARY_MASK: ${{ secrets.CLOUDINARY_MASK }}
+          SSH_PROXY_HOST: ${{ secrets.SSH_PROXY_HOST }}
+          SSH_PROXY_PORT: ${{ secrets.SSH_PROXY_PORT }}
+          SSH_PROXY_USER: ${{ secrets.SSH_PROXY_USER }}
+          SSH_PROXY_PASSWORD: ${{ secrets.SSH_PROXY_PASSWORD }}
         run: yarn add chromedriver@141 --dev && node tests\crxTest.js
