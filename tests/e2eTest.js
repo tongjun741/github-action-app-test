@@ -102,7 +102,7 @@ async function e2eTest(browser) {
   let msg;
   if (ipText) {
     msg = `打开会话测试完成！当前IP地址是：${ipText}。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n`;
-    await saveResult(isDev, process.env.E2E_PLATFORM || "--", `${ipText}|${process.env.DOWNLOAD_URL.split('/').slice(-1)?.[0]?.match(/\d+\.\d+\.\d+/)?.[0]}`);
+    await saveResult(isDev, process.env.E2E_PLATFORM || "--", `${ipText}|${process.env.DOWNLOAD_URL?.split('/')?.slice(-1)?.[0]?.match(/\d+\.\d+\.\d+/)?.[0]}`);
   } else {
     msg = `打开会话测试失败！\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n\n${errorMsg}` + `\n<at user_id=\"${process.env.FEISHU_ME}\">me</at>`;
     await saveResult(isDev, process.env.E2E_PLATFORM || "--", `Error|${process.env.DOWNLOAD_URL.split('/').slice(-1)?.[0]?.match(/\d+\.\d+\.\d+/)?.[0]}`);
