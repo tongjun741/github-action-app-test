@@ -165,6 +165,8 @@ async function openSession() {
   let ipText = await browser.$('#jumbo-ip').getAttribute('data-ip');
   console.log(ipText);
   outputLog(`ipText=${ipText}`);
+  await browser.$('#ip-qv').click();
+  await sleep(3 * 1000);
 
   // 对分身浏览器截图
   outputLog(`对分身浏览器截图`);
