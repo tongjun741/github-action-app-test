@@ -95,6 +95,8 @@ async function e2eTest(browser) {
     console.error(e);
   }
 
+  // 点击支持按钮，展示当前版本号
+  await browser.$('//span[text()="支持"][contains(@class,"menu-item-name")]').click();
   outputLog(`E2E测试结束：ipText=${ipText}`);
 
   let msg;
