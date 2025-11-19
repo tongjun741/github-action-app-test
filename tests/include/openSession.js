@@ -46,7 +46,13 @@ async function openSession() {
   // 等待30秒让浏览器内核解压完成
   outputLog("等待30秒让浏览器内核解压完成");
   await sleep(30 * 1000);
+  // 最多尝试100次
+  let tryCount = 0;
   while (true) {
+    tryCount++;
+    if (tryCount > 100) {
+      throw new Error("等待打开浏览器超时");
+    }
     await sleep(10 * 1000);
     try {
       let chromeOptions = {};
