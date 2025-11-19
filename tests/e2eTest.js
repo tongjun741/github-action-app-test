@@ -53,7 +53,14 @@ async function e2eTest(browser) {
 
     // 处理有其他人在访问的情况
     outputLog(`处理有其他人在访问的情况`);
+    // 最多尝试100次
+    let tryCount = 0;
     while (true) {
+      tryCount++;
+      if (tryCount > 100) {
+        throw new Error("等待打开会话超时");
+      }
+
       try {
         await browser.$(`//span[text()="继续访问"]`).waitForExist({ timeout: 5 * 1000 })
         await browser.$(`//span[text()="继续访问"]`).click();
