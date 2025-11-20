@@ -76,7 +76,7 @@ const uploadFile = async (filePath) => {
     while (retryCount < 3) {
         try {
             const options = {
-                asset_folder: 'e2eTest',
+                asset_folder: `e2eTest_${dateFormat(new Date(), 'yyyy-MM')}`,
                 use_filename: false,
                 unique_filename: false,
             };
