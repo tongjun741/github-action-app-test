@@ -102,16 +102,20 @@ async function e2eTest(browser) {
     console.error(e);
   }
 
-  // 点击支持按钮，展示当前版本号
-  await browser.$('//span[text()="支持"][contains(@class,"menu-item-name")]').click();
+  let msg="";
+  try {
+    // 点击支持按钮，展示当前版本号
+    await browser.$('//span[text()="支持"][contains(@class,"menu-item-name")]').click();
+  } catch (e) {
+    msg+="找不到支持按钮";
+  }
   outputLog(`E2E测试结束：ipText=${ipText}`);
 
-  let msg;
   if (ipText) {
-    msg = `打开会话测试完成！当前IP地址是：${ipText}。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n`;
+    msg += `打开会话测试完成！当前IP地址是：${ipText}。\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n`;
     await saveResult(isDev, process.env.E2E_PLATFORM || "--", `${ipText}|${process.env.DOWNLOAD_URL?.split('/')?.slice(-1)?.[0]?.match(/\d+\.\d+\.\d+/)?.[0]}`);
   } else {
-    msg = `打开会话测试失败！\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n\n${errorMsg}` + `\n<at user_id=\"${process.env.FEISHU_ME}\">me</at>`;
+    msg += `打开会话测试失败！\n客户端下载地址是：${process.env.DOWNLOAD_URL}\n会话截图：${sessionScreenshotUrl}\n\n${errorMsg}` + `\n<at user_id=\"${process.env.FEISHU_ME}\">me</at>`;
     await saveResult(isDev, process.env.E2E_PLATFORM || "--", `Error|${process.env.DOWNLOAD_URL.split('/').slice(-1)?.[0]?.match(/\d+\.\d+\.\d+/)?.[0]}`);
   }
   let rs = await showResultTable(isDev);
