@@ -1,4 +1,3 @@
-const path = require('path');
 const os = require('os');
 const { e2eTest } = require('./e2eTest');
 const { ipTest } = require('./ipTest');
