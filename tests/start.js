@@ -57,8 +57,9 @@ async function main() {
         outputLog("E2E测试完成");
       } else {
         outputLog("开始进行IP测试");
-        testResult = await ipTest(browser);
-        outputLog("开始进行E2E测试");
+        testResult = await ipTest(browser).catch(e=>{
+          return "IP测试失败："+e.message;
+        });
         outputLog("IP测试完成");
       }
     } catch (e) {
