@@ -25,6 +25,7 @@ const executeCommand = async (command, args) => {
       shell: true
     });
     let stdout = '';
+    let stderr = '';
 
     // 监听标准输出，并拼接内容
     childProcess.stdout.on('data', (data) => {
@@ -34,6 +35,7 @@ const executeCommand = async (command, args) => {
 
     // 监听错误输出
     childProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
       console.error(data.toString());
     });
 
@@ -43,7 +45,7 @@ const executeCommand = async (command, args) => {
       if (code === 0) {
         resolve(stdout);
       } else {
-        reject(new Error(`命令【${command} ${JSON.stringify({ args })}】执行失败，退出码：${code}`));
+        reject(new Error(`命令【${command} ${JSON.stringify({ args })}】执行失败，退出码：${code}\n${stderr}`));
       }
     });
   });
