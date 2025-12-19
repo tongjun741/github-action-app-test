@@ -15,7 +15,7 @@ on:
         default: 'false'
       runs_on:
         # https://docs.github.com/zh/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories
-        description: 'macos-14(arm64)、macos-15(arm64)还是macos-13(x64)'
+        description: 'macos-14(arm64)、macos-15(arm64)还是macos-15-intel(x64)'
         default: 'macos-latest'
 
 jobs:
