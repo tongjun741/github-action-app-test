@@ -1,10 +1,10 @@
-name: macOS-13-VNC
+name: macOS-15-intel-VNC
 on: 
   workflow_dispatch:
 jobs:
   build:
-    name: macOS-13-VNC
-    runs-on: macos-13
+    name: macOS-15-intel-VNC
+    runs-on: macos-15-intel
     
     steps:
     - uses: actions/checkout@v4 
