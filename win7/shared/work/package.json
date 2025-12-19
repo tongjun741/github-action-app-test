@@ -1,0 +1,45 @@
+{
+  "name": "electron-playwright-e2e-test-quick-start",
+  "version": "0.0.1",
+  "description": "A Playwright with GitHub Actions E2E Testing Sample for Electron App",
+  "author": "Tan Shuai <opensource@tanshuai.com>",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "xvfb-maybe -- playwright test",
+    "wdio": "wdio run ./wdio.conf.js",
+    "crx": "wdio run ./wdio-crx.conf.js"
+  },
+  "repository": "https://github.com/electron/electron-quick-start",
+  "keywords": [
+    "Playwright",
+    "Electron",
+    "E2E",
+    "Testing",
+    "GitHub Actions",
+    "quick",
+    "start",
+    "tutorial",
+    "demo"
+  ],
+  "license": "CC0-1.0",
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@wdio/cli": "8.38.2",
+    "@wdio/local-runner": "8.38.2",
+    "@wdio/mocha-framework": "8.38.2",
+    "@wdio/spec-reporter": "8.38.2",
+    "chai": "^4.3.7",
+    "eslint": "^9.36.0",
+    "globals": "^16.4.0",
+    "wdio-intercept-service": "^4.4.1"
+  },
+  "dependencies": {
+    "@electron/asar": "^3.2.10",
+    "chromedriver": "^108.0.0",
+    "cloudinary": "^2.8.0",
+    "mongoose": "^8.6.1",
+    "screenshot-desktop": "1.15.0",
+    "wdio-chromedriver-service": "^8.1.1"
+  }
+}

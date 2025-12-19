@@ -68,6 +68,8 @@ jobs:
 
       - name: Copy files to Win7
         run: |
+          rm -rf package.json
+          rm -rf yarn.lock
           find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec rsync --relative {} ./win7/shared/work \;
         
       - name: 复制相关文件到虚拟机共享目录
