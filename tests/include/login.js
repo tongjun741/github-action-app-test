@@ -51,8 +51,8 @@ async function login(config, password, targetBrowser, isClient = true) {
   if (await browser.$('//div[text()="邮箱登录"]').isExisting()) {
     outputLog("当前是登录页面，开始登录")
     await browser.$(`//div[text()="邮箱登录"]`).click();
-    await browser.$('#account').setValue(config.username);
-    await browser.$('#password').setValue(password);
+    await browser.$('#email').setValue(config.username);
+    await browser.$('#email_password').setValue(password);
 
     // 发送请求测试服务器是否可用
     let url = 'https://api.szdamai.com/api/msg-center/broadcasts';
