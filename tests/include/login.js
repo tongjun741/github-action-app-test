@@ -51,6 +51,7 @@ async function login(config, password, targetBrowser, isClient = true) {
   if (await browser.$('//div[text()="邮箱登录"]').isExisting()) {
     outputLog("当前是登录页面，开始登录")
     await browser.$(`//div[text()="邮箱登录"]`).click();
+    await sleep(3 * 1000);
     await browser.$('#email').setValue(config.username);
     await browser.$('#email_password').setValue(password);
 
