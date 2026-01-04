@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { sleep, outputLog } = require('./tools');
+const { sleep, outputLog, screenshot } = require('./tools');
 
 async function login(config, password, targetBrowser, isClient = true) {
   if (targetBrowser) {
@@ -99,6 +99,9 @@ async function login(config, password, targetBrowser, isClient = true) {
         await browser.switchWindow(' - 花漾灵动');
         break;
       } catch (e) {
+        outputLog(`按标题切换到主窗口失败：${e.message}`);
+        let url = await screenshot(browser, 'app-screenshot.png');
+        outputLog(`客户端截图${url}`);
       }
     }
 
