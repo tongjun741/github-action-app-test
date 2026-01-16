@@ -60,6 +60,8 @@ async function login(config, password, targetBrowser, isClient = true) {
     if (process.env.IN_DEV === "true") {
       url = "https://dev.thinkoncloud.cn/api/msg-center/broadcasts";
     }
+    // 最多等待20分钟
+    let startTime = Date.now();
     while (true) {
       try {
         let response = await axios.get(url, { timeout: 10000 });
@@ -68,6 +70,9 @@ async function login(config, password, targetBrowser, isClient = true) {
       } catch (e) {
         console.error(e.message);
         outputLog(`服务器不可用，等待服务器恢复：${url}`)
+        if (Date.now() - startTime > 20 * 60 * 1000) {
+          throw new Error("等待服务器恢复超时");
+        }
         await sleep(60 * 1000);
       }
     }
