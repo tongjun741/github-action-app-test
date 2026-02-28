@@ -48,56 +48,86 @@ jobs:
 
       - name: 安装客户端
         run: |
-          # 检查是否提供了下载 URL
-          if ( -not "${{ github.event.inputs.software_download_url }}" ) {
-            # 没有提供 URL，从 JSON 中获取版本号
+          $ErrorActionPreference = "Stop"
 
-            $url = "https://www.szdamai.com/static.config.json"
-            $response = Invoke-RestMethod -Uri $url
-            $appVersion = $response.windows10AppVersion
+          try {
+            # 检查是否提供了下载 URL
+            if ( -not "${{ github.event.inputs.software_download_url }}" ) {
+              # 没有提供 URL，从 JSON 中获取版本号
+              try {
+                $url = "https://www.szdamai.com/static.config.json"
+                $response = Invoke-RestMethod -Uri $url
+                $appVersion = $response.windows10AppVersion
 
-            # 根据版本号构建下载 URL
-            $downloadUrl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_${appVersion}_zh_setup.exe"
-            Write-Host "Generated download URL: $downloadUrl"
-          } else {
-            # 使用提供的下载 URL
-            $downloadUrl = "${{ github.event.inputs.software_download_url }}"
-            Write-Host "Using provided download URL: $downloadUrl"
-          }
-
-          # 下载客户端安装包
-          Invoke-WebRequest -Uri $downloadUrl -OutFile "$env:TEMP\your_software_installer.exe"
-
-          # 安装客户端
-          Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait -Verb RunAs
-
-          $filePath = "C:\Program Files\HuaYoung\花漾客户端.exe"
-          $timeoutMinutes = 5  # 最大等待时间（分钟）
-          $checkIntervalSeconds = 10  # 检查间隔（秒）
-          $endTime = (Get-Date).AddMinutes($timeoutMinutes)
-          
-          Write-Host "等待文件出现: $filePath"
-          Write-Host "最大等待时间: $timeoutMinutes 分钟"
-          
-          while ((Get-Date) -lt $endTime) {
-              if (Test-Path -Path $filePath -PathType Leaf) {
-                  Write-Host "文件已找到: $filePath"
-
-                  # 启动软件
-                  # Start-Process -FilePath "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"
-                  # exe的路径已经变了
-                  Start-Process -FilePath "$filePath"
-                  exit 0
+                # 根据版本号构建下载 URL
+                $downloadUrl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_${appVersion}_zh_setup.exe"
+                Write-Host "Generated download URL: $downloadUrl"
+              } catch {
+                Write-Error "获取版本信息失败: $_"
+                exit 1
               }
-              
-              $remainingTime = $endTime - (Get-Date)
-              $remainingMinutes = [math]::Round($remainingTime.TotalMinutes, 1)
-              Write-Host "文件未找到，剩余等待时间: $remainingMinutes 分钟，将在 $checkIntervalSeconds 秒后再次检查..."
-              Start-Sleep -Seconds $checkIntervalSeconds
+            } else {
+              # 使用提供的下载 URL
+              $downloadUrl = "${{ github.event.inputs.software_download_url }}"
+              Write-Host "Using provided download URL: $downloadUrl"
+            }
+
+            # 下载客户端安装包
+            try {
+              Invoke-WebRequest -Uri $downloadUrl -OutFile "$env:TEMP\your_software_installer.exe"
+              Write-Host "下载成功: $downloadUrl"
+            } catch {
+              Write-Error "下载安装包失败: $_"
+              exit 1
+            }
+
+            # 安装客户端
+            try {
+              Start-Process -FilePath "$env:TEMP\your_software_installer.exe" -ArgumentList "/S" -Wait -Verb RunAs
+              Write-Host "安装完成"
+            } catch {
+              Write-Error "安装客户端失败: $_"
+              exit 1
+            }
+
+            $filePath = "C:\Program Files\HuaYoung\花漾客户端.exe"
+            $timeoutMinutes = 5  # 最大等待时间（分钟）
+            $checkIntervalSeconds = 10  # 检查间隔（秒）
+            $endTime = (Get-Date).AddMinutes($timeoutMinutes)
+
+            Write-Host "等待文件出现: $filePath"
+            Write-Host "最大等待时间: $timeoutMinutes 分钟"
+
+            while ((Get-Date) -lt $endTime) {
+                if (Test-Path -Path $filePath -PathType Leaf) {
+                    Write-Host "文件已找到: $filePath"
+
+                    # 启动软件
+                    # Start-Process -FilePath "$env:LOCALAPPDATA\Programs\HuaYoung\花漾客户端.exe"
+                    # exe的路径已经变了
+                    try {
+                      Start-Process -FilePath "$filePath"
+                      Write-Host "软件启动成功"
+                      exit 0
+                    } catch {
+                      Write-Error "启动软件失败: $_"
+                      exit 1
+                    }
+                }
+
+                $remainingTime = $endTime - (Get-Date)
+                $remainingMinutes = [math]::Round($remainingTime.TotalMinutes, 1)
+                Write-Host "文件未找到，剩余等待时间: $remainingMinutes 分钟，将在 $checkIntervalSeconds 秒后再次检查..."
+                Start-Sleep -Seconds $checkIntervalSeconds
+            }
+
+            Write-Error "超时错误: 在 $timeoutMinutes 分钟内未找到文件 $filePath"
+            exit 1
+
+          } catch {
+            Write-Error "安装过程发生未预期的错误: $_"
+            exit 1
           }
-          
-          Write-Error "超时错误: 在 $timeoutMinutes 分钟内未找到文件 $filePath"
-          exit 1
 
 
       - name: 检查安装目录是否存在
