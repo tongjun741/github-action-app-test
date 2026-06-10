@@ -36,7 +36,7 @@ jobs:
             echo "Running on an Intel chip"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: 下载并安装客户端
         run: |
@@ -81,7 +81,7 @@ jobs:
           fi
 
       - name: Use Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: 'yarn'
