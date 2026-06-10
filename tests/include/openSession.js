@@ -2,183 +2,160 @@
  * 需要将main.js的
  * this.remoteDebugPort&&t.push
  * 替换成：
-this.remoteDebugPort=9221;t.push
-
-TODO
-关闭窗口后会话不结束
+ * this.remoteDebugPort=9221;t.push
  */
 
-const os = require('os');
-const fs = require('fs');
-const { remote } = require('webdriverio');
-const { exec } = require('child_process');
+const http = require('node:http');
+const https = require('node:https');
+const process = require('node:process');
+const puppeteer = require('puppeteer-core');
 const { sleep, screenshot, outputLog } = require('./tools');
 
-// 当前浏览器内核是128.0.6613.45，但没有这个版本的chromedriver，所以换个相近版本的
-// 版本列表128.0.6613.137  130.0.6723.116 136.0.7103.80
-let browserVersion = '138.0.7204.142';
-if (process.env.IN_DEV === "true") {
-  // 如果测试环境上了新内核可以改这个地方
-  browserVersion = '138.0.7204.142';
-}
-outputLog(`浏览器内核版本为${browserVersion}`);
+const DEFAULT_DEBUGGER_URL = process.env.SESSION_DEBUGGER_URL || 'http://127.0.0.1:9221';
+const DEFAULT_IP_URL = 'https://ipapi.co/';
 
-// 封装为Promise
-const executeCommand = (command) => {
+function getJson(url, timeoutMs = 3000) {
   return new Promise((resolve, reject) => {
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(`执行错误: ${error.message}`));
+    const transport = url.startsWith('https:') ? https : http;
+    const request = transport.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error(`HTTP ${response.statusCode}`));
         return;
       }
-      if (stderr) {
-        reject(new Error(`错误输出: ${stderr}`));
-        return;
-      }
-      resolve(stdout);
-    });
-  });
-};
 
-async function openSession() {
-  let browser = null;
-  let retry = 0;
-  // 等待30秒让浏览器内核解压完成
-  outputLog("等待30秒让浏览器内核解压完成");
-  await sleep(30 * 1000);
-  // 最多尝试100次
-  let tryCount = 0;
-  while (true) {
-    tryCount++;
-    if (tryCount > 100) {
-      throw new Error("等待打开浏览器超时");
-    }
-    await sleep(10 * 1000);
-    try {
-      let chromeOptions = {};
-      if (os.platform() === 'win32' && os.release().startsWith('6.1')) {
-        // 下载地址：https://chromedriver.storage.googleapis.com/109.0.5414.74/chromedriver_win32.zip
-        chromeOptions.binary = 'C:\\Users\\Docker\\AppData\\Local\\Temp\\chromedriver\\win64-109\\chromedriver-win64\\chromedriver.exe';
-        browserVersion = '109';
-        console.log(`当前操作系统是 Windows 7，浏览器内核版本为109，需要手工指定browserVersion为${browserVersion}，chromedriver的路径：${chromeOptions.binary}`);
-      }
-
-      // 如果当前时macOS，则执行命令find ~/Library -name "chrome*" -exec ls -l {} +
-      outputLog('当前操作系统是：' + os.platform());
-      if (os.platform() === 'darwin') {
-        await executeCommand('find ~/Library -name "chrome*" -exec ls -l {} +')
-          .then((output) => {
-            console.log('find命令执行结果：', output);
-          })
-          .catch((error) => {
-            console.error('find命令执行出错：', error);
-          });
-      }
-
-      browser = await remote({
-        capabilities: {
-          browserName: 'chrome',
-          browserVersion, // 值是字符串，不能是数字
-          'goog:chromeOptions': {
-            debuggerAddress: 'localhost:9221',
-            ...chromeOptions,
-            // args: ['--window-size=1440,1280']
-          }
-        },
-        logLevel: 'warn'
+      response.setEncoding('utf8');
+      let body = '';
+      response.on('data', (chunk) => {
+        body += chunk;
       });
-      await sleep(3 * 1000);
-      let title = await browser.getTitle();
-      outputLog(`当前窗口标题是${title}`);
-      if (browserVersion === "109") {
-        outputLog(`开始访问https://ipapi.co/`);
-        await browser.url('https://ipapi.co/');
-        await sleep(10 * 1000);
-        outputLog(`切换到ipapi.co`);
-        await browser.switchWindow('ipapi.co');
-        title = await browser.getTitle();
-        outputLog(`当前窗口标题是${title}`);
-        if (!title) {
-          throw new Error("窗口标题为空");
+      response.on('end', () => {
+        try {
+          resolve(JSON.parse(body));
+        } catch (error) {
+          reject(new Error(`调试端口返回了无效JSON: ${error.message}`));
         }
+      });
+    });
+
+    request.setTimeout(timeoutMs, () => {
+      request.destroy(new Error(`请求超时（${timeoutMs}ms）`));
+    });
+    request.on('error', reject);
+  });
+}
+
+function getDebuggerInfo(debuggerUrl = DEFAULT_DEBUGGER_URL) {
+  return getJson(new URL('/json/version', debuggerUrl).toString());
+}
+
+async function waitForDebugger({
+  debuggerUrl = DEFAULT_DEBUGGER_URL,
+  maxAttempts = 40,
+  intervalMs = 3000,
+  probe = getDebuggerInfo,
+  sleep: wait = sleep,
+  outputLog: log = outputLog,
+} = {}) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await probe(debuggerUrl);
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) {
+        break;
       }
-      outputLog("分身浏览器连接成功");
-      // 调试打开会话失败的问题
-      fs.writeFileSync("openSession-error.txt", "调试打开会话失败的问题");
-    } catch (e) {
-      console.log(e);
-      retry++;
-      outputLog(`分身浏览器连接失败，3秒后重试第${retry}次`);
-      if (retry > 10) {
-        // 调试打开会话失败的问题
-        if (false) {
-          outputLog("调试打开会话失败的问题");
-          fs.writeFileSync("openSession-error.txt", "调试打开会话失败的问题");
-          await sleep(3600 * 100 * 1000);
-        }
-        throw new Error('分身浏览器连接失败');
-      }
-      continue;
+      log(`调试端口尚未就绪，${intervalMs / 1000}秒后重试（${attempt}/${maxAttempts}）：${error.message}`);
+      await wait(intervalMs);
     }
-    break;
   }
 
-  await sleep(10 * 1000);
-  // 验证页面标题
-  let title = await browser.getTitle();
-  outputLog(`当前窗口标题是${title}`);
-
-  // const windowSize = await browser.getWindowSize();
-  // console.log("当前窗口大小是", windowSize);
-
-  // // 设置浏览器窗口大小
-  // await browser.setWindowSize(1600, 1200);
-
-  // const windowSize2 = await browser.getWindowSize();
-  // console.log("当前窗口大小2是", windowSize2);
-
-  // 浏览器检测页面
-  // await browser.switchWindow('szdamai.local');
-  // let t = await browser.$('.ant-pro-card-title').getText();
-  // console.log(t);
-  // await browser.$('//a[text()="定制浏览器首页"]').waitForExist({ timeout: 10 * 1000 });
-
-  // 新开标签页，109中只能用url不能用newWindow
-  outputLog(`开始访问https://ipapi.co/`);
-  await browser.newWindow('https://ipapi.co/');
-  await sleep(10 * 1000);
-  await browser.switchWindow('ipapi.co');
-  // 执行 JavaScript 脚本以获取浏览器窗口大小并在主进程中输出
-  await browser.execute(function () {
-    // 使用JavaScript获取浏览器窗口的宽度和高度
-    var windowWidth = window.innerWidth;
-    var windowHeight = window.innerHeight;
-    // 将窗口大小信息返回给WebdriverIO主进程
-    return { width: windowWidth, height: windowHeight };
-  }).then(function (size) {
-    // 在主进程中输出窗口大小信息
-    console.log("浏览器窗口宽度：" + size.width);
-    console.log("浏览器窗口高度：" + size.height);
-  });
-  await sleep(3000);
-
-  // 验证页面标题
-  title = await browser.getTitle();
-  outputLog(`分身标题是${title}`);
-  outputLog(`等待30秒让IP显示出来`);
-  await sleep(30 * 1000);
-  await browser.$('#jumbo-ip').waitForExist({ timeout: 60 * 1000 });
-  let ipText = await browser.$('#jumbo-ip').getAttribute('data-ip');
-  console.log(ipText);
-  outputLog(`ipText=${ipText}`);
-  await browser.$('#ip-qv').click();
-  await sleep(3 * 1000);
-
-  // 对分身浏览器截图
-  outputLog(`对分身浏览器截图`);
-  let sessionScreenshotUrl = await screenshot(browser, 'session-screenshot.png');
-
-  return { ipText, sessionScreenshotUrl };
+  throw new Error(`等待浏览器调试端口超时：${lastError?.message || '未知错误'}`);
 }
 
+function createOpenSession({
+  connect = (options) => puppeteer.connect(options),
+  waitForDebugger: waitUntilReady = waitForDebugger,
+  sleep: wait = sleep,
+  screenshot: takeScreenshot = screenshot,
+  outputLog: log = outputLog,
+  debuggerUrl = DEFAULT_DEBUGGER_URL,
+  ipUrl = DEFAULT_IP_URL,
+} = {}) {
+  return async function openSession() {
+    log(`等待浏览器调试端口就绪：${debuggerUrl}`);
+    const debuggerInfo = await waitUntilReady({
+      debuggerUrl,
+      sleep: wait,
+      outputLog: log,
+    });
+    log(`浏览器内核版本为${debuggerInfo.Browser || '未知'}`);
+
+    let browser;
+    try {
+      browser = await connect({
+        browserURL: debuggerUrl,
+        defaultViewport: null,
+        protocolTimeout: 60 * 1000,
+      });
+
+      const pages = await browser.pages();
+      if (pages.length > 0) {
+        log(`当前窗口标题是${await pages[0].title()}`);
+      }
+      log('分身浏览器连接成功');
+
+      log(`开始访问${ipUrl}`);
+      const page = await browser.newPage();
+      await page.goto(ipUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60 * 1000,
+      });
+      await page.bringToFront();
+
+      const size = await page.evaluate(() => ({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      }));
+      log(`浏览器窗口宽度：${size.width}`);
+      log(`浏览器窗口高度：${size.height}`);
+
+      log(`分身标题是${await page.title()}`);
+      await page.waitForSelector('#jumbo-ip', { timeout: 60 * 1000 });
+      await page.waitForFunction(
+        () => Boolean(document.querySelector('#jumbo-ip')?.getAttribute('data-ip')),
+        { timeout: 60 * 1000 },
+      );
+
+      const ipText = await page.$eval('#jumbo-ip', (element) => element.getAttribute('data-ip'));
+      log(`ipText=${ipText}`);
+      await page.click('#ip-qv');
+      await wait(3 * 1000);
+
+      log('对分身浏览器截图');
+      const screenshotTarget = {
+        saveScreenshot: (filePath) => page.screenshot({ path: filePath }),
+      };
+      const sessionScreenshotUrl = await takeScreenshot(screenshotTarget, 'session-screenshot.png');
+
+      return { ipText, sessionScreenshotUrl };
+    } finally {
+      if (browser) {
+        try {
+          await browser.disconnect();
+        } catch (error) {
+          log(`断开调试连接失败：${error.message}`);
+        }
+      }
+    }
+  };
+}
+
+const openSession = createOpenSession();
+
 module.exports = openSession;
+module.exports.createOpenSession = createOpenSession;
+module.exports.getDebuggerInfo = getDebuggerInfo;
+module.exports.waitForDebugger = waitForDebugger;

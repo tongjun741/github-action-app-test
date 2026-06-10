@@ -43,6 +43,7 @@
     "cloudinary": "^2.8.0",
     "dotenv": "^17.2.3",
     "mongoose": "^8.6.1",
+    "puppeteer-core": "^20.9.0",
     "screenshot-desktop": "1.15.0",
     "socksv5": "^0.0.6",
     "ssh2": "^1.15.0",
