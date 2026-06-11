@@ -24,7 +24,7 @@ jobs:
       - name: 启动docker
         run: |
           cd win7
-          docker compose up -d
+          bash ./start-docker.sh
 
       - name: 保存密码
         env:
