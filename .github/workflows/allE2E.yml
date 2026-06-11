@@ -52,7 +52,7 @@ jobs:
                     inputs: {
                         software_download_url: 'https://dev.thinkoncloud.cn/downloads/mac_x64_app_zh/HuaYoungApp_Mac_x64_dev_zh_setup.dmg',
                         in_dev: 'true',
-                        runs_on: 'macos-12'
+                        runs_on: 'macos-15-intel'
                     }
                 },
                 {
@@ -102,7 +102,7 @@ jobs:
                         inputs: {
                             software_download_url: `https://dl.szdamai.com/downloads/mac_x64_app_zh/HuaYoungApp_Mac_x64_${data.macX64AppVersion}_zh_setup.dmg`,
                             in_dev: 'false',
-                            runs_on: 'macos-12'
+                            runs_on: 'macos-15-intel'
                         }
                     },
                     {
