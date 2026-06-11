@@ -32,6 +32,8 @@ test('waitForDebugger probes immediately and retries at the configured interval'
 
 test('openSession connects through CDP and disconnects without closing the browser', async () => {
   const calls = [];
+  let nativeClickCount = 0;
+  let domClickCount = 0;
   const existingPage = {
     title: async () => '分身首页',
   };
@@ -41,11 +43,21 @@ test('openSession connects through CDP and disconnects without closing the brows
     evaluate: async () => ({ width: 1440, height: 900 }),
     waitForSelector: async (...args) => calls.push(['waitForSelector', ...args]),
     waitForFunction: async (...args) => calls.push(['waitForFunction', ...args]),
-    $eval: async (...args) => {
-      calls.push(['$eval', args[0]]);
-      return '203.0.113.8';
+    $eval: async (selector, callback) => {
+      calls.push(['$eval', selector]);
+      if (selector === '#jumbo-ip') {
+        return '203.0.113.8';
+      }
+      return callback({
+        click: () => {
+          domClickCount++;
+        },
+      });
     },
-    click: async (...args) => calls.push(['click', ...args]),
+    click: async () => {
+      nativeClickCount++;
+      throw new Error('Runtime.callFunctionOn timed out');
+    },
     screenshot: async (...args) => calls.push(['pageScreenshot', ...args]),
     title: async () => 'IP Address',
   };
@@ -88,6 +100,10 @@ test('openSession connects through CDP and disconnects without closing the brows
   assert.ok(calls.some((call) => call[0] === 'waitForSelector' && call[1] === '#jumbo-ip'));
   assert.ok(calls.some((call) => call[0] === 'waitForFunction'));
   assert.ok(calls.some((call) => call[0] === 'pageScreenshot'));
+  assert.ok(calls.some((call) => call[0] === '$eval' && call[1] === '#ip-qv'));
+  assert.equal(nativeClickCount, 0);
+  assert.equal(domClickCount, 1);
+  assert.ok(calls.some((call) => call[0] === 'sleep' && call[1] === 3000));
   assert.deepEqual(calls.at(-1), ['disconnect']);
 });
 

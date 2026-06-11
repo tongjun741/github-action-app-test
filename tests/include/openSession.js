@@ -131,7 +131,7 @@ function createOpenSession({
 
       const ipText = await page.$eval('#jumbo-ip', (element) => element.getAttribute('data-ip'));
       log(`ipText=${ipText}`);
-      await page.click('#ip-qv');
+      await page.$eval('#ip-qv', (element) => element.click());
       await wait(3 * 1000);
 
       log('对分身浏览器截图');
