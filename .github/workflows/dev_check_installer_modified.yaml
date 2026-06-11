@@ -18,7 +18,7 @@ jobs:
       - run: echo "ok" > empty.txt
 
       - name: 确保能下载artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: last-modified
           path: empty.txt
@@ -75,7 +75,7 @@ jobs:
 
       - name: Save last-modified date to artifact
         if: env.ANY_MODIFIED == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: last-modified
           path: |
