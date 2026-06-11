@@ -7,6 +7,9 @@ services:
       VERSION: "7u"
       RAM_SIZE: "8G"
       CPU_CORES: "4"
+      REGION: "en-US"
+      KEYBOARD: "en-US"
+      LANGUAGE: "en-US
     devices:
       - /dev/kvm
     cap_add:
