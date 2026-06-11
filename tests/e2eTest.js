@@ -1,7 +1,36 @@
 const login = require('./include/login');
 const { productConfig, devConfig } = require('./config');
 const openSession = require('./include/openSession');
-const { saveResult, showResultTable, outputLog, screenshot } = require('./include/tools');
+const { saveResult, showResultTable, outputLog, screenshot, sleep } = require('./include/tools');
+
+async function ensureBrowserWindowSize(browser, {
+  width = 1600,
+  height = 1200,
+  retryDelayMs = 3000,
+  sleep: wait = sleep,
+  outputLog: log = outputLog,
+} = {}) {
+  const resizeWindow = () => browser.execute((targetWidth, targetHeight) => {
+    window.resizeTo(targetWidth, targetHeight);
+  }, width, height);
+
+  log(`设置浏览器窗口大小为${width}x${height}`);
+  await resizeWindow();
+
+  let actualSize = await browser.getWindowSize();
+  if (actualSize.width === width && actualSize.height === height) {
+    log(`浏览器窗口大小设置成功：${actualSize.width}x${actualSize.height}`);
+    return actualSize;
+  }
+
+  log(`浏览器窗口大小未生效，当前为${actualSize.width}x${actualSize.height}，${retryDelayMs / 1000}秒后重新调整`);
+  await wait(retryDelayMs);
+  await resizeWindow();
+
+  actualSize = await browser.getWindowSize();
+  log(`重新调整后的浏览器窗口大小为${actualSize.width}x${actualSize.height}`);
+  return actualSize;
+}
 
 async function e2eTest(browser) {
   outputLog(`当前任务是E2E测试`);
@@ -21,11 +50,7 @@ async function e2eTest(browser) {
     outputLog(`开始登录`);
     await login(config, password, browser);
 
-    // 设置浏览器窗口大小
-    outputLog("设置浏览器窗口大小");
-    await browser.execute(() => {
-      window.resizeTo(1600, 1200);
-    });
+    await ensureBrowserWindowSize(browser);
 
     let shopName = config.shopName;
     if (process.env.IN_WIN7 === "true") {
@@ -126,5 +151,6 @@ async function e2eTest(browser) {
 }
 
 module.exports = {
-  e2eTest
+  e2eTest,
+  ensureBrowserWindowSize,
 };
