@@ -7,10 +7,16 @@ test('ensureBrowserWindowSize does not retry when the requested size is applied'
   let resizeCount = 0;
   const sleepCalls = [];
   const browser = {
-    execute: async () => {
-      resizeCount++;
+    execute: async (_script, ...args) => {
+      if (args.length > 0) {
+        resizeCount++;
+        return;
+      }
+      return { width: 1600, height: 1200 };
     },
-    getWindowSize: async () => ({ width: 1600, height: 1200 }),
+    getWindowSize: async () => {
+      throw new Error("unknown command: 'Browser.getWindowForTarget' wasn't found");
+    },
   };
 
   const result = await ensureBrowserWindowSize(browser, {
@@ -28,14 +34,18 @@ test('ensureBrowserWindowSize waits three seconds and retries when the size is n
   let sizeCheckCount = 0;
   const sleepCalls = [];
   const browser = {
-    execute: async () => {
-      resizeCount++;
-    },
-    getWindowSize: async () => {
+    execute: async (_script, ...args) => {
+      if (args.length > 0) {
+        resizeCount++;
+        return;
+      }
       sizeCheckCount++;
       return sizeCheckCount === 1
         ? { width: 1280, height: 800 }
         : { width: 1600, height: 1200 };
+    },
+    getWindowSize: async () => {
+      throw new Error("unknown command: 'Browser.getWindowForTarget' wasn't found");
     },
   };
 

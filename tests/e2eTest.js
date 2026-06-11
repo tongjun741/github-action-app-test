@@ -13,11 +13,15 @@ async function ensureBrowserWindowSize(browser, {
   const resizeWindow = () => browser.execute((targetWidth, targetHeight) => {
     window.resizeTo(targetWidth, targetHeight);
   }, width, height);
+  const getWindowSize = () => browser.execute(() => ({
+    width: window.outerWidth,
+    height: window.outerHeight,
+  }));
 
   log(`设置浏览器窗口大小为${width}x${height}`);
   await resizeWindow();
 
-  let actualSize = await browser.getWindowSize();
+  let actualSize = await getWindowSize();
   if (actualSize.width === width && actualSize.height === height) {
     log(`浏览器窗口大小设置成功：${actualSize.width}x${actualSize.height}`);
     return actualSize;
@@ -27,7 +31,7 @@ async function ensureBrowserWindowSize(browser, {
   await wait(retryDelayMs);
   await resizeWindow();
 
-  actualSize = await browser.getWindowSize();
+  actualSize = await getWindowSize();
   log(`重新调整后的浏览器窗口大小为${actualSize.width}x${actualSize.height}`);
   return actualSize;
 }
