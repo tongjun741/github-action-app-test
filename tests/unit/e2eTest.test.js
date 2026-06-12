@@ -35,6 +35,21 @@ test('getShopNames keeps using the dedicated Win7 shop', () => {
   assert.deepEqual(result, ['win7-shop']);
 });
 
+test('getShopNames skips shops above 144 on Linux', () => {
+  const config = {
+    shopName: ['UA146', 'UA144', 'UA142'],
+    win7shopName: 'UA109',
+  };
+
+  assert.deepEqual(getShopNames(config, {
+    platform: 'linux',
+  }), ['UA144']);
+  assert.deepEqual(getShopNames(config, {
+    platform: 'linux',
+    testAllShopNames: true,
+  }), ['UA144', 'UA142']);
+});
+
 test('ensureBrowserWindowSize does not retry when the requested size is applied', async () => {
   let resizeCount = 0;
   const sleepCalls = [];
