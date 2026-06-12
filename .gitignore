@@ -4,3 +4,4 @@ tests/screenshots/out.png
 .vagrant
 tkshop-crx
 *secrets.md
+win7/shared/host-time.txt

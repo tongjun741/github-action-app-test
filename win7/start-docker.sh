@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+host_time_file="$script_dir/shared/host-time.txt"
+cd "$script_dir"
+
 is_true() {
   case "${1,,}" in
     1 | true | yes | y ) return 0 ;;
@@ -26,6 +30,24 @@ verify_sha256() {
 
   [[ -z "$expected" ]] && return 0
   printf '%s  %s\n' "$expected" "$target" | sha256sum -c -
+}
+
+write_host_time_file() {
+  local host_time="${WINDOWS_HOST_TIME:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}"
+  local normalized_host_time
+  local temporary_file="${host_time_file}.tmp.$$"
+
+  if [[ ! "$host_time" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] ||
+    ! normalized_host_time="$(date -u -d "$host_time" +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)" ||
+    [[ "$normalized_host_time" != "$host_time" ]]; then
+    echo "宿主机时间格式无效：$host_time" >&2
+    return 1
+  fi
+
+  mkdir -p "$(dirname "$host_time_file")"
+  printf '%s\n' "$host_time" > "$temporary_file"
+  mv "$temporary_file" "$host_time_file"
+  echo "已将宿主机时间写入 host-time.txt：$host_time"
 }
 
 if is_true "${PRIVATE_DEPLOYMENT:-false}"; then
@@ -58,6 +80,7 @@ if is_true "${PRIVATE_DEPLOYMENT:-false}"; then
 
   export WINDOWS_DOCKER_IMAGE="$image_name"
   export WINDOWS_ISO_PATH="$iso_path"
+  write_host_time_file
   docker compose \
     -f docker-compose.yml \
     -f docker-compose.private.yml \
@@ -81,4 +104,5 @@ while ! docker compose pull --policy missing; do
   attempt=$((attempt + 1))
 done
 
+write_host_time_file
 docker compose up -d --pull never

@@ -3,17 +3,16 @@ const test = require('node:test');
 
 const { synchronizeSystemTime } = require('./timeSync');
 
-test('logs the time before and after synchronizing Windows 7 system time', async () => {
+test('sets Windows date and time from the shared host-time file', async () => {
   const events = [];
   const times = [
-    new Date('2026-06-12T01:00:00.000Z'),
-    new Date('2026-06-12T01:00:05.000Z')
+    new Date('2026-06-12T15:25:00.000Z'),
+    new Date('2026-06-12T15:25:01.000Z')
   ];
   const commandResults = [
     'timezone updated',
-    'service started',
-    'time server updated',
-    'resync completed'
+    'date updated',
+    'time updated'
   ];
 
   await synchronizeSystemTime({
@@ -27,119 +26,32 @@ test('logs the time before and after synchronizing Windows 7 system time', async
       events.push(['command', command, args]);
       return commandResults.shift();
     },
+    readFile: async (filePath, encoding) => {
+      events.push(['read', filePath, encoding]);
+      return '2026-06-12T15:24:09Z\n';
+    },
     now: () => times.shift()
   });
 
   assert.deepEqual(events, [
-    ['output', '系统时间同步前：2026-06-12T01:00:00.000Z'],
-    ['log', '系统时间同步前：2026-06-12T01:00:00.000Z'],
+    ['output', '系统时间同步前：2026-06-12T15:25:00.000Z'],
+    ['log', '系统时间同步前：2026-06-12T15:25:00.000Z'],
+    ['read', '\\\\host.lan\\Data\\host-time.txt', 'utf8'],
+    ['log', '从 host-time.txt 读取宿主机时间：2026-06-12T15:24:09Z'],
     ['command', 'tzutil', ['/s', 'China Standard Time']],
     ['log', '命令执行成功：tzutil {"args":["/s","China Standard Time"]}；执行结果："timezone updated"'],
-    ['command', 'net', ['start', 'w32time']],
-    ['log', '命令执行成功：net {"args":["start","w32time"]}；执行结果："service started"'],
-    ['command', 'w32tm', [
-      '/config',
-      '/manualpeerlist:time.nist.gov,0.us.pool.ntp.org,1.us.pool.ntp.org',
-      '/syncfromflags:manual',
-      '/reliable:yes',
-      '/update'
-    ]],
-    ['log', '命令执行成功：w32tm {"args":["/config","/manualpeerlist:time.nist.gov,0.us.pool.ntp.org,1.us.pool.ntp.org","/syncfromflags:manual","/reliable:yes","/update"]}；执行结果："time server updated"'],
-    ['command', 'w32tm', ['/resync', '/force']],
-    ['log', '命令执行成功：w32tm {"args":["/resync","/force"]}；执行结果："resync completed"'],
-    ['output', '系统时间同步后：2026-06-12T01:00:05.000Z'],
-    ['log', '系统时间同步后：2026-06-12T01:00:05.000Z']
+    ['command', 'cmd.exe', ['/d', '/s', '/c', 'date 06-12-2026']],
+    ['log', '命令执行成功：cmd.exe {"args":["/d","/s","/c","date 06-12-2026"]}；执行结果："date updated"'],
+    ['command', 'cmd.exe', ['/d', '/s', '/c', 'time 23:24:09']],
+    ['log', '命令执行成功：cmd.exe {"args":["/d","/s","/c","time 23:24:09"]}；执行结果："time updated"'],
+    ['output', '系统时间同步后：2026-06-12T15:25:01.000Z'],
+    ['log', '系统时间同步后：2026-06-12T15:25:01.000Z']
   ]);
 });
 
-test('logs the failure reason and current time after a failed synchronization attempt', async () => {
+test('rejects a host-time file value that is not UTC ISO format', async () => {
   const logs = [];
-  const output = [];
-  const syncError = new Error('no time data was available');
-  const times = [
-    new Date('2026-06-12T01:00:00.000Z'),
-    new Date('2026-06-12T01:00:05.000Z')
-  ];
-
-  await assert.rejects(
-    synchronizeSystemTime({
-      sendHttpLog: async (message) => {
-        logs.push(message);
-      },
-      output: (message) => {
-        output.push(message);
-      },
-      executeCommand: async (command, args) => {
-        if (command === 'w32tm' && args[0] === '/config') {
-          throw syncError;
-        }
-        return `${command} completed`;
-      },
-      now: () => times.shift()
-    }),
-    syncError
-  );
-
-  assert.deepEqual(logs, [
-    '系统时间同步前：2026-06-12T01:00:00.000Z',
-    '命令执行成功：tzutil {"args":["/s","China Standard Time"]}；执行结果："tzutil completed"',
-    '命令执行成功：net {"args":["start","w32time"]}；执行结果："net completed"',
-    '命令执行失败：w32tm {"args":["/config","/manualpeerlist:time.nist.gov,0.us.pool.ntp.org,1.us.pool.ntp.org","/syncfromflags:manual","/reliable:yes","/update"]}；失败原因：no time data was available',
-    '系统时间同步后：2026-06-12T01:00:05.000Z'
-  ]);
-  assert.deepEqual(output, [
-    '系统时间同步前：2026-06-12T01:00:00.000Z',
-    '系统时间同步后：2026-06-12T01:00:05.000Z'
-  ]);
-});
-
-test('waits five seconds and retries a failed resync until it succeeds', async () => {
-  const logs = [];
-  const delays = [];
-  let resyncAttempts = 0;
-
-  await synchronizeSystemTime({
-    sendHttpLog: async (message) => {
-      logs.push(message);
-    },
-    output: () => {},
-    executeCommand: async (command, args) => {
-      if (command === 'w32tm' && args[0] === '/resync') {
-        resyncAttempts += 1;
-        if (resyncAttempts < 3) {
-          throw new Error(`resync failed ${resyncAttempts}`);
-        }
-        return 'resync completed';
-      }
-      return `${command} completed`;
-    },
-    sleep: async (milliseconds) => {
-      delays.push(milliseconds);
-    }
-  });
-
-  assert.equal(resyncAttempts, 3);
-  assert.deepEqual(delays, [5000, 5000]);
-  assert.ok(logs.includes(
-    '时间同步失败，5 秒后进行第 1/10 次重试'
-  ));
-  assert.ok(logs.includes(
-    '时间同步失败，5 秒后进行第 2/10 次重试'
-  ));
-  assert.ok(logs.some((message) => (
-    message.includes('命令执行失败：w32tm') &&
-    message.includes('失败原因：resync failed 1')
-  )));
-  assert.ok(logs.some((message) => (
-    message.includes('命令执行成功：w32tm') &&
-    message.includes('"resync completed"')
-  )));
-});
-
-test('stops after ten resync retries and throws the final error', async () => {
-  const logs = [];
-  const delays = [];
-  let resyncAttempts = 0;
+  const commands = [];
 
   await assert.rejects(
     synchronizeSystemTime({
@@ -148,26 +60,45 @@ test('stops after ten resync retries and throws the final error', async () => {
       },
       output: () => {},
       executeCommand: async (command, args) => {
-        if (command === 'w32tm' && args[0] === '/resync') {
-          resyncAttempts += 1;
-          throw new Error(`resync failed ${resyncAttempts}`);
-        }
-        return `${command} completed`;
+        commands.push([command, args]);
       },
-      sleep: async (milliseconds) => {
-        delays.push(milliseconds);
-      }
+      readFile: async () => '2026-06-12 15:24:09\n'
     }),
     {
-      message: 'resync failed 11'
+      message: 'host-time.txt 中的时间无效：2026-06-12 15:24:09'
     }
   );
 
-  assert.equal(resyncAttempts, 11);
-  assert.deepEqual(delays, Array(10).fill(5000));
-  assert.ok(logs.includes('时间同步失败，已完成最多 10 次重试'));
-  assert.ok(logs.some((message) => (
-    message.includes('命令执行失败：w32tm') &&
-    message.includes('失败原因：resync failed 11')
-  )));
+  assert.deepEqual(commands, []);
+  assert.ok(logs.includes(
+    '读取宿主机时间失败：host-time.txt 中的时间无效：2026-06-12 15:24:09'
+  ));
+  assert.ok(logs.some((message) => message.startsWith('系统时间同步后：')));
+});
+
+test('logs the command failure reason and rethrows it', async () => {
+  const logs = [];
+  const dateError = new Error('Access is denied');
+
+  await assert.rejects(
+    synchronizeSystemTime({
+      sendHttpLog: async (message) => {
+        logs.push(message);
+      },
+      output: () => {},
+      executeCommand: async (command, args) => {
+        if (command === 'cmd.exe' && args[3].startsWith('date ')) {
+          throw dateError;
+        }
+        return 'completed';
+      },
+      readFile: async () => '2026-06-12T15:24:09Z\n'
+    }),
+    dateError
+  );
+
+  assert.ok(logs.includes(
+    '命令执行失败：cmd.exe {"args":["/d","/s","/c","date 06-12-2026"]}；失败原因：Access is denied'
+  ));
+  assert.ok(logs.some((message) => message.startsWith('系统时间同步后：')));
 });
