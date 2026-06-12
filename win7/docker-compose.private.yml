@@ -1,0 +1,9 @@
+services:
+  windows:
+    image: ${WINDOWS_DOCKER_IMAGE:?WINDOWS_DOCKER_IMAGE is required}
+    pull_policy: never
+    volumes:
+      - type: bind
+        source: ${WINDOWS_ISO_PATH:?WINDOWS_ISO_PATH is required}
+        target: /boot.iso
+        read_only: true

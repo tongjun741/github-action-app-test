@@ -7,6 +7,11 @@ on:
         description: 'Download url'
         required: true
         default: 'https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_10.2.563_zh_setup.exe'
+      private_deployment:
+        description: '是否从固定 OSS 地址加载 Docker 镜像和 Windows 7 ISO'
+        required: true
+        default: false
+        type: boolean
       in_dev:
         description: '是否是测试环境'
         default: 'false'
@@ -22,6 +27,9 @@ jobs:
       - uses: actions/checkout@v6
         
       - name: 启动docker
+        env:
+          PRIVATE_DEPLOYMENT: ${{ inputs.private_deployment }}
+          PRIVATE_DOWNLOAD_DIR: ${{ runner.temp }}/dockurr-windows
         run: |
           cd win7
           bash ./start-docker.sh
