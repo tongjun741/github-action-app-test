@@ -81,7 +81,7 @@ https://downloads.example.com/docker/dockurr-windows-2026-06-12-amd64.tar.gz.sha
 下载目录：https://pageload-test.oss-us-east-1.aliyuncs.com/dockurr-windows/
 镜像包：dockurr-windows-2026-06-12-amd64.tar.gz
 镜像校验：dockurr-windows-2026-06-12-amd64.tar.gz.sha256
-镜像名称：dockurr/windows:latest
+镜像名称：local/dockurr-windows:2026-06-12
 Windows ISO：en_windows_7_ultimate_with_sp1_x64_dvd_u_677332.iso
 ```
 
@@ -93,11 +93,12 @@ https://pageload-test.oss-us-east-1.aliyuncs.com/dockurr-windows/dockurr-windows
 https://pageload-test.oss-us-east-1.aliyuncs.com/dockurr-windows/en_windows_7_ultimate_with_sp1_x64_dvd_u_677332.iso
 ```
 
-镜像包必须由包含 `dockurr/windows:latest` 标签的镜像生成：
+镜像包必须由包含 `local/dockurr-windows:2026-06-12` 标签的镜像生成：
 
 ```bash
 docker pull dockurr/windows:latest
-docker save dockurr/windows:latest \
+docker tag dockurr/windows:latest local/dockurr-windows:2026-06-12
+docker save local/dockurr-windows:2026-06-12 \
   | gzip -1 > dockurr-windows-2026-06-12-amd64.tar.gz
 sha256sum dockurr-windows-2026-06-12-amd64.tar.gz \
   > dockurr-windows-2026-06-12-amd64.tar.gz.sha256

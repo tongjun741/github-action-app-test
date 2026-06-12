@@ -149,12 +149,12 @@ test('downloads private image and ISO before starting without remote pulls', () 
 
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(result.calls, [
-    'docker image inspect dockurr/windows:latest',
+    'docker image inspect local/dockurr-windows:2026-06-12',
     'curl -fL --retry 5 --retry-delay 5 https://pageload-test.oss-us-east-1.aliyuncs.com/dockurr-windows/dockurr-windows-2026-06-12-amd64.tar.gz -o <TMP>/downloads/dockurr-windows-2026-06-12-amd64.tar.gz',
     'curl -fL --retry 5 --retry-delay 5 https://pageload-test.oss-us-east-1.aliyuncs.com/dockurr-windows/dockurr-windows-2026-06-12-amd64.tar.gz.sha256 -o <TMP>/downloads/dockurr-windows-2026-06-12-amd64.tar.gz.sha256',
     'sha256sum -c dockurr-windows-2026-06-12-amd64.tar.gz.sha256',
     'docker load --input <TMP>/downloads/dockurr-windows-2026-06-12-amd64.tar.gz',
-    'docker image inspect dockurr/windows:latest',
+    'docker image inspect local/dockurr-windows:2026-06-12',
     'curl -fL --retry 5 --retry-delay 5 https://pageload-test.oss-us-east-1.aliyuncs.com/dockurr-windows/en_windows_7_ultimate_with_sp1_x64_dvd_u_677332.iso -o <TMP>/downloads/en_windows_7_ultimate_with_sp1_x64_dvd_u_677332.iso',
     'sha256sum -c -',
     'docker compose -f docker-compose.yml -f docker-compose.private.yml up -d --pull never',

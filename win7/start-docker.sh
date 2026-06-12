@@ -32,7 +32,7 @@ if is_true "${PRIVATE_DEPLOYMENT:-false}"; then
   base_url="https://pageload-test.oss-us-east-1.aliyuncs.com/dockurr-windows"
   image_archive_name="dockurr-windows-2026-06-12-amd64.tar.gz"
   image_checksum_name="dockurr-windows-2026-06-12-amd64.tar.gz.sha256"
-  image_name="dockurr/windows:latest"
+  image_name="local/dockurr-windows:2026-06-12"
   iso_name="en_windows_7_ultimate_with_sp1_x64_dvd_u_677332.iso"
   iso_sha256="36f4fa2416d0982697ab106e3a72d2e120dbcdb6cc54fd3906d06120d0653808"
   download_dir="${PRIVATE_DOWNLOAD_DIR:-$PWD/.private-deploy}"
