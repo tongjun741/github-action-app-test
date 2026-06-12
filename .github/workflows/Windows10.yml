@@ -17,6 +17,10 @@ on:
       do_ip_test:
         description: '是否执行 IP 测试'
         default: 'true'
+      test_all_shop_names:
+        description: '是否测试所有 shopName'
+        type: boolean
+        default: false
       debug:
         description: '是否开启调试'
         default: 'false'
@@ -196,6 +200,7 @@ jobs:
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
           DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
           IN_DEV: ${{ github.event.inputs.in_dev }}
+          TEST_ALL_SHOP_NAMES: ${{ github.event.inputs.test_all_shop_names }}
           FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
           FEISHU_ME: ${{ secrets.FEISHU_ME }}
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}

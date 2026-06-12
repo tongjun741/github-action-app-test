@@ -13,6 +13,10 @@ on:
       in_dev:
         description: '是否是测试环境'
         default: 'false'
+      test_all_shop_names:
+        description: '是否测试所有 shopName'
+        type: boolean
+        default: false
 
 jobs:
 
@@ -75,6 +79,7 @@ jobs:
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
           DOWNLOAD_URL: ${{ github.event.inputs.software_download_url }}
           IN_DEV: ${{ github.event.inputs.in_dev }}
+          TEST_ALL_SHOP_NAMES: ${{ github.event.inputs.test_all_shop_names }}
           FEISHU_TOKEN: ${{ secrets.FEISHU_TOKEN }}
           FEISHU_ME: ${{ secrets.FEISHU_ME }}
           LOGGER_SERVER: ${{ secrets.LOGGER_SERVER }}

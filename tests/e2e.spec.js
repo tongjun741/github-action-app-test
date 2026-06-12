@@ -2,6 +2,7 @@ const { productConfig, devConfig } = require('./config');
 const login = require('./include/login');
 const openSession = require('./include/openSession');
 const { feishuNotify, screenshot, saveResult, showResultTable } = require('./include/tools');
+const { getShopNames } = require('./e2eTest');
 
 global.testData = {
   startTime: 0,
@@ -29,11 +30,9 @@ describe('Electron App Test', () => {
       console.log(`开始登录，当前时间是${new Date().toLocaleString()}`);
       await login(config, password);
 
-      let shopName = config.shopName;
-      if(process.env.IN_WIN7==="true"){
-        // win7只有109的浏览器内核，所以要使用特定的分身
-        shopName = config.win7shopName;
-      }
+      const [shopName] = getShopNames(config, {
+        inWin7: process.env.IN_WIN7 === "true",
+      });
       // 进入分身列表页面
       await $(`.icon-chrome_outline`).waitForExist({ timeout: 30 * 1000 })
       await $(`.icon-chrome_outline`).click();

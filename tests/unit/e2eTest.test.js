@@ -1,7 +1,39 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { ensureBrowserWindowSize } = require('../e2eTest');
+const { ensureBrowserWindowSize, getShopNames } = require('../e2eTest');
+
+test('getShopNames uses only the first configured shop by default', () => {
+  const result = getShopNames({
+    shopName: ['shop-a', 'shop-b'],
+    win7shopName: 'win7-shop',
+  });
+
+  assert.deepEqual(result, ['shop-a']);
+});
+
+test('getShopNames uses every configured shop when requested', () => {
+  const result = getShopNames({
+    shopName: ['shop-a', 'shop-b'],
+    win7shopName: 'win7-shop',
+  }, {
+    testAllShopNames: true,
+  });
+
+  assert.deepEqual(result, ['shop-a', 'shop-b']);
+});
+
+test('getShopNames keeps using the dedicated Win7 shop', () => {
+  const result = getShopNames({
+    shopName: ['shop-a', 'shop-b'],
+    win7shopName: 'win7-shop',
+  }, {
+    inWin7: true,
+    testAllShopNames: true,
+  });
+
+  assert.deepEqual(result, ['win7-shop']);
+});
 
 test('ensureBrowserWindowSize does not retry when the requested size is applied', async () => {
   let resizeCount = 0;
