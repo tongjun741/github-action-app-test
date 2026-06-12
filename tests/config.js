@@ -8,7 +8,7 @@ let devConfig = {
 let productConfig = {
     username: '8606d3fbe819@drmail.in',
     teamName: '用户8606的团队',
-    shopName: ['demo-1'],
+    shopName: ['UA146', 'UA144', 'UA142'],
     win7shopName: 'UA109',
 };
 
@@ -16,7 +16,7 @@ let ipTestConfig = {
     username: '1bc01c597f3b@drmail.in',
     teamName: 'TK私信-只养不发',
     // teamName: "童俊的测试团队",
-    shopName: ['demo-1'],
+    shopName: ['UA146'],
 };
 
 let devCrxTestConfig = {
