@@ -40,8 +40,23 @@ const dateFormat = (date, format = 'yyyy-MM-dd hh:mm:ss') => {
     return string;
 };
 
+const formatBeijingTime = (date = new Date()) => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+    return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`;
+};
+
 const outputLog = (msg) => {
-    console.log(`【${dateFormat(new Date())}】${msg}`);
+    console.log(`【${formatBeijingTime()}】${msg}`);
 }
 
 const feishuNotify = async (msg) => {
@@ -222,7 +237,7 @@ const saveResult = async (isDev, platform, result) => {
     if (!rs[env][platform]) {
         rs[env][platform] = [];
     }
-    rs[env][platform].push(`${result}【${new Date().toISOString()}】`);
+    rs[env][platform].push(`${result}【${formatBeijingTime()}】`);
     // 最多保留10个结果
     let maxLength = 10;
     if (rs[env][platform].length > maxLength) {
@@ -310,5 +325,6 @@ const getMongoConnect = async () => {
 }
 
 module.exports = {
-    sleep, feishuNotify, screenshot, saveResult, showResultTable, uploadFile, outputLog, dateFormat
+    sleep, feishuNotify, screenshot, saveResult, showResultTable, uploadFile, outputLog, dateFormat,
+    formatBeijingTime
 };

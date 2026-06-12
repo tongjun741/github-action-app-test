@@ -5,6 +5,8 @@ const CHINA_TIME_OFFSET_MS = 8 * 60 * 60 * 1000;
 const UTC_ISO_SECONDS_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
+const pad = (value) => String(value).padStart(2, '0');
+
 function readHostTime(fileText) {
   const hostTimeText = fileText.trim();
   const hostTime = new Date(hostTimeText);
@@ -26,7 +28,6 @@ function readHostTime(fileText) {
 
 function formatChinaTime(hostTime) {
   const chinaTime = new Date(hostTime.getTime() + CHINA_TIME_OFFSET_MS);
-  const pad = (value) => String(value).padStart(2, '0');
 
   return {
     date: [
@@ -42,6 +43,19 @@ function formatChinaTime(hostTime) {
   };
 }
 
+function formatBeijingTime(date) {
+  const chinaTime = new Date(date.getTime() + CHINA_TIME_OFFSET_MS);
+  return [
+    chinaTime.getUTCFullYear(),
+    pad(chinaTime.getUTCMonth() + 1),
+    pad(chinaTime.getUTCDate())
+  ].join('-') + ' ' + [
+    pad(chinaTime.getUTCHours()),
+    pad(chinaTime.getUTCMinutes()),
+    pad(chinaTime.getUTCSeconds())
+  ].join(':');
+}
+
 async function synchronizeSystemTime({
   sendHttpLog,
   executeCommand,
@@ -51,7 +65,7 @@ async function synchronizeSystemTime({
   output = console.log
 }) {
   const outputCurrentTime = async (label) => {
-    const message = `${label}：${now().toISOString()}`;
+    const message = `${label}：${formatBeijingTime(now())}`;
     output(message);
     await sendHttpLog(message);
   };
@@ -108,5 +122,6 @@ async function synchronizeSystemTime({
 }
 
 module.exports = {
+  formatBeijingTime,
   synchronizeSystemTime
 };

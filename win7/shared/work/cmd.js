@@ -2,7 +2,7 @@ const path = require('path');
 const http = require('http');
 const fs = require('fs');
 const { createCommandExecutor } = require('./commandRunner');
-const { synchronizeSystemTime } = require('./timeSync');
+const { formatBeijingTime, synchronizeSystemTime } = require('./timeSync');
 
 // 读取 passwd.json 文件
 const passwdJson = fs.readFileSync('passwd.json', 'utf8');
@@ -20,8 +20,7 @@ const executeCommand = createCommandExecutor({
 
 function sendHttpLog(logText) {
   return new Promise((resolve, reject) => {
-    // 获取当前时间并格式化为 "HHMMSS" 格式
-    const currentTime = new Date().toISOString();
+    const currentTime = formatBeijingTime(new Date());
 
     // 获取 Node.js 版本
     const nodeVersion = process.version;

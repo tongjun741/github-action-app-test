@@ -34,8 +34,8 @@ test('sets Windows date and time from the shared host-time file', async () => {
   });
 
   assert.deepEqual(events, [
-    ['output', '系统时间同步前：2026-06-12T15:25:00.000Z'],
-    ['log', '系统时间同步前：2026-06-12T15:25:00.000Z'],
+    ['output', '系统时间同步前：2026-06-12 23:25:00'],
+    ['log', '系统时间同步前：2026-06-12 23:25:00'],
     ['read', '\\\\host.lan\\Data\\host-time.txt', 'utf8'],
     ['log', '从 host-time.txt 读取宿主机时间：2026-06-12T15:24:09Z'],
     ['command', 'tzutil', ['/s', 'China Standard Time']],
@@ -44,8 +44,8 @@ test('sets Windows date and time from the shared host-time file', async () => {
     ['log', '命令执行成功：cmd.exe {"args":["/d","/s","/c","date 06-12-2026"]}；执行结果："date updated"'],
     ['command', 'cmd.exe', ['/d', '/s', '/c', 'time 23:24:09']],
     ['log', '命令执行成功：cmd.exe {"args":["/d","/s","/c","time 23:24:09"]}；执行结果："time updated"'],
-    ['output', '系统时间同步后：2026-06-12T15:25:01.000Z'],
-    ['log', '系统时间同步后：2026-06-12T15:25:01.000Z']
+    ['output', '系统时间同步后：2026-06-12 23:25:01'],
+    ['log', '系统时间同步后：2026-06-12 23:25:01']
   ]);
 });
 
