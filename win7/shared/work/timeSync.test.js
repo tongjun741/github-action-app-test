@@ -26,44 +26,9 @@ test('logs the time before and after synchronizing Windows 7 system time', async
   assert.deepEqual(events, [
     ['output', '系统时间同步前：2026-06-12T01:00:00.000Z'],
     ['log', '系统时间同步前：2026-06-12T01:00:00.000Z'],
-    [
-      'command',
-      'reg.exe',
-      [
-        'add',
-        'HKLM\\SYSTEM\\CurrentControlSet\\Services\\W32Time\\TimeProviders\\NtpClient',
-        '/v',
-        'Enabled',
-        '/t',
-        'REG_DWORD',
-        '/d',
-        '1',
-        '/f'
-      ]
-    ],
-    [
-      'command',
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        "$service = Get-Service -Name w32time; if ($service.Status -ne 'Running') { Start-Service -Name w32time }"
-      ]
-    ],
-    [
-      'command',
-      'w32tm.exe',
-      [
-        '/config',
-        '/manualpeerlist:time.windows.com,0x8',
-        '/syncfromflags:manual',
-        '/update'
-      ]
-    ],
-    ['command', 'w32tm.exe', ['/resync', '/rediscover']],
+    ['command', 'tzutil', ['/s', 'China Standard Time']],
+    ['command', 'net', ['start', 'w32time']],
+    ['command', 'w32tm', ['/resync', '/force']],
     ['output', '系统时间同步后：2026-06-12T01:00:05.000Z'],
     ['log', '系统时间同步后：2026-06-12T01:00:05.000Z']
   ]);
@@ -87,7 +52,7 @@ test('logs the current time after a failed synchronization attempt', async () =>
         output.push(message);
       },
       executeCommand: async (command, args) => {
-        if (command === 'w32tm.exe' && args[0] === '/resync') {
+        if (command === 'w32tm' && args[0] === '/resync') {
           throw syncError;
         }
       },
