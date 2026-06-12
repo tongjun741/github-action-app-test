@@ -2,6 +2,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
+const { synchronizeSystemTime } = require('./timeSync');
 
 // 读取 passwd.json 文件
 const passwdJson = fs.readFileSync('passwd.json', 'utf8');
@@ -102,6 +103,11 @@ function sendHttpLog(logText) {
 
 async function main() {
   try {
+    await synchronizeSystemTime({
+      sendHttpLog,
+      executeCommand
+    });
+
     // 调用函数并传递日志内容
     const logText = 'cmd.js log';
     sendHttpLog(logText);
