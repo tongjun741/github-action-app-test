@@ -1,3 +1,4 @@
+@echo off
 set NODE_SKIP_PLATFORM_CHECK=1
 c:\node\node -v
 
@@ -15,7 +16,7 @@ if errorlevel 1 (
 echo Network share %SHARE_PATH% is accessible.
 
 cd c:\work
-c:\node\node c:\work\cmd.js > \\host.lan\Data\start.log
+c:\node\node c:\work\cmd.js > \\host.lan\Data\start.log 2>&1
 echo "start.bat over" >> "\\host.lan\Data\done.log"
 
 pause

@@ -1,56 +1,22 @@
-const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
+const { createCommandExecutor } = require('./commandRunner');
 const { synchronizeSystemTime } = require('./timeSync');
 
 // 读取 passwd.json 文件
 const passwdJson = fs.readFileSync('passwd.json', 'utf8');
 const passwdData = JSON.parse(passwdJson);
 
-// 异步执行命令并输出标准输出内容
-const executeCommand = async (command, args) => {
-  await sendHttpLog(`开始执行命令：${command} ${JSON.stringify({ args })}`);
-  return new Promise((resolve, reject) => {
-    const envVars = {
-      "NODE_SKIP_PLATFORM_CHECK": 1,
-      "IN_WIN7": true,
-      "PATH": "c:\\node;" + process.env.PATH
-    }
-
-    // 将 passwdData 中的环境变量追加到 envVars 中
-    Object.assign(envVars, passwdData);
-
-    const childProcess = spawn(command, args, {
-      env: { ...process.env, ...envVars },
-      shell: true
-    });
-    let stdout = '';
-    let stderr = '';
-
-    // 监听标准输出，并拼接内容
-    childProcess.stdout.on('data', (data) => {
-      stdout += data.toString();
-      console.log(data.toString());
-    });
-
-    // 监听错误输出
-    childProcess.stderr.on('data', (data) => {
-      stderr += data.toString();
-      console.error(data.toString());
-    });
-
-    // 监听命令执行完成事件
-    childProcess.on('close', (code) => {
-      console.log(`命令【${command} ${JSON.stringify({ args })}】执行结束，退出码：${code}`);
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        reject(new Error(`命令【${command} ${JSON.stringify({ args })}】执行失败，退出码：${code}\n${stderr}`));
-      }
-    });
-  });
-};
+const executeCommand = createCommandExecutor({
+  sendHttpLog,
+  envVars: {
+    ...passwdData,
+    NODE_SKIP_PLATFORM_CHECK: 1,
+    IN_WIN7: true,
+    PATH: `c:\\node;${process.env.PATH}`
+  }
+});
 
 function sendHttpLog(logText) {
   return new Promise((resolve, reject) => {
@@ -124,7 +90,7 @@ async function main() {
         break;
       }
       await sendHttpLog('开始安装.exe文件...');
-      await executeCommand(exeName, [`/S`, ` 2>NUL`])
+      await executeCommand(exeName, ['/S'])
         .then((output) => {
           console.log('安装命令执行结果：', output);
           return sendHttpLog(`安装命令执行结果：${JSON.stringify(output)}`);
@@ -159,7 +125,12 @@ async function main() {
 
     // npm install
     await sendHttpLog('开始npm install...');
-    await executeCommand('npm install yarn -g && yarn')
+    await executeCommand(process.env.ComSpec || 'cmd.exe', [
+      '/d',
+      '/s',
+      '/c',
+      'npm install yarn -g && yarn'
+    ])
       .then((output) => {
         console.log('npm install命令执行结果：', output);
       })
