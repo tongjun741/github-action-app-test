@@ -144,7 +144,7 @@ function createOpenSession({
     } finally {
       if (browser) {
         try {
-          await browser.disconnect();
+          await browser.close();
         } catch (error) {
           log(`断开调试连接失败：${error.message}`);
         }
