@@ -88,6 +88,11 @@ async function e2eTest(browser) {
 
       outputLog(`开始测试分身：${shopName}`);
       try {
+        // 进入首页
+        outputLog("进入分身列表页面");
+        await browser.$(`.icon-shouye_24`).waitForExist({ timeout: 30 * 1000 })
+        await browser.$(`.icon-shouye_24`).click();
+
         // 进入分身列表页面
         outputLog("进入分身列表页面");
         await browser.$(`.icon-chrome_outline`).waitForExist({ timeout: 30 * 1000 })
