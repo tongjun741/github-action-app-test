@@ -26,6 +26,27 @@ log_error() {
   echo "[ERROR] $(date +'%Y-%m-%d %H:%M:%S') $*" >&2
 }
 
+# URL 脱敏函数
+mask_url() {
+  local url="$1"
+  # 提取协议、域名和路径
+  if [[ "$url" =~ ^(https?://)([^/]+)(/.*)$ ]]; then
+    local protocol="${BASH_REMATCH[1]}"
+    local domain="${BASH_REMATCH[2]}"
+    local path="${BASH_REMATCH[3]}"
+    # 只保留域名的最后部分（顶级域名和二级域名）
+    local masked_domain
+    if [[ "$domain" =~ \.([^.]+\.[^.]+)$ ]]; then
+      masked_domain="***${BASH_REMATCH[1]}"
+    else
+      masked_domain="***"
+    fi
+    echo "${protocol}${masked_domain}${path}"
+  else
+    echo "$url"
+  fi
+}
+
 is_true() {
   case "${1,,}" in
     1 | true | yes | y ) return 0 ;;
@@ -94,6 +115,8 @@ download_file() {
   local url="$1"
   local target="$2"
   local max_attempts="${3:-$MAX_DOWNLOAD_ATTEMPTS}"
+  local masked_url
+  masked_url=$(mask_url "$url")
 
   # 如果文件已存在且完整，跳过下载
   if [[ -s "$target" ]]; then
@@ -101,7 +124,7 @@ download_file() {
     return 0
   fi
 
-  log_info "开始下载: $url"
+  log_info "开始下载: $masked_url"
 
   local attempt=1
   while (( attempt <= max_attempts )); do
@@ -126,7 +149,7 @@ download_file() {
     attempt=$((attempt + 1))
   done
 
-  log_error "下载失败，已达到最大重试次数: $url"
+  log_error "下载失败，已达到最大重试次数: $masked_url"
   return 1
 }
 
@@ -266,6 +289,7 @@ if is_true "${PRIVATE_DEPLOYMENT:-false}"; then
   log_info "=========================================="
 
   base_url="https://pageload-test.oss-us-east-1.aliyuncs.com/dockurr-windows"
+  log_info "下载源: $(mask_url "$base_url")"
   image_archive_name="dockurr-windows-2026-06-12-amd64.tar.gz"
   image_checksum_name="dockurr-windows-2026-06-12-amd64.tar.gz.sha256"
   image_name="local/dockurr-windows:2026-06-12"
