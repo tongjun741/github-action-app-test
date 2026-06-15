@@ -73,6 +73,8 @@ if is_true "${PRIVATE_DEPLOYMENT:-false}"; then
     )
     docker load --input "$image_archive"
     docker image inspect "$image_name" >/dev/null
+    # 为加载的镜像添加docker-compose.yml期望的标签，以避免镜像引用冲突
+    docker tag "$image_name" dockurr/windows:latest
   fi
 
   download_file "$base_url/$iso_name" "$iso_path"
