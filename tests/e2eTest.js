@@ -158,6 +158,13 @@ async function e2eTest(browser) {
       }
       testResults.push({ shopName, ipText, sessionScreenshotUrl, errorMsg });
       outputLog(`分身${shopName}测试结束：ipText=${ipText}`);
+
+      // 如果不是最后一个 shopName，等待 15 秒后再处理下一个
+      const currentIndex = shopNames.indexOf(shopName);
+      if (currentIndex < shopNames.length - 1) {
+        outputLog(`等待 15 秒后处理下一个分身`);
+        await sleep(15000);
+      }
     }
   } catch (e) {
     console.error(e);
