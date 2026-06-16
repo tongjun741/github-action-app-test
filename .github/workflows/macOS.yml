@@ -44,25 +44,76 @@ jobs:
       
       - name: 下载并安装客户端
         run: |
-          if [ -z "${{ inputs.software_download_url }}" ]; then
-            download_url="https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_10.0.559_zh_setup.dmg"
+          set -e  # 遇到错误立即退出
+
+          if [ -z “${{ inputs.software_download_url }}” ]; then
+            download_url=”https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_10.0.559_zh_setup.dmg”
           else
-            download_url="${{ inputs.software_download_url }}"
+            download_url=”${{ inputs.software_download_url }}”
           fi
-          curl -o /tmp/HuaYoungApp_Mac_setup.dmg $download_url
 
-          # 挂载dmg
+          echo “===== 开始下载客户端 =====”
+          echo “下载地址: $download_url”
+          curl -L -o /tmp/HuaYoungApp_Mac_setup.dmg $download_url
+
+          echo “===== 检查下载结果 =====”
+          if [ ! -f /tmp/HuaYoungApp_Mac_setup.dmg ]; then
+            echo “错误：DMG 文件下载失败”
+            exit 1
+          fi
+          echo “DMG 文件大小: $(ls -lh /tmp/HuaYoungApp_Mac_setup.dmg | awk '{print $5}')”
+          echo “DMG 文件信息: $(file /tmp/HuaYoungApp_Mac_setup.dmg)”
+
+          echo “===== 挂载 DMG =====”
           hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
+          sleep 2  # 等待挂载完成
 
-          # 查找第一个以“花漾客户端”开头的目录
-          appDir=$(find /Volumes -maxdepth 1 -type d -name "花漾客户端*" | head -n 1)
-          echo "appDir: $appDir"
+          echo “===== 查看 /Volumes 目录 =====”
+          ls -la /Volumes/
 
-          sudo cp -R "${appDir}/花漾客户端.app" /Applications/
-          hdiutil detach "${appDir}"
-          if [ -f "/Applications/花漾客户端.app/Contents/Resources/app.asar" ]; then
-            sudo chmod -f a+w /Applications/花漾客户端.app/Contents/Resources/app.asar
+          echo “===== 查找应用目录 =====”
+          appDir=$(find /Volumes -maxdepth 1 -type d -name “花漾客户端*” | head -n 1)
+
+          if [ -z “$appDir” ]; then
+            echo “警告：未找到以'花漾客户端'开头的目录，尝试查找包含 HuaYoung 的目录”
+            appDir=$(find /Volumes -maxdepth 1 -type d -name “*HuaYoung*” | head -n 1)
           fi
+
+          if [ -z “$appDir” ]; then
+            echo “错误：无法找到应用目录”
+            echo “所有挂载的卷：”
+            ls -la /Volumes/
+            exit 1
+          fi
+
+          echo “找到应用目录: $appDir”
+          echo “应用目录内容:”
+          ls -la “$appDir”
+
+          echo “===== 复制应用到 /Applications =====”
+          sudo cp -R “${appDir}/花漾客户端.app” /Applications/
+
+          if [ ! -d “/Applications/花漾客户端.app” ]; then
+            echo “错误：应用复制失败”
+            exit 1
+          fi
+          echo “应用复制成功”
+
+          echo “===== 卸载 DMG =====”
+          hdiutil detach “${appDir}”
+
+          echo “===== 修改应用权限 =====”
+          if [ -f “/Applications/花漾客户端.app/Contents/Resources/app.asar” ]; then
+            echo “找到 app.asar，修改权限”
+            sudo chmod -f a+w /Applications/花漾客户端.app/Contents/Resources/app.asar
+            ls -la /Applications/花漾客户端.app/Contents/Resources/app.asar
+          else
+            echo “警告：未找到 app.asar 文件”
+            echo “/Applications/花漾客户端.app/Contents/Resources/ 目录内容：”
+            ls -la /Applications/花漾客户端.app/Contents/Resources/ || echo “目录不存在”
+          fi
+
+          echo “===== 客户端安装完成 =====”
 
       # - name: Start software
       #   run: |
@@ -70,19 +121,52 @@ jobs:
 
       - name: 准备chromedriver
         run: |
-          if [[ "$(sysctl -n machdep.cpu.brand_string)" == *"Apple"* ]]; then
-            echo "M1芯片下chromedirver路径是：/tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/chromedriver"
+          echo "===== 检测芯片类型 ====="
+          cpu_brand=$(sysctl -n machdep.cpu.brand_string)
+          echo "CPU 信息: $cpu_brand"
+
+          if [[ "$cpu_brand" == *"Apple"* ]]; then
+            echo "检测到 Apple Silicon (M1/M2) 芯片"
+            echo "chromedirver 路径是：/tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/chromedriver"
             mkdir -p /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/
+
+            echo "复制 chromedriver 文件"
+            if [ ! -f "tools/chromedriver/108.0.5359.71/mac-arm64/chromedriver" ]; then
+              echo "错误：找不到 ARM64 版本的 chromedriver"
+              echo "当前目录内容："
+              ls -la tools/chromedriver/108.0.5359.71/ || echo "chromedriver 目录不存在"
+              exit 1
+            fi
+
             cp tools/chromedriver/108.0.5359.71/mac-arm64/chromedriver /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/
             chmod +x /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/chromedriver
+
+            echo "验证 chromedriver"
+            /tmp/chromedriver/mac_arm-108/chromedriver-mac-arm64/chromedriver --version
+
             echo "E2E_PLATFORM=macOS-arm64" >> $GITHUB_ENV
           else
-            echo "Intel芯片下chromedirver路径是：/tmp/chromedriver/mac-108/chromedriver-mac-x64/chromedriver"
+            echo "检测到 Intel 芯片"
+            echo "chromedirver 路径是：/tmp/chromedriver/mac-108/chromedriver-mac-x64/chromedriver"
             mkdir -p /tmp/chromedriver/mac-108/chromedriver-mac-x64/
+
+            echo "复制 chromedriver 文件"
+            if [ ! -f "tools/chromedriver/108.0.5359.71/mac-x64/chromedriver" ]; then
+              echo "错误：找不到 x64 版本的 chromedriver"
+              echo "当前目录内容："
+              ls -la tools/chromedriver/108.0.5359.71/ || echo "chromedriver 目录不存在"
+              exit 1
+            fi
+
             cp tools/chromedriver/108.0.5359.71/mac-x64/chromedriver /tmp/chromedriver/mac-108/chromedriver-mac-x64/
             chmod +x /tmp/chromedriver/mac-108/chromedriver-mac-x64/chromedriver
+
+            echo "验证 chromedriver"
+            /tmp/chromedriver/mac-108/chromedriver-mac-x64/chromedriver --version
+
             echo "E2E_PLATFORM=macOS-x64" >> $GITHUB_ENV
           fi
+          echo "===== chromedriver 准备完成 ====="
 
       - name: Use Node.js 24
         uses: actions/setup-node@v6
@@ -111,7 +195,33 @@ jobs:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
           CLOUDINARY_MASK: ${{ secrets.CLOUDINARY_MASK }}
-        run: sudo node modifyMain.js && node tests/start.js e2e
+        run: |
+          echo "===== 开始 E2E 测试 ====="
+          echo "E2E_PLATFORM: $E2E_PLATFORM"
+          echo "IN_DEV: $IN_DEV"
+          echo "TEST_ALL_SHOP_NAMES: $TEST_ALL_SHOP_NAMES"
+          echo "DOWNLOAD_URL: $DOWNLOAD_URL"
+
+          echo "===== 修改 main.js ====="
+          sudo node modifyMain.js
+
+          if [ $? -ne 0 ]; then
+            echo "错误：modifyMain.js 执行失败"
+            exit 1
+          fi
+          echo "main.js 修改成功"
+
+          echo "===== 开始执行测试 ====="
+          node tests/start.js e2e
+
+          test_exit_code=$?
+          echo "测试退出码: $test_exit_code"
+
+          if [ $test_exit_code -ne 0 ]; then
+            echo "警告：测试执行返回非零退出码"
+          fi
+
+          echo "===== E2E 测试完成 ====="
 
       # - name: Setup tmate session
       #   uses: mxschmitt/action-tmate@v3

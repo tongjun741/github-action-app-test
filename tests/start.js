@@ -21,8 +21,21 @@ if (os.platform() === 'darwin') {
 
 async function main() {
   let taskType = (process.argv.length > 1 && process.argv[2] === "e2e") ? "e2e" : "ipTest";
+  outputLog(`===== 开始测试流程 =====`);
+  outputLog(`任务类型: ${taskType}`);
+  outputLog(`操作系统平台: ${os.platform()}`);
+  outputLog(`客户端可执行文件路径: ${exePath}`);
   outputLog(`环境变量：${JSON.stringify(process.env)}`);
   outputLog(`输入参数：${JSON.stringify(process.argv)}`);
+
+  // 检查客户端可执行文件是否存在
+  const fs = require('fs');
+  if (!fs.existsSync(exePath)) {
+    outputLog(`✗ 错误：客户端可执行文件不存在: ${exePath}`);
+    throw new Error(`客户端可执行文件不存在: ${exePath}`);
+  }
+  outputLog(`✓ 客户端可执行文件存在`);
+
   let screenshotUrl;
   let appScreenshotUrl = "客户端截图失败";
   let startTime = new Date().getTime();
@@ -30,6 +43,13 @@ async function main() {
   let testResult = "";
   let browser;
   try {
+    outputLog(`===== 启动客户端 =====`);
+    outputLog(`WebdriverIO 配置:`);
+    outputLog(`  browserName: chrome`);
+    outputLog(`  browserVersion: 108`);
+    outputLog(`  binary: ${exePath}`);
+    outputLog(`  extCapabilities: ${JSON.stringify(extCapabilities)}`);
+
     browser = await remote({
       capabilities: {
         browserName: 'chrome',
@@ -44,8 +64,11 @@ async function main() {
       logLevel: 'warn'
     });
 
+    outputLog(`✓ 客户端启动成功`);
+
   } catch (e) {
     errorMsg += e.message + '\n';
+    outputLog(`✗ 启动客户端失败: ${e.message}`);
     console.error(e);
     testResult = "启动客户端失败";
   }
