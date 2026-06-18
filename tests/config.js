@@ -21,7 +21,7 @@ let productConfig = {
         "UA130",
         "UA128",
         "UA125",
-        "UA120"
+        // "UA120", --- 120似乎无法连接调试端口，先不管 ---
     ],
     win7shopName: 'UA109',
 };

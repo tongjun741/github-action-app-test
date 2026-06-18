@@ -7,9 +7,7 @@ const { saveResult, showResultTable, outputLog, screenshot, sleep } = require('.
 // 各平台(对应 E2E_PLATFORM 环境变量)需要忽略的分身 shopName。
 const SKIPPED_SHOPS_BY_PLATFORM = {
   'Windows 10': ['UA144'],
-  'Ubuntu': ['UA120'],
   'macOS-x64': ['UA142'],
-  'macOS-arm64': ['UA120'],
 };
 
 function getShopNames(config, {
