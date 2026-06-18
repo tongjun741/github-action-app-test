@@ -6,22 +6,15 @@ const { saveResult, showResultTable, outputLog, screenshot, sleep } = require('.
 
 function getShopNames(config, {
   testAllShopNames = false,
-  inWin7 = false,
-  platform = process.platform,
+  inWin7 = false
 } = {}) {
   const configuredShopNames = inWin7 ? config.win7shopName : config.shopName;
   const shopNames = (Array.isArray(configuredShopNames)
     ? configuredShopNames
     : [configuredShopNames]
   ).filter(Boolean);
-  const supportedShopNames = platform === 'linux'
-    ? shopNames.filter(shopName => {
-      const shopNumber = String(shopName).match(/\d+/)?.[0];
-      return shopNumber !== undefined && Number(shopNumber) <= 144;
-    })
-    : shopNames;
 
-  return testAllShopNames ? supportedShopNames : supportedShopNames.slice(0, 1);
+  return testAllShopNames ? shopNames : shopNames.slice(0, 1);
 }
 
 async function ensureBrowserWindowSize(browser, {
