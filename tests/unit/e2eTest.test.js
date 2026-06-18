@@ -35,19 +35,36 @@ test('getShopNames keeps using the dedicated Win7 shop', () => {
   assert.deepEqual(result, ['win7-shop']);
 });
 
-test('getShopNames skips shops above 144 on Linux', () => {
+test('getShopNames skips the shops configured to be ignored per platform', () => {
   const config = {
-    shopName: ['UA146', 'UA144', 'UA142'],
+    shopName: ['UA146', 'UA144', 'UA142', 'UA120'],
     win7shopName: 'UA109',
   };
 
+  // win10 忽略 UA144
   assert.deepEqual(getShopNames(config, {
-    platform: 'linux',
-  }), ['UA144']);
-  assert.deepEqual(getShopNames(config, {
-    platform: 'linux',
+    platform: 'Windows 10',
     testAllShopNames: true,
-  }), ['UA144', 'UA142']);
+  }), ['UA146', 'UA142', 'UA120']);
+  // ubuntu 忽略 UA120
+  assert.deepEqual(getShopNames(config, {
+    platform: 'Ubuntu',
+    testAllShopNames: true,
+  }), ['UA146', 'UA144', 'UA142']);
+  // mac x64 忽略 UA142
+  assert.deepEqual(getShopNames(config, {
+    platform: 'macOS-x64',
+    testAllShopNames: true,
+  }), ['UA146', 'UA144', 'UA120']);
+  // mac arm 忽略 UA120
+  assert.deepEqual(getShopNames(config, {
+    platform: 'macOS-arm64',
+    testAllShopNames: true,
+  }), ['UA146', 'UA144', 'UA142']);
+  // 忽略分身后默认只取第一个
+  assert.deepEqual(getShopNames(config, {
+    platform: 'Windows 10',
+  }), ['UA146']);
 });
 
 test('ensureBrowserWindowSize does not retry when the requested size is applied', async () => {

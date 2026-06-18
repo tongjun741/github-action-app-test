@@ -4,15 +4,27 @@ const { productConfig, devConfig } = require('./config');
 const openSession = require('./include/openSession');
 const { saveResult, showResultTable, outputLog, screenshot, sleep } = require('./include/tools');
 
+// 各平台(对应 E2E_PLATFORM 环境变量)需要忽略的分身 shopName。
+const SKIPPED_SHOPS_BY_PLATFORM = {
+  'Windows 10': ['UA144'],
+  'Ubuntu': ['UA120'],
+  'macOS-x64': ['UA142'],
+  'macOS-arm64': ['UA120'],
+};
+
 function getShopNames(config, {
   testAllShopNames = false,
-  inWin7 = false
+  inWin7 = false,
+  platform = process.env.E2E_PLATFORM,
 } = {}) {
   const configuredShopNames = inWin7 ? config.win7shopName : config.shopName;
+  const skippedShops = SKIPPED_SHOPS_BY_PLATFORM[platform] || [];
   const shopNames = (Array.isArray(configuredShopNames)
     ? configuredShopNames
     : [configuredShopNames]
-  ).filter(Boolean);
+  )
+    .filter(Boolean)
+    .filter(shopName => !skippedShops.includes(shopName));
 
   return testAllShopNames ? shopNames : shopNames.slice(0, 1);
 }
