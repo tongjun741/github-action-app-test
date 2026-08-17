@@ -26,7 +26,7 @@ on:
         default: 'false'
         
   schedule:
-    - cron: '5 */3 * * *'  # 每隔两个小时自动进行IP测试
+    - cron: '5 */3 * * *'  # 每隔两个小时自动进行IP测试，确认IP是否失效
 
 jobs:
 
