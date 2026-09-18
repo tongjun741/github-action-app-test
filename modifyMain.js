@@ -125,8 +125,9 @@ async function main() {
     // “Session closed. Most likely the page has been closed.”。
     // 客户端 main.js 为 Electron CommonJS 主进程，require('electron') 可用；整段包在 try/catch 中，
     // 若环境异常也不影响原 main.js 加载。app.commandLine 的开关会被子浏览器窗口继承。
-    // 注：早期的 browserSwitches 正则注入点（t.push(...this.browserSwitches...)）在 12.9.x 已失效，
-    // 故改为在必匹配的 remoteDebugPort 锚点处注入，确保一定生效。
+    // 注：早期尝试在 browserSwitches 处注入（t.push...）因真实变量为 s 且 12.9.x 结构变化而失效；
+    // 现改为 (1) 在 main.js 顶部 prepend 注入（覆盖主应用，保证 app.ready 前生效），
+    // (2) 在 browserSwitches 处追加 s.push（覆盖分身浏览器启动参数）。
     const fakeMediaBootstrap = [
       '(function(){',
       'try{',
@@ -140,8 +141,11 @@ async function main() {
       '})();',
     ].join('');
 
-    // 进行内容替换，默认开启9221调试端口（同时注入假媒体开关）
-    fileContent = fileContent.replace(remoteDebugPortPattern, fakeMediaBootstrap + 'this.remoteDebugPort=9221');
+    // 进行内容替换，默认开启9221调试端口
+    fileContent = fileContent.replace(remoteDebugPortPattern, 'this.remoteDebugPort=9221');
+    // 将假媒体开关注入到 main.js 最顶部：保证在 app.ready 之前执行，
+    // 使 app.commandLine 的开关对主应用（含在线客服 getUserMedia 触发的 macOS TCC 麦克风框）生效。
+    fileContent = fakeMediaBootstrap + fileContent;
     // 进行内容替换，设置分身浏览器窗口大小
     fileContent = fileContent.replace(windowSizePattern, 'this.windowSize="1920,1080"');
 
@@ -151,7 +155,7 @@ async function main() {
     if (bsPattern.test(fileContent)) {
       fileContent = fileContent.replace(
         bsPattern,
-        '$1;t.push("--use-fake-ui-for-media-stream");t.push("--use-fake-device-for-media-stream")'
+        '$1;s.push("--use-fake-ui-for-media-stream");s.push("--use-fake-device-for-media-stream")'
       );
       console.log('✓ 已向 browserSwitches 注入假媒体开关（分身浏览器启动参数）');
     } else {
