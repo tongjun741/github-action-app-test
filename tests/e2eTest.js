@@ -92,7 +92,7 @@ async function e2eTest(browser) {
       outputLog(`开始测试分身：${shopName}`);
       try {
         // 进入首页
-        outputLog("进入分身列表页面");
+        outputLog("进入首页");
         await browser.$(`.icon-shouye_24`).waitForExist({ timeout: 30 * 1000 })
         await browser.$(`.icon-shouye_24`).click();
 
@@ -156,7 +156,7 @@ async function e2eTest(browser) {
         ipText = rs.ipText;
         sessionScreenshotUrl = rs.sessionScreenshotUrl;
       } catch (e) {
-        errorMsg += e.message + '\n';
+        errorMsg += (e.stack || e.message) + '\n';
         console.error(e);
       }
       testResults.push({ shopName, ipText, sessionScreenshotUrl, errorMsg });
