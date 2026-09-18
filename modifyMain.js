@@ -91,6 +91,20 @@ async function main() {
     let fileContent = fs.readFileSync(mainJsPath, 'utf8');
     console.log("main.js 文件大小:", fileContent.length, "字节");
 
+    // [diag] 打印关键注入点的真实上下文，便于定位分身浏览器(browserSwitches)与远程调试端口格式
+    const dumpContext = (label, needle) => {
+      let idx = -1, count = 0;
+      while ((idx = fileContent.indexOf(needle, idx + 1)) !== -1) {
+        count++;
+        const start = Math.max(0, idx - 140);
+        const end = Math.min(fileContent.length, idx + 180);
+        console.log(`[diag] ${label} #${count} @${idx}: …${fileContent.slice(start, end)}…`);
+      }
+      console.log(`[diag] ${label} 总出现次数: ${count}`);
+    };
+    dumpContext('browserSwitches', 'browserSwitches');
+    dumpContext('remoteDebugPort', 'remoteDebugPort');
+
     // 检查要替换的内容是否存在
     const remoteDebugPortPattern = /this.remoteDebugPort=e.remoteDebugPort/g;
     const windowSizePattern = /this.windowSize=e.windowSize/g;
@@ -131,10 +145,25 @@ async function main() {
     // 进行内容替换，设置分身浏览器窗口大小
     fileContent = fileContent.replace(windowSizePattern, 'this.windowSize="1920,1080"');
 
+    // 尝试向分身浏览器(browserSwitches)注入假媒体开关：覆盖克隆浏览器启动参数
+    // （app.commandLine 的开关不一定被独立的分身浏览器进程继承，故这里直接打它的启动参数）
+    const bsPattern = /(\.\.\.this\.browserSwitches\.split\(["'][^"']*["']\)\))/;
+    if (bsPattern.test(fileContent)) {
+      fileContent = fileContent.replace(
+        bsPattern,
+        '$1;t.push("--use-fake-ui-for-media-stream");t.push("--use-fake-device-for-media-stream")'
+      );
+      console.log('✓ 已向 browserSwitches 注入假媒体开关（分身浏览器启动参数）');
+    } else {
+      console.warn('⚠ 未在 browserSwitches 找到注入点，[diag] 上方已打印真实上下文');
+    }
+
     // 写入替换后的内容到main.js文件
     console.log("写入修改后的内容到 main.js...");
     fs.writeFileSync(mainJsPath, fileContent, 'utf8');
     console.log('✓ main.js 替换完成');
+    console.log('[verify] use-fake-ui-for-media-stream 已写入:', fileContent.includes('use-fake-ui-for-media-stream'));
+    console.log('[verify] use-fake-device-for-media-stream 已写入:', fileContent.includes('use-fake-device-for-media-stream'));
 
     if (fs.existsSync(asarFilePath)) {
         // 如果是asar压缩包格式需要重新打包修改后的内容
