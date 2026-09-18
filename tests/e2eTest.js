@@ -127,6 +127,16 @@ async function e2eTest(browser) {
           try {
             await browser.$(`//span[text()="继续访问"]`).waitForExist({ timeout: 5 * 1000 })
             await browser.$(`//span[text()="继续访问"]`).click();
+            // 「继续访问」可能弹出 Ant Design 确认对话框(ant-modal-confirm-centered)；
+            // 不点确定会一直阻塞界面，导致「正在访问」永远不出现而超时(等待打开会话超时)。
+            try {
+              const confirmBtn = browser.$('.ant-modal-confirm .ant-btn-primary');
+              await confirmBtn.waitForExist({ timeout: 3 * 1000 });
+              await confirmBtn.click();
+              outputLog(`已点击继续访问确认对话框的确定按钮`);
+            } catch {
+              // 无确认框则忽略，不影响主流程
+            }
           } catch {
             outputLog(`等待继续访问按钮出现`);
             try {
