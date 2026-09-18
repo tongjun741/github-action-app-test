@@ -100,6 +100,7 @@ function createOpenSession({
         defaultViewport: null,
         protocolTimeout: 60 * 1000,
       });
+      log('✓ puppeteer 已连接分身浏览器 CDP');
 
       const pages = await browser.pages();
       if (pages.length > 0) {
@@ -107,14 +108,19 @@ function createOpenSession({
       }
       log('分身浏览器连接成功');
 
-      log(`开始访问${ipUrl}`);
+      log('创建新页面(newPage)…');
       const page = await browser.newPage();
+      log('✓ 新页面已创建');
+
+      log(`导航到${ipUrl}(page.goto)…`);
       await page.goto(ipUrl, {
         waitUntil: 'domcontentloaded',
         timeout: 60 * 1000,
       });
+      log('✓ 页面已加载(domcontentloaded)');
       await page.bringToFront();
 
+      log('读取窗口尺寸(page.evaluate)…');
       const size = await page.evaluate(() => ({
         width: window.innerWidth,
         height: window.innerHeight,
@@ -123,11 +129,15 @@ function createOpenSession({
       log(`浏览器窗口高度：${size.height}`);
 
       log(`分身标题是${await page.title()}`);
+      log('等待 #jumbo-ip 元素(waitForSelector)…');
       await page.waitForSelector('#jumbo-ip', { timeout: 60 * 1000 });
+      log('✓ #jumbo-ip 已出现');
+      log('等待 #jumbo-ip[data-ip] 就绪(waitForFunction)…');
       await page.waitForFunction(
         () => Boolean(document.querySelector('#jumbo-ip')?.getAttribute('data-ip')),
         { timeout: 60 * 1000 },
       );
+      log('✓ #jumbo-ip 的 data-ip 已就绪');
 
       const ipText = await page.$eval('#jumbo-ip', (element) => element.getAttribute('data-ip'));
       log(`ipText=${ipText}`);

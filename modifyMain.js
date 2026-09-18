@@ -110,6 +110,21 @@ async function main() {
     // 进行内容替换，设置分身浏览器窗口大小
     fileContent = fileContent.replace(windowSizePattern, 'this.windowSize="1920,1080"');
 
+    // 注入 Chromium 假媒体设备开关：用合成音视频流并自动授权媒体权限，
+    // 从根本上避免 macOS TCC 麦克风系统权限框阻塞分身浏览器渲染进程。
+    // 该原生弹窗会让 puppeteer 的 CDP 调用报 “Session closed. Most likely the page has been closed.”，
+    // 导致「打开会话」(openSession) 在 macOS 全架构失败（Windows/Ubuntu 无 TCC 机制故正常）。
+    const browserSwitchesPattern = /t\.push\(\.\.\.this\.browserSwitches\.split\(["']\\n["']\)\)/;
+    if (browserSwitchesPattern.test(fileContent)) {
+      fileContent = fileContent.replace(
+        browserSwitchesPattern,
+        't.push(...this.browserSwitches.split("\\n"));t.push("--use-fake-ui-for-media-stream");t.push("--use-fake-device-for-media-stream")'
+      );
+      console.log('✓ 已向分身浏览器注入假媒体设备开关（use-fake-ui/device-for-media-stream）');
+    } else {
+      console.warn('⚠ 未匹配到 browserSwitches 注入点，跳过假媒体开关注入（请检查客户端 main.js 结构是否变化）');
+    }
+
     // 写入替换后的内容到main.js文件
     console.log("写入修改后的内容到 main.js...");
     fs.writeFileSync(mainJsPath, fileContent, 'utf8');
