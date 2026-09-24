@@ -101,14 +101,21 @@ async function e2eTest(browser) {
         await browser.$(`.icon-chrome_outline`).waitForExist({ timeout: 30 * 1000 })
         await browser.$(`.icon-chrome_outline`).click();
 
+        // 诊断：列出分身列表页可见的分身链接文本，版本升级后若选择器失效可据此定位
+        try {
+          const cloneLinks = await browser.$$('a');
+          const cloneTexts = (await Promise.all(cloneLinks.map(l => l.getText().catch(() => '')))).filter(Boolean);
+          outputLog(`[diag] 分身列表页 <a> 文本(${cloneTexts.length}): ${JSON.stringify(cloneTexts.slice(0, 60))}`);
+        } catch (e) { /* 诊断失败不影响主流程 */ }
+
         outputLog("等待分身出现");
-        await browser.$(`//a[text()="${shopName}"]`).waitForExist({ timeout: 30 * 1000 })
+        await browser.$(`//a[contains(.,"${shopName}")]`).waitForExist({ timeout: 30 * 1000 })
         const title = await browser.getTitle();
         outputLog(`当前窗口标题是${title}`);
 
         // 进入分身详情页面
         outputLog("进入分身详情页面");
-        await browser.$(`//a[text()="${shopName}"]`).click();
+        await browser.$(`//a[contains(.,"${shopName}")]`).click();
         // 打开浏览器
         outputLog(`打开浏览器`);
         await browser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 30 * 1000 });
