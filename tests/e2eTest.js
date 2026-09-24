@@ -10,6 +10,10 @@ const SKIPPED_SHOPS_BY_PLATFORM = {
   'macOS-x64': ['UA142'],
 };
 
+// 网络加载超时保护：分身列表 / 分身详情 渲染较慢时增大等待，防止误报超时失败。
+const LIST_LOAD_TIMEOUT = 60 * 1000;   // 等待分身列表中出现目标分身
+const DETAIL_LOAD_TIMEOUT = 60 * 1000; // 等待分身详情页面(打开浏览器按钮)渲染完成
+
 function getShopNames(config, {
   testAllShopNames = false,
   inWin7 = false,
@@ -108,17 +112,19 @@ async function e2eTest(browser) {
           outputLog(`[diag] 分身列表页 <a> 文本(${cloneTexts.length}): ${JSON.stringify(cloneTexts.slice(0, 60))}`);
         } catch (e) { /* 诊断失败不影响主流程 */ }
 
-        outputLog("等待分身出现");
-        await browser.$(`//a[contains(.,"${shopName}")]`).waitForExist({ timeout: 30 * 1000 })
+        outputLog("等待分身列表加载(分身出现)");
+        await browser.$(`//a[contains(.,"${shopName}")]`).waitForExist({ timeout: LIST_LOAD_TIMEOUT })
         const title = await browser.getTitle();
         outputLog(`当前窗口标题是${title}`);
 
         // 进入分身详情页面
         outputLog("进入分身详情页面");
         await browser.$(`//a[contains(.,"${shopName}")]`).click();
+        // 等待分身详情页面加载完成(网络较慢时详情页渲染会延迟，避免过早点击打不开浏览器)
+        outputLog("等待分身详情页面加载");
+        await browser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: DETAIL_LOAD_TIMEOUT });
         // 打开浏览器
         outputLog(`打开浏览器`);
-        await browser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 30 * 1000 });
         await browser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').click();
 
         // 处理有其他人在访问的情况
