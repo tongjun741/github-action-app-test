@@ -105,12 +105,19 @@ async function e2eTest(browser) {
         await browser.$(`.icon-chrome_outline`).waitForExist({ timeout: 30 * 1000 })
         await browser.$(`.icon-chrome_outline`).click();
 
-        // 诊断：列出分身列表页可见的分身链接文本，版本升级后若选择器失效可据此定位
+        // 诊断：列出分身列表页可见的分身链接文本，版本升级后若选择器失效可据此定位。
+        // 用 browser.execute + document.querySelectorAll('a') 在浏览器内一次性取锚文本，
+        // 比 $$('a')+getText 更鲁棒(不会因单个元素异常而静默失败)；catch 内补打失败原因。
         try {
-          const cloneLinks = await browser.$$('a');
-          const cloneTexts = (await Promise.all(cloneLinks.map(l => l.getText().catch(() => '')))).filter(Boolean);
+          const cloneTexts = await browser.execute(() =>
+            Array.from(document.querySelectorAll('a'))
+              .map(a => (a.textContent || '').trim())
+              .filter(Boolean)
+          );
           outputLog(`[diag] 分身列表页 <a> 文本(${cloneTexts.length}): ${JSON.stringify(cloneTexts.slice(0, 60))}`);
-        } catch (e) { /* 诊断失败不影响主流程 */ }
+        } catch (e) {
+          outputLog(`[diag] 分身列表诊断失败(不影响主流程): ${e.stack || e.message}`);
+        }
 
         outputLog("等待分身列表加载(分身出现)");
         await browser.$(`//a[contains(.,"${shopName}")]`).waitForExist({ timeout: LIST_LOAD_TIMEOUT })
