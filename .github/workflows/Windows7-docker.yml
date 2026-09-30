@@ -72,7 +72,20 @@ jobs:
           else
             download_url="${{ inputs.software_download_url }}"
           fi
-          curl -o installer.exe $download_url
+          for i in 1 2 3 4 5; do
+            curl -fSL --retry 3 --retry-delay 5 -o installer.exe "$download_url" && break
+            echo "curl 下载失败(第 $i 次)，5 秒后重试..."
+            sleep 5
+          done
+          if [ ! -f installer.exe ]; then
+            echo "错误：installer.exe 下载失败"
+            exit 1
+          fi
+          # 校验是否为合法 Windows 可执行文件，防止下载到损坏/错误页（本月 09-12 曾因 curl HTTP/2 错误导致下载失败）
+          if ! file installer.exe | grep -q "executable\|PE32\|PE32+"; then
+            echo "错误：installer.exe 类型异常（疑似下载损坏）: $(file installer.exe)"
+            exit 1
+          fi
 
       - name: Copy files to Win7
         run: |

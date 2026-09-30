@@ -17,7 +17,7 @@ async function login(config, password, targetBrowser, isClient = true) {
       // 按标题切换到主窗口
       // 兼容有首页和默认只有分身页的情况
       outputLog(`第 ${retryTimes + 1} 次尝试按标题切换到主窗口，兼容有首页和默认只有分身页的情况`);
-      let titleReg = isClient ? / - HuaYoung| - 花漾灵动/ : /花漾TK/;
+      let titleReg = isClient ? /HuaYoung|花漾灵动/ : /花漾TK/;
       outputLog(`标题正则表达式: ${titleReg}`);
       await browser.switchWindow(titleReg);
       outputLog("✓ 成功切换到主窗口");
@@ -137,7 +137,7 @@ async function login(config, password, targetBrowser, isClient = true) {
         // 按标题切换到主窗口
         outputLog("按标题切换到主窗口")
         // 兼容有首页和默认只有分身页的情况
-        await browser.switchWindow(' - 花漾灵动');
+        await browser.switchWindow(/HuaYoung|花漾灵动/);
         outputLog("✓ 成功进入主界面");
         break;
       } catch (e) {

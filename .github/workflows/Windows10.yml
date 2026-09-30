@@ -76,12 +76,23 @@ jobs:
               Write-Host "Using provided download URL: $downloadUrl"
             }
 
-            # 下载客户端安装包
-            try {
-              Invoke-WebRequest -Uri $downloadUrl -OutFile "$env:TEMP\your_software_installer.exe"
-              Write-Host "下载成功: $downloadUrl"
-            } catch {
-              Write-Error "下载安装包失败: $_"
+            # 下载客户端安装包（带重试，防止网络抖动；本月失败均为下载层问题）
+            $maxAttempts = 5
+            $attempt = 0
+            $downloaded = $false
+            while ($attempt -lt $maxAttempts -and -not $downloaded) {
+              $attempt++
+              try {
+                Invoke-WebRequest -Uri $downloadUrl -OutFile "$env:TEMP\your_software_installer.exe" -ErrorAction Stop
+                $downloaded = $true
+                Write-Host "下载成功(第 $attempt 次): $downloadUrl"
+              } catch {
+                Write-Warning "下载失败(第 $attempt 次): $_"
+                if ($attempt -lt $maxAttempts) { Start-Sleep -Seconds 5 }
+              }
+            }
+            if (-not $downloaded) {
+              Write-Error "下载安装包多次失败: $downloadUrl"
               exit 1
             }
 

@@ -34,14 +34,27 @@ jobs:
       - name: Install libnotify4
         run: sudo apt-get update && sudo apt-get install -y libnotify4 xvfb desktop-file-utils
 
-      - name: Download file with curl
+      - name: Download file with curl (retry + validate)
         run: |
           if [ -z "${{ inputs.software_download_url }}" ]; then
             download_url="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_10.0.533_zh_setup.deb"
           else
             download_url="${{ inputs.software_download_url }}"
           fi
-          curl -o /tmp/HuaYoungApp_Ubuntu_setup.deb $download_url
+          for i in 1 2 3 4 5; do
+            curl -fSL --retry 3 --retry-delay 5 -o /tmp/HuaYoungApp_Ubuntu_setup.deb "$download_url" || { echo "curl 下载失败(第 $i 次)"; sleep 5; continue; }
+            # 校验是否为合法 deb 包，防止下载到损坏/错误页（本月 09-08 曾因 .deb 损坏导致 dpkg 失败）
+            if file /tmp/HuaYoungApp_Ubuntu_setup.deb | grep -q "Debian binary package"; then
+              echo "✓ deb 校验通过(第 $i 次)"
+              break
+            fi
+            echo "第 $i 次下载的 deb 不合法，重新下载..."
+            rm -f /tmp/HuaYoungApp_Ubuntu_setup.deb
+          done
+          if [ ! -f /tmp/HuaYoungApp_Ubuntu_setup.deb ] || ! file /tmp/HuaYoungApp_Ubuntu_setup.deb | grep -q "Debian binary package"; then
+            echo "错误：deb 下载/校验多次失败"
+            exit 1
+          fi
 
       - name: Installation
         run: sudo dpkg -i /tmp/HuaYoungApp_Ubuntu_setup.deb

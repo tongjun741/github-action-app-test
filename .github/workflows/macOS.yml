@@ -52,9 +52,13 @@ jobs:
             download_url="${{ inputs.software_download_url }}"
           fi
 
-          echo "===== 开始下载客户端 ====="
+          echo "===== 开始下载客户端（带重试） ====="
           echo "下载地址: $download_url"
-          curl -L -o /tmp/HuaYoungApp_Mac_setup.dmg $download_url
+          for i in 1 2 3; do
+            curl -L --retry 3 --retry-delay 5 --retry-max-time 300 -o /tmp/HuaYoungApp_Mac_setup.dmg "$download_url" && break
+            echo "curl 下载失败(第 $i 次)，5 秒后重试..."
+            sleep 5
+          done
 
           echo "===== 检查下载结果 ====="
           if [ ! -f /tmp/HuaYoungApp_Mac_setup.dmg ]; then
@@ -63,6 +67,11 @@ jobs:
           fi
           echo "DMG 文件大小: $(ls -lh /tmp/HuaYoungApp_Mac_setup.dmg | awk '{print $5}')"
           echo "DMG 文件信息: $(file /tmp/HuaYoungApp_Mac_setup.dmg)"
+          # 校验 DMG 类型，防止下载到损坏/错误页（本月 09-18 曾因 curl 超时导致 DMG 不完整）
+          if ! file /tmp/HuaYoungApp_Mac_setup.dmg | grep -q "AppleDiskImage\|Macintosh HFS\|ISO 9660"; then
+            echo "错误：DMG 文件类型异常（疑似下载损坏）: $(file /tmp/HuaYoungApp_Mac_setup.dmg)"
+            exit 1
+          fi
 
           echo "===== 挂载 DMG ====="
           hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
