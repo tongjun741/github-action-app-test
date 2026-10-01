@@ -67,11 +67,23 @@ jobs:
           fi
           echo "DMG 文件大小: $(ls -lh /tmp/HuaYoungApp_Mac_setup.dmg | awk '{print $5}')"
           echo "DMG 文件信息: $(file /tmp/HuaYoungApp_Mac_setup.dmg)"
-          # 校验 DMG 类型，防止下载到损坏/错误页（本月 09-18 曾因 curl 超时导致 DMG 不完整）
-          if ! file /tmp/HuaYoungApp_Mac_setup.dmg | grep -q "AppleDiskImage\|Macintosh HFS\|ISO 9660"; then
-            echo "错误：DMG 文件类型异常（疑似下载损坏）: $(file /tmp/HuaYoungApp_Mac_setup.dmg)"
+          # 校验 DMG：接受标准磁盘镜像 与 压缩格式(UDZO/zlib、gzip)，
+          # 并用最小体积门槛拦住截断/错误页下载（本月 09-18 曾因 curl 超时导致 DMG 不完整）。
+          # 注意：dev 构建的 DMG 多为 zlib 压缩格式，file 会识别为 "zlib compressed data"，
+          # 属正常可挂载镜像，不能当作损坏拒绝（5b0eb7e 曾因漏配此项导致 macOS 全量失败）。
+          dmg_type=$(file /tmp/HuaYoungApp_Mac_setup.dmg)
+          echo "DMG 类型判定: $dmg_type"
+          if ! echo "$dmg_type" | grep -q "AppleDiskImage\|Macintosh HFS\|ISO 9660\|zlib compressed\|gzip compressed"; then
+            echo "错误：DMG 文件类型异常（疑似下载损坏）: $dmg_type"
             exit 1
           fi
+          dmg_size=$(stat -f%z /tmp/HuaYoungApp_Mac_setup.dmg 2>/dev/null || wc -c < /tmp/HuaYoungApp_Mac_setup.dmg)
+          min_size=$((50 * 1024 * 1024))  # 50MB
+          if [ "$dmg_size" -lt "$min_size" ]; then
+            echo "错误：DMG 文件体积过小（${dmg_size} 字节 < 50MB），疑似下载不完整/错误页"
+            exit 1
+          fi
+          echo "DMG 体积校验通过: $((dmg_size / 1024 / 1024))MB"
 
           echo "===== 挂载 DMG ====="
           hdiutil attach /tmp/HuaYoungApp_Mac_setup.dmg
