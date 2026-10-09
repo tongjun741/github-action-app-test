@@ -319,7 +319,8 @@ jobs:
           ./frpc -c ./win7/frpc_16020852.ini > /tmp/frpc.log 2>&1 &
 
       - name: 等待测试开始
-        timeout-minutes: 45
+        # VM 内 autorun 未落 start.log 时应尽快失败，不再空等 45 分钟拖住整条流水线
+        timeout-minutes: 20
         run: |
           while [ ! -f "win7/shared/start.log" ]; do sleep 10; done
 
@@ -363,6 +364,9 @@ jobs:
   report:
     name: 合并生成 Excel 报告
     needs: [verify, verify-win7]
+    # 关键：只要有任意平台是红（例如 iphey 判 fail、Win7 未产出），report 就会被默认跳过。
+    # 加 always() 保证无论验证结果如何都能合并出 report.xlsx（业务项 fail 也要体现在报告里）。
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
