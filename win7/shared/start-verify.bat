@@ -66,8 +66,11 @@ REM ---- 给客户端 main.js 注入 remoteDebugPort=9221 + 假媒体开关 ----
 c:\node\node c:\work\modifyMain.js >> %SHARE%\start.log 2>&1
 
 REM ---- 安装依赖（VM 内 node18：wdio/chromedriver/puppeteer-core） ----
-if not exist c:\work\node_modules (
-  echo Installing npm deps... >> %SHARE%\start.log
+REM 宿主机已用 Linux 的 npm 在共享目录预装整套 node_modules（含 @wdio/*、puppeteer-core），
+REM 会随 OEM xcopy 一起进 c:\work。守卫改成检查真正被 require 的 webdriverio，
+REM 只有它缺失时才在 VM 内补装（yarn install 在 VM 里很慢，非必要不跑）。
+if not exist c:\work\node_modules\webdriverio (
+  echo Installing npm deps in VM (webdriverio missing)... >> %SHARE%\start.log
   call npm install yarn -g >> %SHARE%\start.log 2>&1
   call yarn install >> %SHARE%\start.log 2>&1
   call npm install puppeteer-core@21 --no-save >> %SHARE%\start.log 2>&1
@@ -76,7 +79,8 @@ if not exist c:\work\node_modules (
 REM ---- WDIO 驱动主壳：登录 -> 打开目标分身 -> 连分身内核 9221 跑 14 项 ----
 echo "== start e2e-verify ==" >> %SHARE%\start.log
 c:\node\node c:\work\tests\e2e-verify.cjs >> %SHARE%\start.log 2>&1
+echo "[verify-win7] e2e-verify 退出码=%errorlevel%" >> %SHARE%\start.log
 
 echo "verify-win7 done" >> %SHARE%\done.log
 echo "done" >> %SHARE%\done.log
-pause
+REM 不要 pause：无人值守，pause 会让 cmd 永久挂起占住会话。

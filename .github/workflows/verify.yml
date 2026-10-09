@@ -319,15 +319,45 @@ jobs:
           ./frpc -c ./win7/frpc_16020852.ini > /tmp/frpc.log 2>&1 &
 
       - name: 等待测试开始
-        # VM 内 autorun 未落 start.log 时应尽快失败，不再空等 45 分钟拖住整条流水线
-        timeout-minutes: 20
+        # Win7 走的是「非受支持」的嵌套虚拟化：镜像拉取 + Win7 安装 + OEM 装驱动 + 重启 + 登录自启，
+        # 实测 8.5~12 分钟且波动大（Run#9 11.8min / Run#10 8.5min）。20 分钟过紧 → 曾多次超时且
+        # 不留任何诊断。这里放宽到 40 分钟，并每 30s 打点；超时则 dump 容器日志/共享目录再失败。
+        timeout-minutes: 45
         run: |
-          while [ ! -f "win7/shared/start.log" ]; do sleep 10; done
+          deadline=$((SECONDS + 2400)) # 40 分钟
+          while [ ! -f "win7/shared/start.log" ]; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Win7 VM 未在 40 分钟内写入 start.log（等待测试开始超时）"
+              echo "----- docker ps -a -----"; docker ps -a || true
+              echo "----- docker logs windows (tail 250) -----"; docker logs --tail 250 windows 2>&1 || true
+              echo "----- win7/shared -----"; ls -la win7/shared || true
+              echo "----- win7/shared/oem.log (VM OEM 阶段心跳) -----"; cat win7/shared/oem.log 2>/dev/null || echo "(无 oem.log：VM 尚未跑到 OEM install.bat)"
+              exit 1
+            fi
+            if [ $((SECONDS % 30)) -lt 10 ]; then
+              echo "[${SECONDS}s] 等待 start.log ... 容器: $(docker ps --filter name=windows --format '{{.Status}}' 2>/dev/null || echo '?-') | shared: $(ls win7/shared 2>/dev/null | tr '\n' ' ')"
+            fi
+            sleep 10
+          done
+          echo "start.log 已出现（等待 ${SECONDS}s）"
+          tail -n 40 win7/shared/start.log || true
 
       - name: 等待测试完成
-        timeout-minutes: 30
+        # 每 60s 回显 start.log 尾部（恢复上游 Windows7-docker.yml 的做法）：VM 内若卡住，
+        # 日志里能看到卡在哪一步，而不是又一段 30 分钟的黑盒。
+        timeout-minutes: 35
         run: |
-          while [ ! -f "win7/shared/done.log" ]; do sleep 60; done
+          for i in $(seq 1 33); do
+            [ -f "win7/shared/done.log" ] && break
+            sleep 60
+            echo "----- [第 ${i} 分钟] start.log 尾部 -----"
+            tail -n 25 win7/shared/start.log 2>/dev/null || echo "(start.log 尚不可读)"
+          done
+          if [ ! -f "win7/shared/done.log" ]; then
+            echo "::error::VM 未在 33 分钟内写完 done.log"
+            echo "----- docker logs windows (tail 120) -----"; docker logs --tail 120 windows 2>&1 || true
+            exit 1
+          fi
           echo "测试结束"
           cat win7/shared/start.log
 
