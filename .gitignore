@@ -5,7 +5,12 @@ tests/screenshots/out.png
 tkshop-crx
 *secrets.md
 win7/shared/host-time.txt
+win7/shared/work/e2e-env.txt
+win7/shared/start.bat
 results-*.json
 report.xlsx
 client/
 client.zip
+_tmp_ci/
+_tmp_e2e_logs2.txt
+.workbuddy/

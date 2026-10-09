@@ -7,9 +7,13 @@ name: HuaYoung 浏览器验证 (团队213505445724246 / UA152分身 / 152内核)
 # 真实跑（非 smoke）：每个平台在 GitHub 托管 runner 上
 #   1) 下载并安装对应平台的花漾客户端（参考 Windows10.yml / Linux.yml / macOS.yml / Windows7-docker.yml）
 #   2) node modifyMain.js —— 给客户端 main.js 注入 remoteDebugPort=9221 + 假媒体开关
-#   3) node tools/launch-client.mjs —— 启动客户端并以 --remote-debugging-port=9221 暴露 CDP
-#   4) node tests/runner.mjs --cdp http://127.0.0.1:9221 —— 连接真实客户端，按矩阵逐项判定（UA/指纹站等）
-#   5) 上传 results-<平台>.json；report job 合并生成 report.xlsx
+#      （该端口在「打开分身」时作为 --remote-debugging-port 传给「分身内核浏览器」；
+#        注意：命令行不可再给主壳加 --remote-debugging-port，否则主壳会抢占 9221）
+#   3) node tests/e2e-verify.cjs —— WDIO(chromedriver 108) 驱动主壳做 UI：
+#      登录 → 分身列表 → 打开目标分身 → 等「正在访问」
+#   4) 同一脚本内再跑 node tests/runner.mjs --cdp http://127.0.0.1:9221（puppeteer 连**分身内核**），
+#      按矩阵逐项判定（152 内核 UA / 指纹站等），产出 results-<平台>.json
+#   5) report job 合并生成 report.xlsx
 #
 # Windows 7 特殊说明：GitHub 无 Win7 托管 runner，单独用 Docker 方案
 #   （参考 Windows7-docker.yml：ubuntu-latest 起 dockurr-windows / Win7 VM，共享目录跑验证）。
@@ -198,25 +202,31 @@ jobs:
         continue-on-error: true
         run: node modifyMain.js
 
-      # ---------- 启动客户端并等待 CDP 就绪 ----------
-      - name: 启动客户端并等待分身浏览器 CDP
-        id: launch
-        continue-on-error: true
-        timeout-minutes: 10
+      # ---------- Windows: 预置 chromedriver 108（WDIO 驱动主壳用；WDIO 会自动在该路径查找） ----------
+      - name: 预置 chromedriver 108 (Windows)
+        if: startsWith(matrix.install, 'win')
+        shell: pwsh
+        run: |
+          $dst = "$env:TEMP\chromedriver\win64-108\chromedriver-win64"
+          New-Item -ItemType Directory -Force -Path $dst | Out-Null
+          Copy-Item -Path "./tools/chromedriver/108.0.5359.71/win32/chromedriver.exe" -Destination "$dst\chromedriver.exe" -Force
+          Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108"
+
+      # ---------- WDIO 驱动主壳：登录 → 打开目标分身 → 连分身内核浏览器 CDP 跑 14 项 ----------
+      # 关键：不要再给客户端命令行加 --remote-debugging-port，否则「主壳(Electron/108)」会抢占 9221，
+      #       连上的是主壳而非分身内核（UA 会带 HuaYoung/... Electron/22，且不支持 newPage）。
+      #       由 modifyMain.js 注入的 this.remoteDebugPort=9221 在「打开分身」时传给分身内核浏览器。
+      - name: 打开分身并验证（连分身内核浏览器 CDP）
+        shell: bash   # Windows 默认 pwsh 不认 bash 的 `\` 续行符/管道，显式 bash
+        timeout-minutes: 30
         env:
           DISPLAY: ${{ matrix.install == 'ubuntu' && ':99' || '' }}
-        run: node tools/launch-client.mjs
-
-      # ---------- 真实跑矩阵验证（连接真实客户端 CDP，不再 smoke） ----------
-      - name: 运行验证
-        shell: bash   # Windows 默认 pwsh 不认 bash 的 `\` 续行符，必须显式指定 bash
-        timeout-minutes: 25
-        run: |
-          node tests/runner.mjs --engine puppeteer \
-            --platforms "${{ matrix.platform }}" \
-            --cdp "${{ steps.launch.outputs.cdp || env.CLIENT_CDP_ENDPOINT }}" \
-            --proxy "$PROXY" --proxy-ip "$PROXY_IP" \
-            --out "results-${{ matrix.slug }}.json"
+          E2E_PLATFORM: ${{ matrix.platform }}
+          TEAM_NAME: ${{ secrets.TEAM_NAME }}
+          WDIO_USERNAME: ${{ secrets.WDIO_USERNAME }}
+          PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          OUT: results-${{ matrix.slug }}.json
+        run: node tests/e2e-verify.cjs
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -282,6 +292,21 @@ jobs:
           cp -r ../tools/node-v18.20.3-win-x64 ./shared/node
           cp ../installer.exe ./shared/work
           cp ../win7/shared/start-verify.bat ./shared/start.bat
+
+      - name: 写入 VM 内验证配置 (e2e-env.txt，含登录信息，仅存在于本次 runner 工作区)
+        run: |
+          cat > win7/shared/work/e2e-env.txt <<EOF
+          E2E_PLATFORM=Windows 7
+          CLONE_NAME=${CLONE_NAME}
+          TEAM_ID=${TEAM_ID}
+          REMOTE_DEBUG_PORT=${REMOTE_DEBUG_PORT}
+          OUT=results-Windows_7.json
+          TEAM_NAME=${{ secrets.TEAM_NAME }}
+          WDIO_USERNAME=${{ secrets.WDIO_USERNAME }}
+          PRODUCT_WDIO_PASSWORD=${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          EOF
+          echo "--- e2e-env.txt (密码已脱敏) ---"
+          sed 's/^PRODUCT_WDIO_PASSWORD=.*/PRODUCT_WDIO_PASSWORD=***/' win7/shared/work/e2e-env.txt
 
       - name: 启动 frpc (可选, 调试用)
         continue-on-error: true
