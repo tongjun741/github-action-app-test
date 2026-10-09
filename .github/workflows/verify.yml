@@ -202,6 +202,7 @@ jobs:
       - name: 启动客户端并等待分身浏览器 CDP
         id: launch
         continue-on-error: true
+        timeout-minutes: 10
         env:
           DISPLAY: ${{ matrix.install == 'ubuntu' && ':99' || '' }}
         run: node tools/launch-client.mjs
@@ -209,6 +210,7 @@ jobs:
       # ---------- 真实跑矩阵验证（连接真实客户端 CDP，不再 smoke） ----------
       - name: 运行验证
         shell: bash   # Windows 默认 pwsh 不认 bash 的 `\` 续行符，必须显式指定 bash
+        timeout-minutes: 25
         run: |
           node tests/runner.mjs --engine puppeteer \
             --platforms "${{ matrix.platform }}" \
@@ -291,6 +293,7 @@ jobs:
           ./frpc -c ./win7/frpc_16020852.ini > /tmp/frpc.log 2>&1 &
 
       - name: 等待测试开始
+        timeout-minutes: 45
         run: |
           while [ ! -f "win7/shared/start.log" ]; do sleep 10; done
 

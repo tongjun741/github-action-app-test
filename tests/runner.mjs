@@ -52,7 +52,7 @@ async function loadBrowser(opts) {
       try {
         const pptr = await import('puppeteer-core');
         const puppeteer = pptr.default || pptr;
-        const browser = await puppeteer.connect({ browserURL: cdp });
+        const browser = await puppeteer.connect({ browserURL: cdp, protocolTimeout: 60000 });
         console.log(`[runner] 已用 puppeteer-core 连接真实客户端 CDP: ${cdp}`);
         return { browser, proxyIp, mode: 'cdp', engine };
       } catch (e) {
@@ -113,7 +113,10 @@ async function run() {
     if (browser) {
       try {
         if (engine === 'puppeteer') {
-          page = await browser.newPage();
+          // Electron 客户端上 browser.newPage()（Target.createTarget）易挂起；优先复用已存在的 page
+          const pages = await browser.pages().catch(() => []);
+          page = (pages && pages.length) ? pages[0] : await browser.newPage();
+          if (page && page.setDefaultTimeout) page.setDefaultTimeout(45000);
         } else {
           context = await browser.newContext();
           page = await context.newPage();
@@ -144,15 +147,20 @@ async function run() {
         }
       } else {
         try {
-          res = await checkCase(page, c, { proxyIp, engine });
+          res = await Promise.race([
+            checkCase(page, c, { proxyIp, engine }),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('用例判定超时(120s)')), 120000)),
+          ]);
         } catch (e) {
           res = { status: 'error', detail: `判定过程异常: ${e.message}` };
           console.error(`  [错误] ${c.name}: ${e.message}`);
         }
-        if (page && c.url) {
+        if (page && c.url && engine !== 'puppeteer') {
+          // Playwright：每用例换新 page，避免状态串扰
           try { await page.close(); } catch (_) {}
-          try { page = engine === 'puppeteer' ? await browser.newPage() : await context.newPage(); } catch (_) { page = null; }
+          try { page = await context.newPage(); } catch (_) { page = null; }
         }
+        // puppeteer：复用同一个 page，不再 newPage（Electron 上 Target.createTarget 易挂起）
       }
       platformResults.push({
         caseId: c.id, name: c.name, type: c.type,
