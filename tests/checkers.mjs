@@ -1,5 +1,5 @@
 // checkers.mjs — 每个测试用例的自动判定逻辑
-// 输入：Playwright page + case 定义 + opts（proxy / proxyIp / cdp）
+// 输入：Playwright / puppeteer-core page + case 定义 + opts（proxy / proxyIp / engine）
 // 输出：{ status: 'pass'|'fail'|'manual'|'error', detail: string }
 
 function isPublicIp(ip) {
@@ -19,30 +19,32 @@ async function bodyText(page) {
   return page.evaluate(() => (document.body ? document.body.innerText : '') || '');
 }
 
-async function gotoSafe(page, url, wait = 'domcontentloaded', timeout = 30000) {
-  const resp = await page.goto(url, { waitUntil: wait, timeout });
+// waitUntil 兼容：Playwright 支持 'networkidle'；puppeteer-core 不支持，需映射为 'networkidle2'
+async function gotoSafe(page, url, wait = 'domcontentloaded', timeout = 30000, engine = 'playwright') {
+  const w = engine === 'puppeteer' && wait === 'networkidle' ? 'networkidle2' : wait;
+  const resp = await page.goto(url, { waitUntil: w, timeout });
   return resp;
 }
 
 // 1) 打开会话是否成功 —— 导航到 qq.com 能正常加载
-async function navigation(page, c) {
-  const resp = await gotoSafe(page, c.url);
+async function navigation(page, c, opts) {
+  const resp = await gotoSafe(page, c.url, 'domcontentloaded', 30000, opts?.engine);
   const text = await bodyText(page);
   const ok = resp && resp.status() < 400 && text.length > 50;
   return { status: ok ? 'pass' : 'fail', detail: `status=${resp && resp.status()} bodyLen=${text.length}` };
 }
 
 // 2) 内核版本 —— 读取 UA 中的 Chromium 版本
-async function kernel_version(page, c) {
-  await gotoSafe(page, 'about:blank');
+async function kernel_version(page, c, opts) {
+  await gotoSafe(page, 'about:blank', 'domcontentloaded', 30000, opts?.engine);
   const ua = await page.evaluate(() => navigator.userAgent);
   const pass = ua.includes(c.expected);
   return { status: pass ? 'pass' : 'fail', detail: `UA=${ua}` };
 }
 
 // 3) pixelscan —— 允许“使用了代理”，但不应有其它红色警告
-async function fingerprint_pixelscan(page, c) {
-  await gotoSafe(page, c.url, 'networkidle', 45000).catch(() => {});
+async function fingerprint_pixelscan(page, c, opts) {
+  await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
   const text = await bodyText(page);
   const proxy = /very likely you are using proxy/i.test(text);
   const other = /very likely/i.test(text.replace(/very likely you are using proxy/i, ''));
@@ -51,8 +53,8 @@ async function fingerprint_pixelscan(page, c) {
 }
 
 // 4) iphey —— 全绿（无 leak/mismatch/detected）
-async function fingerprint_iphey(page, c) {
-  await gotoSafe(page, c.url, 'networkidle', 45000).catch(() => {});
+async function fingerprint_iphey(page, c, opts) {
+  await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
   const text = await bodyText(page);
   const red = /not good|bad|\bleak\b|mismatch|detected|暴露/i.test(text);
   return { status: red ? 'fail' : text.length > 50 ? 'pass' : 'manual', detail: text.slice(0, 140).replace(/\n/g, ' ') };
@@ -60,7 +62,7 @@ async function fingerprint_iphey(page, c) {
 
 // 5) browserleaks/ip —— 自采集 WebRTC IP，与代理 IP 比对
 async function fingerprint_webrtc(page, c, opts) {
-  await gotoSafe(page, c.url, 'domcontentloaded', 30000);
+  await gotoSafe(page, c.url, 'domcontentloaded', 30000, opts?.engine);
   const rtcIps = await page.evaluate(async () => {
     return await new Promise((resolve) => {
       const ips = new Set();
@@ -93,8 +95,8 @@ async function fingerprint_webrtc(page, c, opts) {
 }
 
 // 6) whoer —— 解析匿名得分 >= 90
-async function fingerprint_whoer(page, c) {
-  await gotoSafe(page, c.url, 'networkidle', 45000).catch(() => {});
+async function fingerprint_whoer(page, c, opts) {
+  await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
   const text = await bodyText(page);
   const m = text.match(/(\d{1,3})\s*%/);
   if (!m) return { status: 'manual', detail: '无法从页面解析得分，需人工确认' };
@@ -103,8 +105,8 @@ async function fingerprint_whoer(page, c) {
 }
 
 // 7) ipbinding —— WebRTC blocked
-async function fingerprint_ipbinding(page, c) {
-  await gotoSafe(page, c.url, 'domcontentloaded', 30000);
+async function fingerprint_ipbinding(page, c, opts) {
+  await gotoSafe(page, c.url, 'domcontentloaded', 30000, opts?.engine);
   const text = await bodyText(page);
   return { status: /webrtc blocked/i.test(text) ? 'pass' : 'fail', detail: text.slice(0, 140).replace(/\n/g, ' ') };
 }
@@ -115,8 +117,8 @@ async function manual_captcha() {
 }
 
 // 9) fingerprint-scan —— 分数 < 50
-async function fingerprint_score(page, c) {
-  await gotoSafe(page, c.url, 'networkidle', 45000).catch(() => {});
+async function fingerprint_score(page, c, opts) {
+  await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
   const text = await bodyText(page);
   const m = text.match(/score[^0-9]*(\d{1,3})/i) || text.match(/(\d{1,3})\s*\/\s*100/);
   if (!m) return { status: 'manual', detail: '无法解析指纹分数，需人工确认' };
@@ -125,8 +127,8 @@ async function fingerprint_score(page, c) {
 }
 
 // 10) devtools-detector —— devtools status: close
-async function fingerprint_devtools(page, c) {
-  await gotoSafe(page, c.url, 'networkidle', 45000).catch(() => {});
+async function fingerprint_devtools(page, c, opts) {
+  await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
   const text = await bodyText(page);
   const close = /devtools status:\s*close/i.test(text);
   const open = /devtools status:\s*open/i.test(text);
@@ -170,7 +172,7 @@ async function checkCase(page, caseDef, opts) {
   const fn = CHECKERS[caseDef.type];
   try {
     if (!fn) {
-      if (caseDef.url) return await navigation(page, caseDef);
+      if (caseDef.url) return await navigation(page, caseDef, opts);
       return { status: 'manual', detail: '未实现自动判定，需人工确认' };
     }
     return await fn(page, caseDef, opts);

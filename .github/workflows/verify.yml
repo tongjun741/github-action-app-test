@@ -11,8 +11,10 @@ name: HuaYoung 浏览器验证 (团队213505445724246 / UA152分身 / 152内核)
 #   4) node tests/runner.mjs --cdp http://127.0.0.1:9221 —— 连接真实客户端，按矩阵逐项判定（UA/指纹站等）
 #   5) 上传 results-<平台>.json；report job 合并生成 report.xlsx
 #
-# 提示：Windows 7 真实运行需 Win7 系统；GitHub 无 Win7 托管 runner，可用 workflow_dispatch
-#       的 runs_on_override 指向自托管的 Win7 runner，否则 windows-latest 上跑 Win7 客户端构建为尽力而为。
+# Windows 7 特殊说明：GitHub 无 Win7 托管 runner，单独用 Docker 方案
+#   （参考 Windows7-docker.yml：ubuntu-latest 起 dockurr-windows / Win7 VM，共享目录跑验证）。
+#   Win7 VM 内 node 为 node18（最后支持 Win7 的版本），用 puppeteer-core 连 CDP（无需本地 chromium）。
+#   该 job 仅在 workflow_dispatch / schedule 触发；push 不自动起 Win7 VM（成本高）。
 on:
   workflow_dispatch:
     inputs:
@@ -40,6 +42,11 @@ on:
       runs_on_override:
         description: '覆盖所有平台的 runs-on（留空=各平台默认 GitHub 托管 runner；填 self-hosted 或具体 label 则全部用该 label）。分身验证需已登录客户端的 runner。'
         required: false
+      private_deployment:
+        description: 'Win7 Docker 是否从固定 OSS 地址加载镜像/ISO（私有部署）。仅影响 Windows 7 (Docker) job。'
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '0 9 * * 1' # 每周一 09:00 UTC 自动跑一轮
   push:
@@ -49,6 +56,7 @@ on:
       - 'modifyMain.js'
       - 'package.json'
       - '.github/workflows/verify.yml'
+      - 'win7/**'
 
 permissions:
   contents: read
@@ -65,8 +73,7 @@ jobs:
           - { platform: "macOS arm64", os: macos-14,      slug: macOS_arm64, client: '/Applications/花漾客户端.app/Contents/MacOS/花漾客户端', install: 'mac-arm64' }
           - { platform: "macOS x64",   os: macos-13,      slug: macOS_x64,   client: '/Applications/花漾客户端.app/Contents/MacOS/花漾客户端', install: 'mac-x64' }
           - { platform: "Ubuntu 22",   os: ubuntu-22.04,   slug: Ubuntu_22,   client: '/opt/花漾客户端/huayoung', install: 'ubuntu' }
-          # Windows 7 无 GitHub 托管 runner，生产请改用自托管 Win7 runner（runs_on_override=win7-label）
-          - { platform: "Windows 7",   os: windows-latest, slug: Windows_7,  client: 'C:\Program Files\HuaYoung\花漾客户端.exe', install: 'win7' }
+          # Windows 7 不走此矩阵（无 GitHub Win7 托管 runner），改由下方 verify-win7 (Docker) job 单独跑
     runs-on: ${{ github.event.inputs.runs_on_override || matrix.os }}
     env:
       CLIENT_BINARY: ${{ matrix.client }}
@@ -85,7 +92,7 @@ jobs:
           node-version: '24'
 
       - name: 安装依赖
-        run: npm install && npx playwright install chromium
+        run: npm install
 
       # ---------- 按平台安装真实客户端 ----------
       - name: 安装客户端 (Windows)
@@ -135,6 +142,7 @@ jobs:
           else
             dl="${{ github.event.inputs.software_download_url }}"
           fi
+          echo "下载客户端: $dl"
           for i in 1 2 3 4 5; do
             curl -fSL --retry 3 --retry-delay 5 -o /tmp/hy.deb "$dl" && break
             echo "下载失败(第 $i 次)"; sleep 5
@@ -209,9 +217,103 @@ jobs:
           path: results-${{ matrix.slug }}.json
           if-no-files-found: error
 
+  verify-win7:
+    name: 验证 Windows 7 (Docker)
+    # Win7 无 GitHub 托管 runner，用 Docker/VM 方案；push 不自动起 VM（成本高），仅 dispatch/schedule 跑
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    env:
+      TEAM_ID: ${{ github.event.inputs.team_id || '213505445724246' }}
+      CLONE_NAME: ${{ github.event.inputs.clone_name || 'UA152' }}
+      REMOTE_DEBUG_PORT: ${{ github.event.inputs.cdp_port || '9221' }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 启动 Win7 Docker 虚拟机 (dockurr-windows)
+        env:
+          PRIVATE_DEPLOYMENT: ${{ inputs.private_deployment }}
+          PRIVATE_DOWNLOAD_DIR: ${{ runner.temp }}/dockurr-windows
+        run: |
+          cd win7
+          bash ./start-docker.sh
+
+      - name: 下载 Win7 客户端
+        run: |
+          if [ -z "${{ inputs.software_download_url }}" ]; then
+            download_url="https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_10.2.563_zh_setup.exe"
+          else
+            download_url="${{ inputs.software_download_url }}"
+          fi
+          for i in 1 2 3 4 5; do
+            curl -fSL --retry 3 --retry-delay 5 -o installer.exe "$download_url" && break
+            echo "curl 下载失败(第 $i 次)，5 秒后重试..."
+            sleep 5
+          done
+          if [ ! -f installer.exe ]; then echo "错误：installer.exe 下载失败"; exit 1; fi
+          if ! file installer.exe | grep -q "executable\|PE32\|PE32+"; then
+            echo "错误：installer.exe 类型异常（疑似下载损坏）: $(file installer.exe)"; exit 1
+          fi
+
+      - name: 复制仓库文件到虚拟机共享目录 (c:\work)
+        run: |
+          rm -rf package.json yarn.lock
+          find . -type f -not -path "*/\.*" -not -path "./win7/*" -exec rsync --relative {} ./win7/shared/work \;
+
+      - name: 在共享目录安装 puppeteer-core (VM 内 node18/Win7 用，连 CDP 无需本地 chromium)
+        working-directory: win7/shared/work
+        run: npm install puppeteer-core@21 --no-save
+
+      - name: 复制相关文件到虚拟机共享目录
+        run: |
+          cd tools
+          unzip -o node-v18.20.3-win-x64.zip >/dev/null 2>&1 || true
+          cd ../win7
+          cp ../tools/Windows6.1-KB3080149-x64.msu ./shared
+          cp ../tools/chromedriver/108.0.5359.71/win32/chromedriver.exe ./shared/work/chromedriver.exe
+          cp -r ../tools/node-v18.20.3-win-x64 ./shared/node
+          cp ../installer.exe ./shared/work
+          cp ../win7/shared/start-verify.bat ./shared/start.bat
+
+      - name: 启动 frpc (可选, 调试用)
+        continue-on-error: true
+        run: |
+          sed -i "s/user = .*/user = ${{ secrets.FRPC_USER }}/g" win7/frpc_16020852.ini
+          sed -i "s/remote_port = .*/remote_port = ${{ secrets.FRPC_WIN7_REMOTE_PORT }}/g" win7/frpc_16020852.ini
+          cp tools/frpc_linux_amd64 frpc
+          chmod +x frpc
+          ./frpc -c ./win7/frpc_16020852.ini > /tmp/frpc.log 2>&1 &
+
+      - name: 等待测试开始
+        run: |
+          while [ ! -f "win7/shared/start.log" ]; do sleep 10; done
+
+      - name: 等待测试完成
+        timeout-minutes: 30
+        run: |
+          while [ ! -f "win7/shared/done.log" ]; do sleep 60; done
+          echo "测试结束"
+          cat win7/shared/start.log
+
+      - name: 取回 Win7 验证结果
+        if: always()
+        run: |
+          if [ -f "win7/shared/work/results-Windows_7.json" ]; then
+            cp win7/shared/work/results-Windows_7.json results-Windows_7.json
+          else
+            echo "警告：未生成 results-Windows_7.json，写入空结果占位"
+            echo '{"meta":{"kernel":"152","platform":"Windows 7","teamId":"'"$TEAM_ID"'","cloneName":"'"$CLONE_NAME"'"},"platform":"Windows 7","results":[]}' > results-Windows_7.json
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-Windows_7
+          path: results-Windows_7.json
+          if-no-files-found: warn
+
   report:
     name: 合并生成 Excel 报告
-    needs: verify
+    needs: [verify, verify-win7]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

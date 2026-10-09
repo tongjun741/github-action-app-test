@@ -6,6 +6,10 @@
 //   2) 无头浏览器（本地开发）：自动用 Playwright 启动 headless chromium（可加 --proxy 走代理）
 //   3) 无浏览器（--smoke）：不启动浏览器，自动项标记 skipped、人工项标记 manual，仅验证流程并产出骨架报告
 //
+// 引擎：
+//   --engine playwright（默认）：用 playwright 的 connectOverCDP 连真实客户端（托管 runner / 本地）
+//   --engine puppeteer    ：用 puppeteer-core 的 connect 连真实客户端（Win7 Docker VM 内，node18/Win7 兼容性最佳，无需本地 chromium）
+//
 // 环境变量：
 //   PLATFORMS       逗号分隔，限定要测的平台（默认 matrix 中全部）
 //   CLIENT_CDP_ENDPOINT  真实客户端 CDP 地址（覆盖无头模式）
@@ -31,6 +35,7 @@ function parseArgs(argv) {
     else if (a === '--proxy-ip') out.proxyIp = argv[++i];
     else if (a === '--platforms') out.platforms = argv[++i];
     else if (a === '--out') out.out = argv[++i];
+    else if (a === '--engine') out.engine = argv[++i];
   }
   return out;
 }
@@ -39,13 +44,23 @@ async function loadBrowser(opts) {
   const cdp = opts.cdp || process.env.CLIENT_CDP_ENDPOINT;
   const proxy = opts.proxy || process.env.PROXY;
   const proxyIp = opts.proxyIp || process.env.PROXY_IP;
+  const engine = (opts.engine || 'playwright').toLowerCase();
 
   if (cdp) {
+    if (engine === 'puppeteer') {
+      // Win7 Docker VM 内：puppeteer-core 纯 JS 驱动 CDP，无需本地 chromium，node18/Win7 兼容最佳
+      const pptr = await import('puppeteer-core');
+      const puppeteer = pptr.default || pptr;
+      const browser = await puppeteer.connect({ browserURL: cdp });
+      console.log(`[runner] 已用 puppeteer-core 连接真实客户端 CDP: ${cdp}`);
+      return { browser, proxyIp, mode: 'cdp', engine };
+    }
     const { chromium } = await import('playwright');
     const browser = await chromium.connectOverCDP(cdp);
     console.log(`[runner] 已连接真实客户端 CDP: ${cdp}`);
-    return { browser, proxyIp, mode: 'cdp' };
+    return { browser, proxyIp, mode: 'cdp', engine };
   }
+  // 本地开发用无头浏览器（仅 Playwright 支持）
   try {
     const { chromium } = await import('playwright');
     const browser = await chromium.launch({
@@ -53,10 +68,10 @@ async function loadBrowser(opts) {
       proxy: proxy ? { server: proxy, bypass: '<-loopback>' } : undefined,
     });
     console.log(`[runner] 已启动无头 chromium${proxy ? ` (proxy=${proxy})` : ''}`);
-    return { browser, proxyIp, mode: 'headless' };
+    return { browser, proxyIp, mode: 'headless', engine };
   } catch (e) {
     console.log(`[runner] 未找到 Playwright/Chromium，进入 smoke 模式: ${e.message}`);
-    return { browser: null, proxyIp, mode: 'smoke' };
+    return { browser: null, proxyIp, mode: 'smoke', engine };
   }
 }
 
@@ -68,12 +83,12 @@ async function run() {
     ? args.platforms.split(',').map((s) => s.trim())
     : allPlatforms;
 
-  const { browser, proxyIp, mode } = await loadBrowser(args);
+  const { browser, proxyIp, mode, engine } = await loadBrowser(args);
 
   // 验证目标：团队内的「UA152」分身（CDP 端口 9221）。env 可覆盖 spec 默认值。
   const teamId = process.env.TEAM_ID || matrix.meta.teamId || '';
   const cloneName = process.env.CLONE_NAME || matrix.meta.cloneName || '';
-  console.log(`[runner] 验证目标分身: team=${teamId || '(未指定)'} clone=${cloneName || '(未指定)'} (CDP=${matrix.meta.cloneCdpPort || 9221})`);
+  console.log(`[runner] 验证目标分身: team=${teamId || '(未指定)'} clone=${cloneName || '(未指定)'} (CDP=${matrix.meta.cloneCdpPort || 9221}) engine=${engine}`);
 
   const resultsByPlatform = {};
   for (const platform of scope) {
@@ -86,8 +101,12 @@ async function run() {
     let context = null;
     let page = null;
     if (browser) {
-      context = await browser.newContext();
-      page = await context.newPage();
+      if (engine === 'puppeteer') {
+        page = await browser.newPage();
+      } else {
+        context = await browser.newContext();
+        page = await context.newPage();
+      }
     }
     for (const c of matrix.cases) {
       if (!c.appliesTo.includes(platform)) {
@@ -104,10 +123,10 @@ async function run() {
           ? { status: 'manual', detail: '需人工按验证标准确认' }
           : { status: 'skipped', detail: '无浏览器环境，未执行自动判定' };
       } else {
-        res = await checkCase(page, c, { proxyIp });
+        res = await checkCase(page, c, { proxyIp, engine });
         if (page && c.url) {
           try { await page.close(); } catch (_) {}
-          page = await context.newPage();
+          page = engine === 'puppeteer' ? await browser.newPage() : await context.newPage();
         }
       }
       platformResults.push({
@@ -118,6 +137,7 @@ async function run() {
       console.log(`  [${tag}] ${c.name} — ${res.detail}`);
     }
     if (context) await context.close().catch(() => {});
+    if (page && engine === 'puppeteer') await page.close().catch(() => {});
     resultsByPlatform[platform] = platformResults;
   }
 
