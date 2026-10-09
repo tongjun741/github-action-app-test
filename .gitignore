@@ -5,3 +5,7 @@ tests/screenshots/out.png
 tkshop-crx
 *secrets.md
 win7/shared/host-time.txt
+results-*.json
+report.xlsx
+client/
+client.zip

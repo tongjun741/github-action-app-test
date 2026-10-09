@@ -1,7 +1,8 @@
 {
-  "name": "electron-playwright-e2e-test-quick-start",
-  "version": "0.0.1",
-  "description": "A Playwright with GitHub Actions E2E Testing Sample for Electron App",
+  "name": "huayoung-e2e-verifier",
+  "version": "1.0.0",
+  "private": true,
+  "description": "按 生产环境-12.9-148内核.xlsx 验证花漾浏览器全部项目，并生成 Excel 报告",
   "author": "Tan Shuai <opensource@tanshuai.com>",
   "main": "main.js",
   "scripts": {
@@ -11,7 +12,10 @@
     "crx": "wdio run ./wdio-crx.conf.js",
     "test-local": "node test-local.js",
     "test-ssh": "node test-ssh.js",
-    "debug-ssh": "node debug-ssh.js"
+    "debug-ssh": "node debug-ssh.js",
+    "verify": "node tests/runner.mjs",
+    "report": "node tests/report.mjs",
+    "ci": "node tests/runner.mjs && node tests/report.mjs --inputs results-*.json"
   },
   "repository": "https://github.com/electron/electron-quick-start",
   "keywords": [
@@ -42,7 +46,9 @@
     "chromedriver": "^108.0.0",
     "cloudinary": "^2.8.0",
     "dotenv": "^17.2.3",
+    "exceljs": "^4.4.0",
     "mongoose": "^8.6.1",
+    "playwright": "^1.48.0",
     "puppeteer-core": "^20.9.0",
     "screenshot-desktop": "1.15.0",
     "socksv5": "^0.0.6",
