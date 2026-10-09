@@ -38,25 +38,29 @@ if not defined OUT set "OUT=results-Windows_7.json"
 REM ---- 尽早创建 start.log，避免宿主「等待测试开始」长时间空等 ----
 echo "== verify-win7 start %DATE% %TIME% ==" > %SHARE%\start.log
 
-REM ---- 定位客户端 exe（用通配避开中文路径硬编码） ----
+REM ---- 定位客户端 exe（通配 + 过滤卸载/安装程序；中文路径会变 ????? 故不硬编码） ----
 set "HD=%ProgramFiles%\HuaYoung"
 if not exist "%HD%" set "HD=C:\Program Files\HuaYoung"
+set "FILTER=uninst setup update crashpad report repair"
 set CLI=
-for /f "delims=" %%i in ('dir /b "%HD%\*.exe" 2^>nul') do set "CLI=%HD%\%%i"
+for /f "delims=" %%i in ('dir /b "%HD%\*.exe" 2^>nul ^| findstr /I /V "%FILTER%"') do set "CLI=%HD%\%%i"
 
 REM ---- 安装客户端（若未安装） ----
 if not defined CLI (
   echo Installing HuaYoung client... >> %SHARE%\start.log
   installer.exe /S
+  set /a _WAIT=0
   :WaitInstall
-  for /f "delims=" %%i in ('dir /b "%HD%\*.exe" 2^>nul') do set "CLI=%HD%\%%i"
-  if not defined CLI (
-    timeout /t 10 >nul
+  set /a _WAIT+=1
+  for /f "delims=" %%i in ('dir /b "%HD%\*.exe" 2^>nul ^| findstr /I /V "%FILTER%"') do set "CLI=%HD%\%%i"
+  if not defined CLI if %_WAIT% LSS 60 (
+    timeout /t 5 >nul
     goto WaitInstall
   )
 )
 echo Client: %CLI% >> %SHARE%\start.log
-set "CLIENT_BINARY=%CLI%"
+REM 不导出 CLIENT_BINARY：bat 经代码页读中文文件名可能损坏，交给 e2e-verify.cjs
+REM 用 Node(UTF-8) 在 Program Files\HuaYoung 里解析并排除卸载器，更稳。
 
 REM ---- 给客户端 main.js 注入 remoteDebugPort=9221 + 假媒体开关 ----
 c:\node\node c:\work\modifyMain.js >> %SHARE%\start.log 2>&1

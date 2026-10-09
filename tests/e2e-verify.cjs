@@ -51,11 +51,22 @@ const DETAIL_LOAD_TIMEOUT = 120 * 1000;
 const log = (...a) => console.log('[e2e-verify]', ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** 在给定目录里找第一个 *.exe（绕开 bat/GBK 中文路径编码坑） */
-function firstExeIn(dir) {
+/**
+ * 在给定目录里找「客户端主程序」exe（绕开 bat/GBK 中文路径编码坑）。
+ * ⚠️ 直接取第一个 *.exe 会命中卸载器（如 `Uninstall 花漾客户端.exe`，字典序在前），
+ *    导致 chromedriver 启动卸载器后立即退出（"Chrome has crashed"）。
+ *    故排除 卸载/安装/更新/崩溃上报/提权 等辅助程序，并优先名字像客户端的。
+ */
+function firstClientExeIn(dir) {
   try {
-    const f = fs.readdirSync(dir).find((n) => n.toLowerCase().endsWith('.exe'));
-    return f ? path.join(dir, f) : null;
+    const exes = fs.readdirSync(dir).filter((n) => n.toLowerCase().endsWith('.exe'));
+    if (!exes.length) return null;
+    const bad = /(uninst|卸载|update|setup|install|crash|report|helper|elevate|repair)/i;
+    const good = exes.filter((n) => !bad.test(n));
+    const pool = good.length ? good : exes;
+    const score = (n) => (/花漾|huayoung|hua\s*young/i.test(n) ? 0 : 1);
+    const pick = pool.slice().sort((a, b) => score(a) - score(b))[0];
+    return pick ? path.join(dir, pick) : null;
   } catch (_) {
     return null;
   }
@@ -83,7 +94,7 @@ function resolveBinary() {
   ].filter(Boolean);
   for (const c of cands) {
     if (c.toLowerCase().endsWith('.exe') && fs.existsSync(c)) return c;
-    const hit = firstExeIn(c);
+    const hit = firstClientExeIn(c);
     if (hit) return hit;
   }
   return 'C:\\Program Files\\HuaYoung\\花漾客户端.exe';
@@ -178,6 +189,79 @@ async function listCloneNamesAnyEl(browser) {
   }
 }
 
+/** 在候选名里匹配目标分身（精确 → 包含） */
+function matchClone(names, want) {
+  const W = String(want).toUpperCase();
+  return names.find((n) => String(n).toUpperCase() === W)
+    || names.find((n) => String(n).toUpperCase().includes(W))
+    || null;
+}
+
+/**
+ * 尝试把分页每页条数调大（Ant Design size-changer，如 15条/页 → 100条/页），
+ * 这样多数情况下一页就能看到全部分身，省去逐页点。失败静默忽略。
+ */
+async function tryIncreasePageSize(browser) {
+  try {
+    const sel = browser.$('.ant-pagination-options .ant-select');
+    if (!(await sel.isExisting())) return false;
+    await sel.click();
+    await sleep(600);
+    const opts = await browser.$$('.ant-select-item-option');
+    let best = null;
+    let bestV = -1;
+    for (const o of opts) {
+      const t = ((await o.getText()) || '').trim();
+      const m = t.match(/(\d+)/);
+      if (m && Number(m[1]) > bestV) { bestV = Number(m[1]); best = o; }
+    }
+    if (best) {
+      await best.click();
+      await sleep(2500);
+      log(`分页每页条数 -> ${bestV}`);
+      return true;
+    }
+    await browser.keys(['Escape']).catch(() => {});
+  } catch (e) {
+    log(`调整每页条数失败(忽略): ${e.message}`);
+  }
+  return false;
+}
+
+/**
+ * 点击分页「下一页」；返回是否真的翻动了。
+ * 优先 Ant Design 分页控件（`.ant-pagination-next`），兜底点当前页的下一个页码。
+ * 整个点击在页面上下文内原子完成，避免元素句柄失效。
+ */
+async function clickNextPage(browser) {
+  try {
+    return await browser.execute(() => {
+      const txt = (el) => (el.textContent || '').trim();
+      const cont = document.querySelector('.ant-pagination');
+      if (cont) {
+        const next = cont.querySelector('.ant-pagination-next');
+        if (next && !next.className.includes('ant-pagination-disabled')) {
+          (next.querySelector('button') || next).click();
+          return true;
+        }
+        const items = Array.from(cont.querySelectorAll('.ant-pagination-item'));
+        const idx = items.findIndex((li) => li.className.includes('ant-pagination-item-active'));
+        if (idx >= 0 && idx + 1 < items.length) { items[idx + 1].click(); return true; }
+        return false;
+      }
+      // 兜底：无 Ant class 时，找「下一页」按钮，或点最后一个纯数字 <a>
+      const nxt = Array.from(document.querySelectorAll('a,button,span,li'))
+        .find((el) => txt(el) === '下一页' || el.getAttribute('aria-label') === 'next');
+      if (nxt) { nxt.click(); return true; }
+      const nums = Array.from(document.querySelectorAll('a')).filter((a) => /^\d+$/.test(txt(a)));
+      if (nums.length >= 2) { nums[nums.length - 1].click(); return true; }
+      return false;
+    });
+  } catch (_) {
+    return false;
+  }
+}
+
 /** 进入分身列表并打开目标分身（复用 origin e2eTest 的 UI 路径与选择器） */
 async function openClone(browser) {
   log('进入首页');
@@ -188,8 +272,7 @@ async function openClone(browser) {
   await browser.$('.icon-chrome_outline').waitForExist({ timeout: 60 * 1000 });
   await browser.$('.icon-chrome_outline').click();
 
-  // 分身列表在 12.9 为异步渲染：轮询等待出现 UAxxx，最多 90s；
-  // 期间每 15s dump 一次 <a>，用于区分「列表未渲染」与「列表里确实没有该分身」。
+  // 分身列表在 12.9 为异步渲染 + 分页（默认 15条/页）：轮询等待第 1 页出现 UAxxx，最多 90s。
   let names = [];
   const deadline = Date.now() + 90 * 1000;
   let lastDump = 0;
@@ -202,25 +285,47 @@ async function openClone(browser) {
     }
     await sleep(2000);
   }
-  log(`[diag] 分身名(<a> 中 ${names.length}): ${JSON.stringify(names)}`);
+  log(`[diag] 第 1 页分身名(<a> 中 ${names.length}): ${JSON.stringify(names)}`);
 
-  let target = names.find((n) => n.toUpperCase() === CLONE.toUpperCase())
-    || names.find((n) => n.toUpperCase().includes(CLONE.toUpperCase()));
+  let target = matchClone(names, CLONE);
 
-  // 兜底：任意元素文本匹配
+  // 第 1 页没命中 → 先尝试放大每页条数（多数情况一次搞定）
+  if (!target) {
+    await tryIncreasePageSize(browser);
+    names = await listCloneNamesFromAnchors(browser);
+    log(`[diag] 放大每页条数后分身名(${names.length}): ${JSON.stringify(names)}`);
+    target = matchClone(names, CLONE);
+  }
+
+  // 仍未命中 → 逐页翻（最多 20 页），跨页累积用于失败诊断
+  if (!target) {
+    const all = new Set(names);
+    for (let i = 0; i < 20; i++) {
+      const moved = await clickNextPage(browser);
+      if (!moved) { log(`分页：已到最后一页（翻了 ${i} 次）`); break; }
+      await sleep(2000);
+      const pageNames = await listCloneNamesFromAnchors(browser);
+      log(`[diag] 第 ${i + 2} 页分身名(${pageNames.length}): ${JSON.stringify(pageNames)}`);
+      pageNames.forEach((n) => all.add(n));
+      target = matchClone(pageNames, CLONE);
+      if (target) break;
+    }
+    names = Array.from(all);
+  }
+
+  // 兜底：任意元素文本匹配（新版 UI 可能不是 <a>）
   let viaAnyEl = false;
   if (!target) {
     const any = await listCloneNamesAnyEl(browser);
     log(`[diag] 分身名(任意元素 ${any.length}): ${JSON.stringify(any)}`);
-    target = any.find((n) => n.toUpperCase() === CLONE.toUpperCase())
-      || any.find((n) => n.toUpperCase().includes(CLONE.toUpperCase()));
+    target = matchClone(any, CLONE);
     viaAnyEl = !!target;
   }
 
   if (!target) {
     await dumpAnchorTexts(browser);
     await saveShot(browser, SHOT);
-    throw new Error(`分身列表未找到「${CLONE}」；可见分身: ${names.length ? names.join(', ') : '(空/列表未渲染)'}`);
+    throw new Error(`分身列表未找到「${CLONE}」；可见分身(${names.length}): ${names.length ? names.join(', ') : '(空/列表未渲染)'}`);
   }
 
   log(`选中分身: ${target}${viaAnyEl ? '（经任意元素定位）' : ''}`);
