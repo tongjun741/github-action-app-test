@@ -1,0 +1,116 @@
+name: HuaYoung 浏览器验证 (12.9-148内核)
+
+# 按 生产环境-12.9-148内核.xlsx 验证全部项目，并生成 Excel 报告
+on:
+  workflow_dispatch:
+    inputs:
+      proxy:
+        description: '代理地址，如 http://user:pass@host:port'
+        required: false
+      proxy_ip:
+        description: '代理出口公网 IP（WebRTC 一致性判定用）'
+        required: false
+      cdp_port:
+        description: '客户端远程调试端口'
+        default: '9222'
+        required: false
+  schedule:
+    - cron: '0 9 * * 1' # 每周一 09:00 UTC 自动跑一轮
+  push:
+    paths:
+      - 'tests/**'
+      - 'tools/**'
+      - '.github/workflows/verify.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 验证 ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: "Windows 10",  os: windows-latest, slug: Windows_10 }
+          - { platform: "macOS arm64", os: macos-14,       slug: macOS_arm64 }
+          - { platform: "macOS x64",   os: macos-13,       slug: macOS_x64 }
+          - { platform: "Ubuntu 22",   os: ubuntu-22.04,   slug: Ubuntu_22 }
+          # Windows 7 无 GitHub 托管 runner，生产请改用 self-hosted Win7 runner：
+          - { platform: "Windows 7",   os: "windows-latest", slug: Windows_7 }
+    runs-on: ${{ matrix.os }}
+    env:
+      CLIENT_DOWNLOAD_URL: ${{ secrets.CLIENT_DOWNLOAD_URL }}
+      CLIENT_BINARY: ${{ secrets.CLIENT_BINARY_PATH }}
+      PROXY: ${{ github.event.inputs.proxy }}
+      PROXY_IP: ${{ github.event.inputs.proxy_ip }}
+      REMOTE_DEBUG_PORT: ${{ github.event.inputs.cdp_port || '9222' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 安装 Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: 下载/准备花漾客户端
+        shell: bash
+        run: |
+          # 项目相关：从 CLIENT_DOWNLOAD_URL 拉取对应平台客户端并解压；
+          # 或直接用 secret CLIENT_BINARY_PATH 指向已安装路径。生产环境由仓库 secret 提供。
+          if [ -n "$CLIENT_DOWNLOAD_URL" ]; then
+            curl -fsSL "$CLIENT_DOWNLOAD_URL" -o client.zip
+            (command -v unzip >/dev/null && unzip -o client.zip -d client) || echo "请在此步骤按平台解压客户端"
+          fi
+          echo "CLIENT_BINARY=$CLIENT_BINARY"
+
+      - name: 启动客户端并等待 CDP
+        id: launch
+        run: node tools/launch-client.mjs
+
+      - name: 运行验证
+        run: |
+          node tests/runner.mjs --platforms "${{ matrix.platform }}" \
+            --cdp "${{ steps.launch.outputs.cdp }}" \
+            --proxy "$PROXY" --proxy-ip "$PROXY_IP" \
+            --out "results-${{ matrix.slug }}.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.slug }}
+          path: results-${{ matrix.slug }}.json
+          if-no-files-found: error
+
+  report:
+    name: 合并生成 Excel 报告
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: results-*
+          merge-multiple: true
+
+      - name: 生成 Excel 报告
+        run: node tests/report.mjs --dir artifacts --out report.xlsx
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verification-report
+          path: report.xlsx

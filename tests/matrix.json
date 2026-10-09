@@ -1,0 +1,148 @@
+{
+  "meta": {
+    "product": "HuaYoung Browser (花漾浏览器)",
+    "sourceExcel": "生产环境-12.9-148内核.xlsx",
+    "kernelVersion": "152",
+    "testVersion": {
+      "Windows 10": "12.9.1027",
+      "Ubuntu 22": "12.9.896"
+    },
+    "generatedFromExcel": true,
+    "platforms": [
+      "Windows 10",
+      "macOS arm64",
+      "macOS x64",
+      "Ubuntu 22",
+      "Windows 7"
+    ],
+    "notes": "本 spec 由 生产环境-12.9-148内核.xlsx 转写而来。name / 验证标准 / platforms 忠实于原表；type / url / expected 为自动化判定所需的补充元数据。Windows 7 列在原表中仅关注‘打开会话是否成功’。"
+  },
+  "cases": [
+    {
+      "id": "open_session",
+      "name": "打开会话是否成功",
+      "type": "navigation",
+      "url": "https://www.qq.com/",
+      "expected": "load_ok",
+      "criteria": "访问 https://www.qq.com/ 能正常显示",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22", "Windows 7"]
+    },
+    {
+      "id": "kernel_version",
+      "name": "内核版本",
+      "type": "kernel_version",
+      "url": null,
+      "expected": "152",
+      "criteria": "打开浏览器后在右上角的菜单中查看 About HuaYoungBrowser 页面的版本号，UA 中应包含 Chromium 152 内核（Chrome/152.），即 152 内核版本",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22", "Windows 7"]
+    },
+    {
+      "id": "pixelscan",
+      "name": "http://pixelscan.net/",
+      "type": "fingerprint_pixelscan",
+      "url": "http://pixelscan.net/",
+      "expected": "no_proxy_only",
+      "criteria": "使用本机 IP 访问时，除了第三项 ‘Very likely you are using Proxy’ 其它都应该是绿色",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "iphey",
+      "name": "https://iphey.com/",
+      "type": "fingerprint_iphey",
+      "url": "https://iphey.com/",
+      "expected": "all_green",
+      "criteria": "使用 Webshare 的 IP 访问时，所有项目都应该是绿色",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "browserleaks_ip",
+      "name": "https://browserleaks.com/ip",
+      "type": "fingerprint_webrtc",
+      "url": "https://browserleaks.com/ip",
+      "expected": "webrtc_matches_proxy",
+      "criteria": "使用 Webshare 的 IP 访问时，页面上显示的所有 IP 都应该与代理 IP 一致，尤其要注意 WebRTC 这一项",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "whoer",
+      "name": "https://whoer.net/",
+      "type": "fingerprint_whoer",
+      "url": "https://whoer.net/",
+      "expected": "score_ge_90",
+      "criteria": "使用 Webshare 的 IP 访问时，页面上显示得分应该在 90% 以上，一般情况下只有时区这一项不匹配，且检测到的时区与 IP 所在国家应该匹配",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "ipbinding",
+      "name": "https://ipbinding.online/index.html#",
+      "type": "fingerprint_ipbinding",
+      "url": "https://ipbinding.online/index.html#",
+      "expected": "webrtc_blocked",
+      "criteria": "使用 Webshare 的 IP 访问时，页面右侧显示 WebRTC blocked 才是正确的",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "nopecha",
+      "name": "https://nopecha.com/demo",
+      "type": "manual_captcha",
+      "url": "https://nopecha.com/demo",
+      "expected": "manual",
+      "criteria": "使用 Webshare 的 IP 访问时，打开右边截图中的三个链接，手工过验证码应该都能通过：hCaptcha / Google reCAPTCHA / Cloudflare Turnstile",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "fingerprint_scan",
+      "name": "https://fingerprint-scan.com/",
+      "type": "fingerprint_score",
+      "url": "https://fingerprint-scan.com/",
+      "expected": "score_lt_50",
+      "criteria": "使用本机 IP 直连访问这个页面应该显示如右侧截图的内容，且分数低于 50",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "devtools_detector",
+      "name": "https://blog.aepkill.com/demos/devtools-detector/",
+      "type": "fingerprint_devtools",
+      "url": "https://blog.aepkill.com/demos/devtools-detector/",
+      "expected": "devtools_close",
+      "criteria": "应该显示 ‘devtools status: close’",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "plugins_load",
+      "name": "分身自带插件是否正常加载",
+      "type": "client_plugins",
+      "url": null,
+      "expected": "manual",
+      "criteria": "打开浏览器后右上角应该能正常加载这四个插件，且都能正常点开",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "password_save",
+      "name": "普通会话能否保存密码",
+      "type": "client_password_save",
+      "url": "https://www.wdku.net/",
+      "expected": "manual",
+      "criteria": "访问 https://www.wdku.net/，使用用户名 713180a1a383@drmail.in 和密码 5bO^I(!IMz)ZRGjh 登录，浏览器应该会提示保存密码。关闭浏览器后刷新分身详情页面，在保存的密码记录中应该能看到这个网站",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "password_autofill",
+      "name": "普通会话能否代填密码",
+      "type": "client_password_autofill",
+      "url": "https://www.wdku.net/",
+      "expected": "manual",
+      "criteria": "‘普通会话能否保存密码’完成后，再次打开浏览器访问 https://www.wdku.net/，退出登录后再次进入登录页面，检查是否能使用浏览器保存的密码自动代填并登录成功",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "cookie_sync",
+      "name": "Cookie同步",
+      "type": "client_cookie_sync",
+      "url": "https://www.wdku.net/",
+      "expected": "manual",
+      "criteria": "‘普通会话能否保存密码’完成后，换一台电脑打开分身浏览器访问 https://www.wdku.net/，检查是否处于已登录状态",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    }
+  ]
+}
