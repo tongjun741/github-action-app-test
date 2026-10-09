@@ -114,9 +114,15 @@ async function run() {
     if (browser) {
       try {
         if (engine === 'puppeteer') {
-          // Electron 客户端上 browser.newPage()（Target.createTarget）易挂起；优先复用已存在的 page
-          const pages = await browser.pages().catch(() => []);
-          page = (pages && pages.length) ? pages[0] : await browser.newPage();
+          // 现在连的是「分身内核浏览器」（真 Chromium，支持 Target.createTarget）→ 优先 newPage 拿一个
+          // 干净、可控的页；若失败（例如误连到 Electron 主壳，主壳不支持建 target）再回退复用已有 page。
+          try {
+            page = await browser.newPage();
+          } catch (e) {
+            console.error(`[runner] newPage 失败，回退复用已有 page: ${e.message}`);
+            const pages = await browser.pages().catch(() => []);
+            page = (pages && pages.length) ? pages[0] : null;
+          }
           if (page && page.setDefaultTimeout) page.setDefaultTimeout(45000);
         } else {
           context = await browser.newContext();
@@ -148,6 +154,13 @@ async function run() {
         }
       } else {
         try {
+          // 若 page 已被关闭（分身页可能被客户端回收），重建一个，避免整轮用例因 Session closed 全错
+          if (engine === 'puppeteer' && page && typeof page.isClosed === 'function' && page.isClosed()) {
+            try {
+              page = await browser.newPage();
+              if (page && page.setDefaultTimeout) page.setDefaultTimeout(45000);
+            } catch (_) { /* 保持原 page，让本用例如实报错 */ }
+          }
           res = await Promise.race([
             checkCase(page, c, { proxyIp, engine }),
             new Promise((_, rej) => setTimeout(() => rej(new Error('用例判定超时(120s)')), 120000)),

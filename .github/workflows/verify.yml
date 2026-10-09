@@ -158,7 +158,11 @@ jobs:
           sudo dpkg -i /tmp/hy.deb || sudo apt-get -f install -y
           sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
           mkdir -p ~/.config/HuaYoung
+          # 客户端安装到 /opt（root 属主）：放开 main.js 所在资源的写权限，否则 modifyMain.js 注入
+          # remoteDebugPort 会 EACCES 失败 → 分身内核不会带 --remote-debugging-port=9221 → CDP 连不上。
+          # Linux 客户端可能用 app.asar（打包）或 resources/app（解包）两种布局，都处理。
           if [ -f /opt/花漾客户端/resources/app.asar ]; then sudo chmod a+w /opt/花漾客户端/resources/app.asar; fi
+          if [ -d /opt/花漾客户端/resources/app ]; then sudo chmod -R a+w /opt/花漾客户端/resources/app; fi
 
       - name: 安装客户端 (macOS)
         if: startsWith(matrix.install, 'mac')
