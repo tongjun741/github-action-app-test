@@ -56,8 +56,8 @@ async function loadBrowser(opts) {
         console.log(`[runner] 已用 puppeteer-core 连接真实客户端 CDP: ${cdp}`);
         return { browser, proxyIp, mode: 'cdp', engine };
       } catch (e) {
-        console.error(`[runner] puppeteer 连接 CDP 失败，降级为无浏览器模式（仅记录 error）: ${e.message}`);
-        return { browser: null, proxyIp, mode: 'smoke', engine };
+        console.error(`[runner] puppeteer 连接 CDP 失败: ${e.message}`);
+        return { browser: null, proxyIp, mode: 'smoke', engine, cdpRequested: true, cdpError: e.message };
       }
     }
     try {
@@ -66,8 +66,8 @@ async function loadBrowser(opts) {
       console.log(`[runner] 已连接真实客户端 CDP: ${cdp}`);
       return { browser, proxyIp, mode: 'cdp', engine };
     } catch (e) {
-      console.error(`[runner] Playwright 连接 CDP 失败，降级为无浏览器模式（仅记录 error）: ${e.message}`);
-      return { browser: null, proxyIp, mode: 'smoke', engine };
+      console.error(`[runner] Playwright 连接 CDP 失败: ${e.message}`);
+      return { browser: null, proxyIp, mode: 'smoke', engine, cdpRequested: true, cdpError: e.message };
     }
   }
   // 本地开发用无头浏览器（仅 Playwright 支持）
@@ -93,7 +93,7 @@ async function run() {
     ? args.platforms.split(',').map((s) => s.trim())
     : allPlatforms;
 
-  const { browser, proxyIp, mode, engine } = await loadBrowser(args);
+  let { browser, proxyIp, mode, engine, cdpRequested, cdpError } = await loadBrowser(args);
 
   // 验证目标：团队内的「UA152」分身（CDP 端口 9221）。env 可覆盖 spec 默认值。
   const teamId = process.env.TEAM_ID || matrix.meta.teamId || '';
@@ -133,10 +133,15 @@ async function run() {
       }
       let res;
       if (!browser) {
-        // smoke / 无浏览器：自动项 skipped，人工项 manual
-        res = ['manual_captcha', 'client_plugins', 'client_password_save', 'client_password_autofill', 'client_cookie_sync'].includes(c.type)
-          ? { status: 'manual', detail: '需人工按验证标准确认' }
-          : { status: 'skipped', detail: '无浏览器环境（CDP 未连上），未执行自动判定' };
+        if (cdpRequested) {
+          // 真实跑模式（显式指定 --cdp）却连不上 —— 这是真失败，不能静默跳过（防假绿）
+          res = { status: 'error', detail: `CDP 连接失败（真实跑模式，未执行判定）: ${cdpError || '未知原因'}` };
+        } else {
+          // smoke / 无浏览器：自动项 skipped，人工项 manual
+          res = ['manual_captcha', 'client_plugins', 'client_password_save', 'client_password_autofill', 'client_cookie_sync'].includes(c.type)
+            ? { status: 'manual', detail: '需人工按验证标准确认' }
+            : { status: 'skipped', detail: '无浏览器环境（CDP 未连上），未执行自动判定' };
+        }
       } else {
         try {
           res = await checkCase(page, c, { proxyIp, engine });
@@ -190,6 +195,10 @@ async function run() {
   // 退出码：只要有「fail」(真实验证不通过) 或「error」(判定过程异常) 即非 0，便于 CI 标红；
   // 纯 manual / skipped / na / pass 不视为失败。
   let hasProblem = false;
+  if (cdpRequested && !browser) {
+    console.error('[runner] 真实跑模式（--cdp 已指定）但 CDP 连接失败，判定为失败（非 0 退出）');
+    hasProblem = true;
+  }
   for (const arr of Object.values(resultsByPlatform)) {
     for (const r of arr) {
       if (r.status === 'fail' || r.status === 'error') { hasProblem = true; break; }
