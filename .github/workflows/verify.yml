@@ -75,7 +75,8 @@ jobs:
         include:
           - { platform: "Windows 10",  os: windows-latest, slug: Windows_10,  client: 'C:\Program Files\HuaYoung\花漾客户端.exe', install: 'win10' }
           - { platform: "macOS arm64", os: macos-14,      slug: macOS_arm64, client: '/Applications/花漾客户端.app/Contents/MacOS/花漾客户端', install: 'mac-arm64' }
-          - { platform: "macOS x64",   os: macos-13,      slug: macOS_x64,   client: '/Applications/花漾客户端.app/Contents/MacOS/花漾客户端', install: 'mac-x64' }
+          # macos-13 已于 2025-12-04 退役（pin 它会直接失败/永远排不上）；x86_64 改用 macos-15-intel
+          - { platform: "macOS x64",   os: macos-15-intel, slug: macOS_x64,   client: '/Applications/花漾客户端.app/Contents/MacOS/花漾客户端', install: 'mac-x64' }
           - { platform: "Ubuntu 22",   os: ubuntu-22.04,   slug: Ubuntu_22,   client: '/opt/花漾客户端/huayoung', install: 'ubuntu' }
           # Windows 7 不走此矩阵（无 GitHub Win7 托管 runner），改由下方 verify-win7 (Docker) job 单独跑
     runs-on: ${{ github.event.inputs.runs_on_override || matrix.os }}
@@ -202,15 +203,9 @@ jobs:
         continue-on-error: true
         run: node modifyMain.js
 
-      # ---------- Windows: 预置 chromedriver 108（WDIO 驱动主壳用；WDIO 会自动在该路径查找） ----------
-      - name: 预置 chromedriver 108 (Windows)
-        if: startsWith(matrix.install, 'win')
-        shell: pwsh
-        run: |
-          $dst = "$env:TEMP\chromedriver\win64-108\chromedriver-win64"
-          New-Item -ItemType Directory -Force -Path $dst | Out-Null
-          Copy-Item -Path "./tools/chromedriver/108.0.5359.71/win32/chromedriver.exe" -Destination "$dst\chromedriver.exe" -Force
-          Get-ChildItem -Path "$env:TEMP\chromedriver\win64-108"
+      # 注：chromedriver 不再预置/自动下载 —— e2e-verify.cjs 会显式传
+      # `wdio:chromedriverOptions.binary` 指向仓库内 tools/chromedriver/108.0.5359.71/<平台>，
+      # 从根上避免 WDIO 去 Chrome for Testing 下载 v108（CfT 只提供 v115+ → 404）。
 
       # ---------- WDIO 驱动主壳：登录 → 打开目标分身 → 连分身内核浏览器 CDP 跑 14 项 ----------
       # 关键：不要再给客户端命令行加 --remote-debugging-port，否则「主壳(Electron/108)」会抢占 9221，
@@ -232,7 +227,9 @@ jobs:
         if: always()
         with:
           name: results-${{ matrix.slug }}
-          path: results-${{ matrix.slug }}.json
+          path: |
+            results-${{ matrix.slug }}.json
+            screenshot-${{ matrix.slug }}.png
           if-no-files-found: warn
 
   verify-win7:
@@ -332,18 +329,31 @@ jobs:
       - name: 取回 Win7 验证结果
         if: always()
         run: |
+          FAIL=0
           if [ -f "win7/shared/work/results-Windows_7.json" ]; then
             cp win7/shared/work/results-Windows_7.json results-Windows_7.json
+            # VM 内正常跑完时 results 数组非空；为空说明 e2e-verify 在内就挂了
+            if ! node -e "const d=require('./results-Windows_7.json'); process.exit(Array.isArray(d.results)&&d.results.length>0?0:1)"; then
+              echo "::warning::Win7 results 为空，VM 内验证未真正执行"
+              FAIL=1
+            fi
           else
-            echo "警告：未生成 results-Windows_7.json，写入空结果占位"
-            echo '{"meta":{"kernel":"152","platform":"Windows 7","teamId":"'"$TEAM_ID"'","cloneName":"'"$CLONE_NAME"'"},"platform":"Windows 7","results":[]}' > results-Windows_7.json
+            echo "::warning::VM 未生成 results-Windows_7.json，写入空结果占位"
+            echo '{"meta":{"kernel":"152","platform":"Windows 7","teamId":"'"$TEAM_ID"'","cloneName":"'"$CLONE_NAME"'"},"platform":"Windows 7","results":[],"fatal":"VM 未生成结果（见 start.log）"}' > results-Windows_7.json
+            FAIL=1
           fi
+          if [ -f "win7/shared/work/screenshot-Windows_7.png" ]; then
+            cp win7/shared/work/screenshot-Windows_7.png screenshot-Windows_7.png || true
+          fi
+          exit $FAIL
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: results-Windows_7
-          path: results-Windows_7.json
+          path: |
+            results-Windows_7.json
+            screenshot-Windows_7.png
           if-no-files-found: warn
 
   report:

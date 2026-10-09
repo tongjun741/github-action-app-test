@@ -14,7 +14,9 @@
  * 本脚本把 (2)(3) 串成一步，跑完即产出 results-<platform>.json。
  *
  * 环境变量：
- *   CLIENT_BINARY         客户端可执行文件（缺省按平台推断）
+ *   CLIENT_BINARY         客户端可执行文件（缺省按平台推断；Windows 下精确路径不存在时自动在
+ *                         Program Files\HuaYoung / %LOCALAPPDATA%\Programs\HuaYoung 里扫 *.exe）
+ *   CHROMEDRIVER_BIN      chromedriver 可执行文件（缺省用仓库内 tools/chromedriver/108.0.5359.71/<平台>）
  *   E2E_PLATFORM          平台名（须与 matrix.json 一致，如 "Windows 10" / "macOS arm64" / "Ubuntu 22" / "Windows 7"）
  *   CLONE_NAME            目标分身名（默认 UA152）
  *   TEAM_NAME            登录后要选的团队显示名（默认取 tests/config.js productConfig.teamName）
@@ -26,6 +28,7 @@
  */
 const os = require('node:os');
 const fs = require('node:fs');
+const path = require('node:path');
 const process = require('node:process');
 const { spawnSync } = require('node:child_process');
 const { remote } = require('webdriverio');
@@ -34,26 +37,78 @@ const login = require('./include/login');
 const { productConfig } = require('./config');
 
 const PLATFORM = process.env.E2E_PLATFORM || 'Windows 10';
+const SLUG = PLATFORM.replace(/\s+/g, '_');
 const CLONE = process.env.CLONE_NAME || 'UA152';
 const CDP_PORT = Number(process.env.REMOTE_DEBUG_PORT || 9221);
 const CDP = process.env.CLIENT_CDP_ENDPOINT || `http://127.0.0.1:${CDP_PORT}`;
-const OUT = process.env.OUT || `results-${PLATFORM.replace(/\s+/g, '_')}.json`;
+const OUT = process.env.OUT || `results-${SLUG}.json`;
+const SHOT = `screenshot-${SLUG}.png`;
 const OPEN_ONLY = process.env.OPEN_CLONE_ONLY === '1';
 
 const LIST_LOAD_TIMEOUT = 120 * 1000;
 const DETAIL_LOAD_TIMEOUT = 120 * 1000;
 
 const log = (...a) => console.log('[e2e-verify]', ...a);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** 在给定目录里找第一个 *.exe（绕开 bat/GBK 中文路径编码坑） */
+function firstExeIn(dir) {
+  try {
+    const f = fs.readdirSync(dir).find((n) => n.toLowerCase().endsWith('.exe'));
+    return f ? path.join(dir, f) : null;
+  } catch (_) {
+    return null;
+  }
+}
 
 function resolveBinary() {
-  if (process.env.CLIENT_BINARY) return process.env.CLIENT_BINARY;
-  if (os.platform() === 'darwin') return '/Applications/花漾客户端.app/Contents/MacOS/花漾客户端';
-  if (os.platform() === 'linux') return '/opt/花漾客户端/huayoung';
+  if (process.env.CLIENT_BINARY && fs.existsSync(process.env.CLIENT_BINARY)) {
+    return process.env.CLIENT_BINARY;
+  }
+  if (os.platform() === 'darwin') {
+    return '/Applications/花漾客户端.app/Contents/MacOS/花漾客户端';
+  }
+  if (os.platform() === 'linux') {
+    return '/opt/花漾客户端/huayoung';
+  }
+  // Windows：精确路径优先，找不到就在常见安装目录扫 *.exe（Win7 上 exe 名可能与 Win10 不同）
+  const cands = [
+    process.env.CLIENT_BINARY,
+    'C:\\Program Files\\HuaYoung',
+    process.env['ProgramFiles'] ? path.join(process.env['ProgramFiles'], 'HuaYoung') : null,
+    process.env['ProgramFiles(x86)'] ? path.join(process.env['ProgramFiles(x86)'], 'HuaYoung') : null,
+    process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Programs', 'HuaYoung') : null,
+    'C:\\Program Files\\HuaYoung',
+    'C:\\Program Files (x86)\\HuaYoung',
+  ].filter(Boolean);
+  for (const c of cands) {
+    if (c.toLowerCase().endsWith('.exe') && fs.existsSync(c)) return c;
+    const hit = firstExeIn(c);
+    if (hit) return hit;
+  }
   return 'C:\\Program Files\\HuaYoung\\花漾客户端.exe';
 }
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
+/**
+ * chromedriver 108 的本地二进制。
+ * 必须显式指定，否则 WDIO 会去 Chrome for Testing 下载 v108 → 404
+ * （CfT 只提供 v115+）。见 https://webdriver.io/docs/driverbinaries
+ */
+function resolveChromedriver() {
+  if (process.env.CHROMEDRIVER_BIN && fs.existsSync(process.env.CHROMEDRIVER_BIN)) return process.env.CHROMEDRIVER_BIN;
+  const base = path.resolve(__dirname, '..', 'tools', 'chromedriver', '108.0.5359.71');
+  let p;
+  if (os.platform() === 'darwin') {
+    p = path.join(base, os.arch() === 'arm64' ? 'mac-arm64' : 'mac-x64', 'chromedriver');
+  } else if (os.platform() === 'linux') {
+    p = path.join(base, 'linux64', 'chromedriver');
+  } else {
+    p = path.join(base, 'win32', 'chromedriver.exe');
+  }
+  try {
+    if (os.platform() !== 'win32') fs.chmodSync(p, 0o755); // git 从 Windows 提交后可能丢执行位
+  } catch (_) { /* ignore */ }
+  return p;
 }
 
 function writePlaceholder(reason) {
@@ -73,6 +128,56 @@ function writePlaceholder(reason) {
   } catch (_) { /* ignore */ }
 }
 
+async function saveShot(browser, name) {
+  try {
+    const b64 = await browser.takeScreenshot();
+    fs.writeFileSync(name, Buffer.from(b64, 'base64'));
+    log(`已保存截图: ${name}`);
+  } catch (e) {
+    log(`截图失败(忽略): ${e.message}`);
+  }
+}
+
+async function dumpAnchorTexts(browser) {
+  try {
+    const all = await browser.execute(() =>
+      Array.from(document.querySelectorAll('a')).map((a) => (a.textContent || '').trim()).filter(Boolean));
+    log(`[diag] 当前 <a> 文本(${all.length}): ${JSON.stringify(all.slice(0, 80))}`);
+  } catch (e) {
+    log(`[diag] dump <a> 失败: ${e.message}`);
+  }
+}
+
+/** 分身列表里的分身名（找到 <a> 里形如 UA123 的文本） */
+async function listCloneNamesFromAnchors(browser) {
+  try {
+    return await browser.execute(() =>
+      Array.from(document.querySelectorAll('a'))
+        .map((a) => (a.textContent || '').trim())
+        .filter((t) => /^UA\d+$/i.test(t)));
+  } catch (_) {
+    return [];
+  }
+}
+
+/** 兜底：任意叶子节点上恰好是 UA123 的文本（新版 UI 可能不是 <a>） */
+async function listCloneNamesAnyEl(browser) {
+  try {
+    return await browser.execute(() => {
+      const s = new Set();
+      document.querySelectorAll('*').forEach((el) => {
+        if (el.children.length === 0) {
+          const t = (el.textContent || '').trim();
+          if (/^UA\d+$/i.test(t)) s.add(t);
+        }
+      });
+      return Array.from(s);
+    });
+  } catch (_) {
+    return [];
+  }
+}
+
 /** 进入分身列表并打开目标分身（复用 origin e2eTest 的 UI 路径与选择器） */
 async function openClone(browser) {
   log('进入首页');
@@ -83,18 +188,47 @@ async function openClone(browser) {
   await browser.$('.icon-chrome_outline').waitForExist({ timeout: 60 * 1000 });
   await browser.$('.icon-chrome_outline').click();
 
-  // 诊断：列出可见分身链接，便于选择器失效时定位
-  try {
-    const texts = await browser.execute(() =>
-      Array.from(document.querySelectorAll('a')).map((a) => (a.textContent || '').trim()).filter(Boolean));
-    log(`[diag] 分身列表 <a> 文本(${texts.length}): ${JSON.stringify(texts.slice(0, 60))}`);
-  } catch (e) {
-    log(`[diag] 分身列表诊断失败(不影响主流程): ${e.message}`);
+  // 分身列表在 12.9 为异步渲染：轮询等待出现 UAxxx，最多 90s；
+  // 期间每 15s dump 一次 <a>，用于区分「列表未渲染」与「列表里确实没有该分身」。
+  let names = [];
+  const deadline = Date.now() + 90 * 1000;
+  let lastDump = 0;
+  while (Date.now() < deadline) {
+    names = await listCloneNamesFromAnchors(browser);
+    if (names.length) break;
+    if (Date.now() - lastDump > 15000) {
+      lastDump = Date.now();
+      await dumpAnchorTexts(browser);
+    }
+    await sleep(2000);
+  }
+  log(`[diag] 分身名(<a> 中 ${names.length}): ${JSON.stringify(names)}`);
+
+  let target = names.find((n) => n.toUpperCase() === CLONE.toUpperCase())
+    || names.find((n) => n.toUpperCase().includes(CLONE.toUpperCase()));
+
+  // 兜底：任意元素文本匹配
+  let viaAnyEl = false;
+  if (!target) {
+    const any = await listCloneNamesAnyEl(browser);
+    log(`[diag] 分身名(任意元素 ${any.length}): ${JSON.stringify(any)}`);
+    target = any.find((n) => n.toUpperCase() === CLONE.toUpperCase())
+      || any.find((n) => n.toUpperCase().includes(CLONE.toUpperCase()));
+    viaAnyEl = !!target;
   }
 
-  log(`等待分身出现: ${CLONE}`);
-  await browser.$(`//a[contains(.,"${CLONE}")]`).waitForExist({ timeout: LIST_LOAD_TIMEOUT });
-  await browser.$(`//a[contains(.,"${CLONE}")]`).click();
+  if (!target) {
+    await dumpAnchorTexts(browser);
+    await saveShot(browser, SHOT);
+    throw new Error(`分身列表未找到「${CLONE}」；可见分身: ${names.length ? names.join(', ') : '(空/列表未渲染)'}`);
+  }
+
+  log(`选中分身: ${target}${viaAnyEl ? '（经任意元素定位）' : ''}`);
+  if (viaAnyEl) {
+    await browser.$(`//*[normalize-space(text())="${target}"]`).click();
+  } else {
+    await browser.$(`//a[contains(.,"${target}")]`).click();
+  }
 
   log('进入分身详情页，等待「打开浏览器」');
   const openBtn = '//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]';
@@ -104,7 +238,10 @@ async function openClone(browser) {
   log('处理「继续访问」并等待「正在访问」');
   let n = 0;
   for (;;) {
-    if (++n > 100) throw new Error('等待打开会话超时（未出现「正在访问」）');
+    if (++n > 100) {
+      await saveShot(browser, SHOT);
+      throw new Error('等待打开会话超时（未出现「正在访问」）');
+    }
 
     try {
       await browser.$('//span[text()="继续访问"]').waitForExist({ timeout: 5 * 1000 });
@@ -133,7 +270,11 @@ async function openClone(browser) {
 async function main() {
   const binary = resolveBinary();
   if (!fs.existsSync(binary)) {
-    throw new Error(`客户端可执行文件不存在: ${binary}`);
+    throw new Error(`客户端可执行文件不存在: ${binary}（已尝试扫描 Program Files\\HuaYoung / %LOCALAPPDATA%\\Programs\\HuaYoung）`);
+  }
+  const chromedriver = resolveChromedriver();
+  if (!fs.existsSync(chromedriver)) {
+    throw new Error(`chromedriver 不存在: ${chromedriver}`);
   }
 
   const config = {
@@ -145,14 +286,17 @@ async function main() {
 
   log(`平台=${PLATFORM} 目标分身=${CLONE} 团队=${config.teamName} 账号=${config.username} CDP=${CDP}`);
   log(`客户端=${binary}`);
+  log(`chromedriver=${chromedriver}`);
 
   const caps = {
     browserName: 'chrome',
     browserVersion: '108',
     'goog:chromeOptions': { binary },
+    // 必须显式指定，禁用 WDIO 自动下载（CfT 无 v108 → 404）
+    'wdio:chromedriverOptions': { binary: chromedriver },
   };
   if (os.platform() === 'darwin') {
-    caps['wdio:chromedriverOptions'] = { cacheDir: '/tmp' };
+    caps['wdio:chromedriverOptions'].cacheDir = '/tmp';
   }
 
   let browser;
@@ -171,11 +315,17 @@ async function main() {
         log('[diag] 登录失败，页面文本:', JSON.stringify(txt));
         log('[diag] 可见 span 文本:', JSON.stringify(spans));
       } catch (_) { /* ignore */ }
+      await saveShot(browser, SHOT);
       throw e;
     }
     log('登录完成');
 
-    await openClone(browser);
+    try {
+      await openClone(browser);
+    } catch (e) {
+      await saveShot(browser, SHOT);
+      throw e;
+    }
 
     if (OPEN_ONLY) {
       log('OPEN_CLONE_ONLY=1 → 仅打开分身，跳过验证');
