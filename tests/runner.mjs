@@ -45,6 +45,7 @@ async function loadBrowser(opts) {
   const proxy = opts.proxy || process.env.PROXY;
   const proxyIp = opts.proxyIp || process.env.PROXY_IP;
   const engine = (opts.engine || 'playwright').toLowerCase();
+  const cdpRequested = !!cdp; // 只要显式给了 --cdp/环境变量，就算「真实跑」，失败必须判红（防假绿）
 
   if (cdp) {
     if (engine === 'puppeteer') {
@@ -54,7 +55,7 @@ async function loadBrowser(opts) {
         const puppeteer = pptr.default || pptr;
         const browser = await puppeteer.connect({ browserURL: cdp, protocolTimeout: 60000 });
         console.log(`[runner] 已用 puppeteer-core 连接真实客户端 CDP: ${cdp}`);
-        return { browser, proxyIp, mode: 'cdp', engine };
+        return { browser, proxyIp, mode: 'cdp', engine, cdpRequested };
       } catch (e) {
         console.error(`[runner] puppeteer 连接 CDP 失败: ${e.message}`);
         return { browser: null, proxyIp, mode: 'smoke', engine, cdpRequested: true, cdpError: e.message };
@@ -64,7 +65,7 @@ async function loadBrowser(opts) {
       const { chromium } = await import('playwright');
       const browser = await chromium.connectOverCDP(cdp);
       console.log(`[runner] 已连接真实客户端 CDP: ${cdp}`);
-      return { browser, proxyIp, mode: 'cdp', engine };
+      return { browser, proxyIp, mode: 'cdp', engine, cdpRequested };
     } catch (e) {
       console.error(`[runner] Playwright 连接 CDP 失败: ${e.message}`);
       return { browser: null, proxyIp, mode: 'smoke', engine, cdpRequested: true, cdpError: e.message };
@@ -78,10 +79,10 @@ async function loadBrowser(opts) {
       proxy: proxy ? { server: proxy, bypass: '<-loopback>' } : undefined,
     });
     console.log(`[runner] 已启动无头 chromium${proxy ? ` (proxy=${proxy})` : ''}`);
-    return { browser, proxyIp, mode: 'headless', engine };
+    return { browser, proxyIp, mode: 'headless', engine, cdpRequested };
   } catch (e) {
     console.log(`[runner] 未找到 Playwright/Chromium，进入 smoke 模式: ${e.message}`);
-    return { browser: null, proxyIp, mode: 'smoke', engine };
+    return { browser: null, proxyIp, mode: 'smoke', engine, cdpRequested };
   }
 }
 
@@ -176,7 +177,10 @@ async function run() {
 
   if (browser) {
     if (mode === 'cdp') {
-      // 不要关闭真实客户端
+      // 不要关闭真实客户端；但 puppeteer 的 WS 连接会保持事件循环，需 disconnect
+      if (engine === 'puppeteer' && typeof browser.disconnect === 'function') {
+        try { browser.disconnect(); } catch (_) {}
+      }
     } else {
       await browser.close().catch(() => {});
     }
@@ -217,6 +221,8 @@ async function run() {
     console.error('[runner] 存在失败/异常用例，进程以非 0 退出（便于 CI 标红）');
     process.exit(1);
   }
+  // 显式退出：puppeteer 连上真实客户端后其 WS 连接会保持事件循环，若不 process.exit 会永久挂起
+  process.exit(0);
 }
 
 run().catch((e) => {
