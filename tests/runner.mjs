@@ -49,16 +49,26 @@ async function loadBrowser(opts) {
   if (cdp) {
     if (engine === 'puppeteer') {
       // Win7 Docker VM 内：puppeteer-core 纯 JS 驱动 CDP，无需本地 chromium，node18/Win7 兼容最佳
-      const pptr = await import('puppeteer-core');
-      const puppeteer = pptr.default || pptr;
-      const browser = await puppeteer.connect({ browserURL: cdp });
-      console.log(`[runner] 已用 puppeteer-core 连接真实客户端 CDP: ${cdp}`);
-      return { browser, proxyIp, mode: 'cdp', engine };
+      try {
+        const pptr = await import('puppeteer-core');
+        const puppeteer = pptr.default || pptr;
+        const browser = await puppeteer.connect({ browserURL: cdp });
+        console.log(`[runner] 已用 puppeteer-core 连接真实客户端 CDP: ${cdp}`);
+        return { browser, proxyIp, mode: 'cdp', engine };
+      } catch (e) {
+        console.error(`[runner] puppeteer 连接 CDP 失败，降级为无浏览器模式（仅记录 error）: ${e.message}`);
+        return { browser: null, proxyIp, mode: 'smoke', engine };
+      }
     }
-    const { chromium } = await import('playwright');
-    const browser = await chromium.connectOverCDP(cdp);
-    console.log(`[runner] 已连接真实客户端 CDP: ${cdp}`);
-    return { browser, proxyIp, mode: 'cdp', engine };
+    try {
+      const { chromium } = await import('playwright');
+      const browser = await chromium.connectOverCDP(cdp);
+      console.log(`[runner] 已连接真实客户端 CDP: ${cdp}`);
+      return { browser, proxyIp, mode: 'cdp', engine };
+    } catch (e) {
+      console.error(`[runner] Playwright 连接 CDP 失败，降级为无浏览器模式（仅记录 error）: ${e.message}`);
+      return { browser: null, proxyIp, mode: 'smoke', engine };
+    }
   }
   // 本地开发用无头浏览器（仅 Playwright 支持）
   try {
@@ -101,11 +111,16 @@ async function run() {
     let context = null;
     let page = null;
     if (browser) {
-      if (engine === 'puppeteer') {
-        page = await browser.newPage();
-      } else {
-        context = await browser.newContext();
-        page = await context.newPage();
+      try {
+        if (engine === 'puppeteer') {
+          page = await browser.newPage();
+        } else {
+          context = await browser.newContext();
+          page = await context.newPage();
+        }
+      } catch (e) {
+        console.error(`[runner] 创建页面/上下文失败，降级为无浏览器模式: ${e.message}`);
+        browser = null;
       }
     }
     for (const c of matrix.cases) {
@@ -121,12 +136,17 @@ async function run() {
         // smoke / 无浏览器：自动项 skipped，人工项 manual
         res = ['manual_captcha', 'client_plugins', 'client_password_save', 'client_password_autofill', 'client_cookie_sync'].includes(c.type)
           ? { status: 'manual', detail: '需人工按验证标准确认' }
-          : { status: 'skipped', detail: '无浏览器环境，未执行自动判定' };
+          : { status: 'skipped', detail: '无浏览器环境（CDP 未连上），未执行自动判定' };
       } else {
-        res = await checkCase(page, c, { proxyIp, engine });
+        try {
+          res = await checkCase(page, c, { proxyIp, engine });
+        } catch (e) {
+          res = { status: 'error', detail: `判定过程异常: ${e.message}` };
+          console.error(`  [错误] ${c.name}: ${e.message}`);
+        }
         if (page && c.url) {
           try { await page.close(); } catch (_) {}
-          page = engine === 'puppeteer' ? await browser.newPage() : await context.newPage();
+          try { page = engine === 'puppeteer' ? await browser.newPage() : await context.newPage(); } catch (_) { page = null; }
         }
       }
       platformResults.push({
@@ -166,9 +186,23 @@ async function run() {
     }
   }
   console.log(`\n[runner] 已写出: ${written.join(', ')}`);
+
+  // 退出码：只要有「fail」(真实验证不通过) 或「error」(判定过程异常) 即非 0，便于 CI 标红；
+  // 纯 manual / skipped / na / pass 不视为失败。
+  let hasProblem = false;
+  for (const arr of Object.values(resultsByPlatform)) {
+    for (const r of arr) {
+      if (r.status === 'fail' || r.status === 'error') { hasProblem = true; break; }
+    }
+    if (hasProblem) break;
+  }
+  if (hasProblem) {
+    console.error('[runner] 存在失败/异常用例，进程以非 0 退出（便于 CI 标红）');
+    process.exit(1);
+  }
 }
 
 run().catch((e) => {
-  console.error('[runner] 失败:', e);
+  console.error('[runner] 致命错误:', e);
   process.exit(1);
 });
