@@ -52,12 +52,14 @@ async function fingerprint_pixelscan(page, c, opts) {
   return { status: other ? 'fail' : 'pass', detail: `proxyHint=${proxy} otherWarn=${other}` };
 }
 
-// 4) iphey —— 全绿（无 leak/mismatch/detected）
+// 4) iphey —— 全绿（无 Unreliable / leak / mismatch / detected）
+// 判定口径（用户确认 2026-10-09）：iphey 首页给出 “Unreliable” 即算【真实失败 fail】，不降级。
 async function fingerprint_iphey(page, c, opts) {
   await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
   const text = await bodyText(page);
-  const red = /not good|bad|\bleak\b|mismatch|detected|暴露/i.test(text);
-  return { status: red ? 'fail' : text.length > 50 ? 'pass' : 'manual', detail: text.slice(0, 140).replace(/\n/g, ' ') };
+  const m = text.match(/unreliable|not good|bad|\bleak\b|mismatch|detected|暴露/i);
+  const red = !!m;
+  return { status: red ? 'fail' : text.length > 50 ? 'pass' : 'manual', detail: (red ? `命中风险词「${m[0]}」; ` : '') + text.slice(0, 140).replace(/\n/g, ' ') };
 }
 
 // 5) browserleaks/ip —— 自采集 WebRTC IP，与代理 IP 比对
@@ -105,6 +107,8 @@ async function fingerprint_whoer(page, c, opts) {
 }
 
 // 7) ipbinding —— WebRTC blocked
+// 判定口径（用户确认 2026-10-09）：CI 无代理时，分身自配的 SOCKS 不可达 -> 导航抛错
+//   -> 保持 error（不降级为 manual/skipped）。
 async function fingerprint_ipbinding(page, c, opts) {
   await gotoSafe(page, c.url, 'domcontentloaded', 30000, opts?.engine);
   const text = await bodyText(page);
