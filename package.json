@@ -2,7 +2,6 @@
   "name": "huayoung-e2e-verifier",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "description": "按 生产环境-12.9-148内核.xlsx 验证花漾浏览器全部项目，并生成 Excel 报告",
   "scripts": {
     "verify": "node tests/runner.mjs",
@@ -10,6 +9,7 @@
     "ci": "node tests/runner.mjs && node tests/report.mjs --inputs results-*.json"
   },
   "dependencies": {
+    "@electron/asar": "^3.2.10",
     "exceljs": "^4.4.0",
     "playwright": "^1.48.0"
   }

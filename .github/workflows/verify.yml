@@ -3,9 +3,22 @@ name: HuaYoung 浏览器验证 (团队213505445724246 / UA152分身 / 152内核)
 # 按 生产环境-12.9-148内核.xlsx 验证全部项目，并生成 Excel 报告。
 # 验证目标：团队 213505445724246 内的「UA152」分身（分身浏览器 CDP 端口 9221），
 # 断言其 UA 含 Chromium 152 内核（Chrome/152.）。
+#
+# 真实跑（非 smoke）：每个平台在 GitHub 托管 runner 上
+#   1) 下载并安装对应平台的花漾客户端（参考 Windows10.yml / Linux.yml / macOS.yml / Windows7-docker.yml）
+#   2) node modifyMain.js —— 给客户端 main.js 注入 remoteDebugPort=9221 + 假媒体开关
+#   3) node tools/launch-client.mjs —— 启动客户端并以 --remote-debugging-port=9221 暴露 CDP
+#   4) node tests/runner.mjs --cdp http://127.0.0.1:9221 —— 连接真实客户端，按矩阵逐项判定（UA/指纹站等）
+#   5) 上传 results-<平台>.json；report job 合并生成 report.xlsx
+#
+# 提示：Windows 7 真实运行需 Win7 系统；GitHub 无 Win7 托管 runner，可用 workflow_dispatch
+#       的 runs_on_override 指向自托管的 Win7 runner，否则 windows-latest 上跑 Win7 客户端构建为尽力而为。
 on:
   workflow_dispatch:
     inputs:
+      software_download_url:
+        description: '各平台客户端下载地址（留空则按平台默认；可覆盖单一平台）'
+        required: false
       proxy:
         description: '代理地址，如 http://user:pass@host:port'
         required: false
@@ -25,7 +38,7 @@ on:
         default: 'UA152'
         required: false
       runs_on_override:
-        description: '覆盖所有平台的 runs-on（留空=各平台默认 GitHub 托管 runner；填 self-hosted 或具体 label 则全部用该 label）。分身验证需已登录客户端的自托管 runner。'
+        description: '覆盖所有平台的 runs-on（留空=各平台默认 GitHub 托管 runner；填 self-hosted 或具体 label 则全部用该 label）。分身验证需已登录客户端的 runner。'
         required: false
   schedule:
     - cron: '0 9 * * 1' # 每周一 09:00 UTC 自动跑一轮
@@ -33,6 +46,8 @@ on:
     paths:
       - 'tests/**'
       - 'tools/**'
+      - 'modifyMain.js'
+      - 'package.json'
       - '.github/workflows/verify.yml'
 
 permissions:
@@ -46,18 +61,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { platform: "Windows 10",  os: windows-latest, slug: Windows_10 }
-          - { platform: "macOS arm64", os: macos-14,       slug: macOS_arm64 }
-          - { platform: "macOS x64",   os: macos-13,       slug: macOS_x64 }
-          - { platform: "Ubuntu 22",   os: ubuntu-22.04,   slug: Ubuntu_22 }
-          # Windows 7 无 GitHub 托管 runner，生产请改用 self-hosted Win7 runner：
-          - { platform: "Windows 7",   os: "windows-latest", slug: Windows_7 }
-    # 分身（UA152）需在其所属团队账号已登录的客户端上运行，
-    # 因此生产环境请在 workflow_dispatch 里把 runs_on_override 设为 self-hosted（或具体 label）。
+          - { platform: "Windows 10",  os: windows-latest, slug: Windows_10,  client: 'C:\Program Files\HuaYoung\花漾客户端.exe', install: 'win10' }
+          - { platform: "macOS arm64", os: macos-14,      slug: macOS_arm64, client: '/Applications/花漾客户端.app/Contents/MacOS/花漾客户端', install: 'mac-arm64' }
+          - { platform: "macOS x64",   os: macos-13,      slug: macOS_x64,   client: '/Applications/花漾客户端.app/Contents/MacOS/花漾客户端', install: 'mac-x64' }
+          - { platform: "Ubuntu 22",   os: ubuntu-22.04,   slug: Ubuntu_22,   client: '/opt/花漾客户端/huayoung', install: 'ubuntu' }
+          # Windows 7 无 GitHub 托管 runner，生产请改用自托管 Win7 runner（runs_on_override=win7-label）
+          - { platform: "Windows 7",   os: windows-latest, slug: Windows_7,  client: 'C:\Program Files\HuaYoung\花漾客户端.exe', install: 'win7' }
     runs-on: ${{ github.event.inputs.runs_on_override || matrix.os }}
     env:
-      CLIENT_DOWNLOAD_URL: ${{ secrets.CLIENT_DOWNLOAD_URL }}
-      CLIENT_BINARY: ${{ secrets.CLIENT_BINARY_PATH }}
+      CLIENT_BINARY: ${{ matrix.client }}
       TEAM_ID: ${{ github.event.inputs.team_id || '213505445724246' }}
       CLONE_NAME: ${{ github.event.inputs.clone_name || 'UA152' }}
       PROXY: ${{ github.event.inputs.proxy }}
@@ -65,49 +77,130 @@ jobs:
       REMOTE_DEBUG_PORT: ${{ github.event.inputs.cdp_port || '9221' }}
       CLIENT_CDP_ENDPOINT: ${{ secrets.CLIENT_CDP_ENDPOINT || 'http://127.0.0.1:9221' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - name: Use Node.js 24
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: 安装依赖
-        run: npm ci
+        run: npm install && npx playwright install chromium
 
-      - name: 安装 Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      # ---------- 按平台安装真实客户端 ----------
+      - name: 安装客户端 (Windows)
+        if: startsWith(matrix.install, 'win')
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if ("${{ github.event.inputs.software_download_url }}") {
+            $dl = "${{ github.event.inputs.software_download_url }}"
+          } else {
+            if ("${{ matrix.install }}" -eq "win7") {
+              $dl = "https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_10.2.563_zh_setup.exe"
+            } else {
+              try {
+                $v = (Invoke-RestMethod -Uri "https://www.szdamai.com/static.config.json").windows10AppVersion
+                $dl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_${v}_zh_setup.exe"
+                Write-Host "线上版本号: $v"
+              } catch {
+                Write-Warning "取版本号失败，回退固定版本"; $dl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_10.0.559_zh_setup.exe"
+              }
+            }
+          }
+          Write-Host "下载客户端: $dl"
+          for ($i=1; $i -le 5; $i++) {
+            try { Invoke-WebRequest -Uri $dl -OutFile "$env:TEMP\hy_setup.exe" -ErrorAction Stop; break }
+            catch { Write-Warning "下载失败(第 $i 次)"; Start-Sleep 5 }
+          }
+          if (-not (Test-Path "$env:TEMP\hy_setup.exe")) { Write-Error "客户端下载失败"; exit 1 }
+          Start-Process -FilePath "$env:TEMP\hy_setup.exe" -ArgumentList "/S" -Wait -Verb RunAs
+          $p = "C:\Program Files\HuaYoung\花漾客户端.exe"
+          $end = (Get-Date).AddMinutes(5)
+          while ((Get-Date) -lt $end -and -not (Test-Path $p)) { Start-Sleep 10 }
+          Test-Path $p
+          if (-not (Test-Path "$env:LOCALAPPDATA\Programs\HuaYoung")) {
+            New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\Programs\HuaYoung" | Out-Null
+          }
 
-      - name: 下载/准备花漾客户端
+      - name: 安装客户端 (Ubuntu)
+        if: matrix.install == 'ubuntu'
         shell: bash
         run: |
-          # 分身验证需要在已登录团队 213505445724246 的客户端上进行。
-          # 方式一：用 secret CLIENT_DOWNLOAD_URL 拉取对应平台客户端并解压；
-          # 方式二：用 secret CLIENT_BINARY_PATH 指向已安装路径（自托管 runner 推荐）；
-          # 方式三：自托管 runner 上客户端已就绪，直接留空。
-          if [ -n "$CLIENT_DOWNLOAD_URL" ]; then
-            curl -fsSL "$CLIENT_DOWNLOAD_URL" -o client.zip
-            (command -v unzip >/dev/null && unzip -o client.zip -d client) || echo "请在此步骤按平台解压客户端"
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils
+          if [ -z "${{ github.event.inputs.software_download_url }}" ]; then
+            dl="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_10.0.533_zh_setup.deb"
+          else
+            dl="${{ github.event.inputs.software_download_url }}"
           fi
-          echo "CLIENT_BINARY=$CLIENT_BINARY"
+          for i in 1 2 3 4 5; do
+            curl -fSL --retry 3 --retry-delay 5 -o /tmp/hy.deb "$dl" && break
+            echo "下载失败(第 $i 次)"; sleep 5
+          done
+          [ -f /tmp/hy.deb ] || { echo "客户端下载失败"; exit 1; }
+          sudo dpkg -i /tmp/hy.deb || sudo apt-get -f install -y
+          sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
+          mkdir -p ~/.config/HuaYoung
+          if [ -f /opt/花漾客户端/resources/app.asar ]; then sudo chmod a+w /opt/花漾客户端/resources/app.asar; fi
 
+      - name: 安装客户端 (macOS)
+        if: startsWith(matrix.install, 'mac')
+        shell: bash
+        run: |
+          set -e
+          if [ -z "${{ github.event.inputs.software_download_url }}" ]; then
+            if [ "${{ matrix.install }}" = "mac-x64" ]; then
+              dl="https://dl.szdamai.com/downloads/mac_x64_app_zh/HuaYoungApp_Mac_x64_10.0.559_zh_setup.dmg"
+            else
+              dl="https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_10.0.559_zh_setup.dmg"
+            fi
+          else
+            dl="${{ github.event.inputs.software_download_url }}"
+          fi
+          echo "下载客户端: $dl"
+          for i in 1 2 3; do
+            curl -L --retry 3 --retry-delay 5 -o /tmp/hy.dmg "$dl" && break
+            echo "下载失败(第 $i 次)"; sleep 5
+          done
+          [ -f /tmp/hy.dmg ] || { echo "客户端下载失败"; exit 1; }
+          hdiutil attach /tmp/hy.dmg
+          appDir=$(find /Volumes -maxdepth 1 -type d -name "花漾客户端*" | head -n 1)
+          [ -n "$appDir" ] || { echo "未找到挂载的客户端卷"; exit 1; }
+          sudo cp -R "${appDir}/花漾客户端.app" /Applications/
+          hdiutil detach "${appDir}"
+          if [ -f "/Applications/花漾客户端.app/Contents/Resources/app.asar" ]; then
+            sudo chmod -f a+w /Applications/花漾客户端.app/Contents/Resources/app.asar
+          fi
+          mkdir -p ~/Library/Application\ Support/HuaYoung
+
+      # ---------- 注入 CDP 端口 + 假媒体开关 ----------
+      - name: 修改 main.js (macOS, 需 sudo)
+        if: startsWith(matrix.install, 'mac')
+        continue-on-error: true
+        run: sudo node modifyMain.js
+
+      - name: 修改 main.js (其他平台)
+        if: "!startsWith(matrix.install, 'mac')"
+        continue-on-error: true
+        run: node modifyMain.js
+
+      # ---------- 启动客户端并等待 CDP 就绪 ----------
       - name: 启动客户端并等待分身浏览器 CDP
         id: launch
         continue-on-error: true
+        env:
+          DISPLAY: ${{ matrix.install == 'ubuntu' && ':99' || '' }}
         run: node tools/launch-client.mjs
 
+      # ---------- 真实跑矩阵验证（连接真实客户端 CDP，不再 smoke） ----------
       - name: 运行验证
-        shell: bash
         run: |
-          if [ -z "$CLIENT_BINARY" ]; then
-            echo "未提供 CLIENT_BINARY → 使用 smoke 模式（仅生成骨架报告，自动项=跳过 / 人工项=人工）"
-            node tests/runner.mjs --platforms "${{ matrix.platform }}" --smoke \
-              --out "results-${{ matrix.slug }}.json"
-          else
-            node tests/runner.mjs --platforms "${{ matrix.platform }}" \
-              --cdp "${{ steps.launch.outputs.cdp || env.CLIENT_CDP_ENDPOINT }}" \
-              --proxy "$PROXY" --proxy-ip "$PROXY_IP" \
-              --out "results-${{ matrix.slug }}.json"
-          fi
+          node tests/runner.mjs --platforms "${{ matrix.platform }}" \
+            --cdp "${{ steps.launch.outputs.cdp || env.CLIENT_CDP_ENDPOINT }}" \
+            --proxy "$PROXY" --proxy-ip "$PROXY_IP" \
+            --out "results-${{ matrix.slug }}.json"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -121,14 +214,15 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - name: Use Node.js 24
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: 安装依赖
-        run: npm ci
+        run: npm install
 
       - uses: actions/download-artifact@v4
         with:
