@@ -14,7 +14,7 @@ name: HuaYoung 浏览器验证 (团队213505445724246 / UA152分身 / 152内核)
 # Windows 7 特殊说明：GitHub 无 Win7 托管 runner，单独用 Docker 方案
 #   （参考 Windows7-docker.yml：ubuntu-latest 起 dockurr-windows / Win7 VM，共享目录跑验证）。
 #   Win7 VM 内 node 为 node18（最后支持 Win7 的版本），用 puppeteer-core 连 CDP（无需本地 chromium）。
-#   该 job 仅在 workflow_dispatch / schedule 触发；push 不自动起 Win7 VM（成本高）。
+#   该 job 现已随 push / workflow_dispatch / schedule 一同触发（用户要求 SSH push 即覆盖全 5 平台 + 报告）。
 on:
   workflow_dispatch:
     inputs:
@@ -219,8 +219,7 @@ jobs:
 
   verify-win7:
     name: 验证 Windows 7 (Docker)
-    # Win7 无 GitHub 托管 runner，用 Docker/VM 方案；push 不自动起 VM（成本高），仅 dispatch/schedule 跑
-    if: github.event_name != 'push'
+    # Win7 无 GitHub 托管 runner，用 Docker/VM 方案；随 push / dispatch / schedule 一同触发（全 5 平台覆盖）
     runs-on: ubuntu-latest
     env:
       TEAM_ID: ${{ github.event.inputs.team_id || '213505445724246' }}
