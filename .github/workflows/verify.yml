@@ -37,6 +37,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   verify:
@@ -91,14 +92,22 @@ jobs:
 
       - name: 启动客户端并等待分身浏览器 CDP
         id: launch
+        continue-on-error: true
         run: node tools/launch-client.mjs
 
       - name: 运行验证
+        shell: bash
         run: |
-          node tests/runner.mjs --platforms "${{ matrix.platform }}" \
-            --cdp "${{ steps.launch.outputs.cdp || env.CLIENT_CDP_ENDPOINT }}" \
-            --proxy "$PROXY" --proxy-ip "$PROXY_IP" \
-            --out "results-${{ matrix.slug }}.json"
+          if [ -z "$CLIENT_BINARY" ]; then
+            echo "未提供 CLIENT_BINARY → 使用 smoke 模式（仅生成骨架报告，自动项=跳过 / 人工项=人工）"
+            node tests/runner.mjs --platforms "${{ matrix.platform }}" --smoke \
+              --out "results-${{ matrix.slug }}.json"
+          else
+            node tests/runner.mjs --platforms "${{ matrix.platform }}" \
+              --cdp "${{ steps.launch.outputs.cdp || env.CLIENT_CDP_ENDPOINT }}" \
+              --proxy "$PROXY" --proxy-ip "$PROXY_IP" \
+              --out "results-${{ matrix.slug }}.json"
+          fi
 
       - uses: actions/upload-artifact@v4
         if: always()

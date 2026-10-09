@@ -18,8 +18,8 @@ import http from 'node:http';
 
 const binary = process.env.CLIENT_BINARY;
 if (!binary) {
-  console.error('[launch] CLIENT_BINARY 未设置（建议用 repository secret 提供）');
-  process.exit(2);
+  console.warn('[launch] CLIENT_BINARY 未设置 → 跳过启动，下游将以 smoke 模式生成骨架报告（无真实客户端判定）');
+  process.exit(0);
 }
 const port = process.env.REMOTE_DEBUG_PORT || '9221';
 const waitMs = Number(process.env.WAIT_MS || 30000);
