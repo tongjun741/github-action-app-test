@@ -52,14 +52,25 @@ async function fingerprint_pixelscan(page, c, opts) {
   return { status: other ? 'fail' : 'pass', detail: `proxyHint=${proxy} otherWarn=${other}` };
 }
 
-// 4) iphey —— 全绿（无 Unreliable / leak / mismatch / detected）
-// 判定口径（用户确认 2026-10-09）：iphey 首页给出 “Unreliable” 即算【真实失败 fail】，不降级。
+// 4) iphey —— 全绿（无 Unreliable / leak / mismatch）
+// 判定口径（用户确认 2026-10-09）：结果页出现 “Unreliable” 即算【真实失败 fail】，不降级。
+// 注意：页面含 “detected / bad” 等泛化词（页头页脚营销文案），不可作判定依据，已从 red 词表剔除
+//       （曾误命中 “detected”）；且判定词渲染较慢，需轮询等待出现，避免空文本/竞态误判。
+const IPHEY_VERDICT_RE = /unreliable|looks reliable|\breliable\b/i;
+const IPHEY_FAIL_RE = /unreliable|not good|mismatch|\bleak\b|暴露/i;
 async function fingerprint_iphey(page, c, opts) {
   await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
-  const text = await bodyText(page);
-  const m = text.match(/unreliable|not good|bad|\bleak\b|mismatch|detected|暴露/i);
-  const red = !!m;
-  return { status: red ? 'fail' : text.length > 50 ? 'pass' : 'manual', detail: (red ? `命中风险词「${m[0]}」; ` : '') + text.slice(0, 140).replace(/\n/g, ' ') };
+  let text = '';
+  const deadline = Date.now() + 25000;
+  for (;;) {
+    text = await bodyText(page);
+    if (IPHEY_VERDICT_RE.test(text) || Date.now() > deadline) break;
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  const m = text.match(IPHEY_FAIL_RE);
+  if (m) return { status: 'fail', detail: `命中风险词「${m[0]}」; ${text.slice(0, 160).replace(/\n/g, ' ')}` };
+  if (/\blooks reliable\b|\breliable\b/i.test(text)) return { status: 'pass', detail: text.slice(0, 160).replace(/\n/g, ' ') };
+  return { status: 'manual', detail: `未解析到判定词（Unreliable/Reliable），需人工确认; ${text.slice(0, 160).replace(/\n/g, ' ')}` };
 }
 
 // 5) browserleaks/ip —— 自采集 WebRTC IP，与代理 IP 比对
