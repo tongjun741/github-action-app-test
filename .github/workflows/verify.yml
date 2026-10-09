@@ -1,6 +1,8 @@
-name: HuaYoung 浏览器验证 (12.9-148内核)
+name: HuaYoung 浏览器验证 (团队213505445724246 / UA152分身 / 152内核)
 
-# 按 生产环境-12.9-148内核.xlsx 验证全部项目，并生成 Excel 报告
+# 按 生产环境-12.9-148内核.xlsx 验证全部项目，并生成 Excel 报告。
+# 验证目标：团队 213505445724246 内的「UA152」分身（分身浏览器 CDP 端口 9221），
+# 断言其 UA 含 Chromium 152 内核（Chrome/152.）。
 on:
   workflow_dispatch:
     inputs:
@@ -11,8 +13,19 @@ on:
         description: '代理出口公网 IP（WebRTC 一致性判定用）'
         required: false
       cdp_port:
-        description: '客户端远程调试端口'
-        default: '9222'
+        description: '分身浏览器 CDP 端口（默认 9221，与 matrix meta.cloneCdpPort 一致）'
+        default: '9221'
+        required: false
+      team_id:
+        description: '验证目标团队 ID'
+        default: '213505445724246'
+        required: false
+      clone_name:
+        description: '验证目标分身名'
+        default: 'UA152'
+        required: false
+      runs_on_override:
+        description: '覆盖所有平台的 runs-on（留空=各平台默认 GitHub 托管 runner；填 self-hosted 或具体 label 则全部用该 label）。分身验证需已登录客户端的自托管 runner。'
         required: false
   schedule:
     - cron: '0 9 * * 1' # 每周一 09:00 UTC 自动跑一轮
@@ -38,13 +51,18 @@ jobs:
           - { platform: "Ubuntu 22",   os: ubuntu-22.04,   slug: Ubuntu_22 }
           # Windows 7 无 GitHub 托管 runner，生产请改用 self-hosted Win7 runner：
           - { platform: "Windows 7",   os: "windows-latest", slug: Windows_7 }
-    runs-on: ${{ matrix.os }}
+    # 分身（UA152）需在其所属团队账号已登录的客户端上运行，
+    # 因此生产环境请在 workflow_dispatch 里把 runs_on_override 设为 self-hosted（或具体 label）。
+    runs-on: ${{ github.event.inputs.runs_on_override || matrix.os }}
     env:
       CLIENT_DOWNLOAD_URL: ${{ secrets.CLIENT_DOWNLOAD_URL }}
       CLIENT_BINARY: ${{ secrets.CLIENT_BINARY_PATH }}
+      TEAM_ID: ${{ github.event.inputs.team_id || '213505445724246' }}
+      CLONE_NAME: ${{ github.event.inputs.clone_name || 'UA152' }}
       PROXY: ${{ github.event.inputs.proxy }}
       PROXY_IP: ${{ github.event.inputs.proxy_ip }}
-      REMOTE_DEBUG_PORT: ${{ github.event.inputs.cdp_port || '9222' }}
+      REMOTE_DEBUG_PORT: ${{ github.event.inputs.cdp_port || '9221' }}
+      CLIENT_CDP_ENDPOINT: ${{ secrets.CLIENT_CDP_ENDPOINT || 'http://127.0.0.1:9221' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,22 +79,24 @@ jobs:
       - name: 下载/准备花漾客户端
         shell: bash
         run: |
-          # 项目相关：从 CLIENT_DOWNLOAD_URL 拉取对应平台客户端并解压；
-          # 或直接用 secret CLIENT_BINARY_PATH 指向已安装路径。生产环境由仓库 secret 提供。
+          # 分身验证需要在已登录团队 213505445724246 的客户端上进行。
+          # 方式一：用 secret CLIENT_DOWNLOAD_URL 拉取对应平台客户端并解压；
+          # 方式二：用 secret CLIENT_BINARY_PATH 指向已安装路径（自托管 runner 推荐）；
+          # 方式三：自托管 runner 上客户端已就绪，直接留空。
           if [ -n "$CLIENT_DOWNLOAD_URL" ]; then
             curl -fsSL "$CLIENT_DOWNLOAD_URL" -o client.zip
             (command -v unzip >/dev/null && unzip -o client.zip -d client) || echo "请在此步骤按平台解压客户端"
           fi
           echo "CLIENT_BINARY=$CLIENT_BINARY"
 
-      - name: 启动客户端并等待 CDP
+      - name: 启动客户端并等待分身浏览器 CDP
         id: launch
         run: node tools/launch-client.mjs
 
       - name: 运行验证
         run: |
           node tests/runner.mjs --platforms "${{ matrix.platform }}" \
-            --cdp "${{ steps.launch.outputs.cdp }}" \
+            --cdp "${{ steps.launch.outputs.cdp || env.CLIENT_CDP_ENDPOINT }}" \
             --proxy "$PROXY" --proxy-ip "$PROXY_IP" \
             --out "results-${{ matrix.slug }}.json"
 

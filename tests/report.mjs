@@ -76,8 +76,11 @@ async function buildReport(platformFiles, outPath) {
   const wb = new ExcelJS.Workbook();
   const kernel = platformFiles[0]?.meta?.kernel || '';
   const testVer = platformFiles[0]?.meta?.testVersion || {};
+  const teamId = platformFiles[0]?.meta?.teamId || '';
+  const cloneName = platformFiles[0]?.meta?.cloneName || '';
+  const cloneCdpPort = platformFiles[0]?.meta?.cloneCdpPort || 9221;
   wb.creator = 'HuaYoung E2E Verifier';
-  wb.title = `验证报告 ${kernel || ''}`.trim();
+  wb.title = `验证报告 ${kernel || ''} ${teamId ? `[team ${teamId} / ${cloneName} 分身]` : ''}`.trim();
 
   // ---- Sheet 1: 验证结果 ----
   const ws = wb.addWorksheet('验证结果');

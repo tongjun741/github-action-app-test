@@ -70,6 +70,11 @@ async function run() {
 
   const { browser, proxyIp, mode } = await loadBrowser(args);
 
+  // 验证目标：团队内的「UA152」分身（CDP 端口 9221）。env 可覆盖 spec 默认值。
+  const teamId = process.env.TEAM_ID || matrix.meta.teamId || '';
+  const cloneName = process.env.CLONE_NAME || matrix.meta.cloneName || '';
+  console.log(`[runner] 验证目标分身: team=${teamId || '(未指定)'} clone=${cloneName || '(未指定)'} (CDP=${matrix.meta.cloneCdpPort || 9221})`);
+
   const resultsByPlatform = {};
   for (const platform of scope) {
     if (!allPlatforms.includes(platform)) {
@@ -128,14 +133,15 @@ async function run() {
   const kernel = matrix.meta.kernelVersion;
   const testVer = matrix.meta.testVersion || {};
   const written = [];
+  const resultMeta = { kernel, testVersion: testVer, generatedAt, teamId, cloneName, cloneCdpPort: matrix.meta.cloneCdpPort || 9221 };
   if (scope.length === 1) {
     const out = args.out || `results-${scope[0].replace(/\s+/g, '_')}.json`;
-    writeFileSync(out, JSON.stringify({ meta: { kernel, testVersion: testVer, generatedAt }, platform: scope[0], results: resultsByPlatform[scope[0]] }, null, 2));
+    writeFileSync(out, JSON.stringify({ meta: resultMeta, platform: scope[0], results: resultsByPlatform[scope[0]] }, null, 2));
     written.push(out);
   } else {
     for (const p of Object.keys(resultsByPlatform)) {
       const out = args.out ? args.out.replace(/<platform>/g, p.replace(/\s+/g, '_')) : `results-${p.replace(/\s+/g, '_')}.json`;
-      writeFileSync(out, JSON.stringify({ meta: { kernel, testVersion: testVer, generatedAt }, platform: p, results: resultsByPlatform[p] }, null, 2));
+      writeFileSync(out, JSON.stringify({ meta: resultMeta, platform: p, results: resultsByPlatform[p] }, null, 2));
       written.push(out);
     }
   }

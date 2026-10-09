@@ -3,6 +3,9 @@
     "product": "HuaYoung Browser (花漾浏览器)",
     "sourceExcel": "生产环境-12.9-148内核.xlsx",
     "kernelVersion": "152",
+    "teamId": "213505445724246",
+    "cloneName": "UA152",
+    "cloneCdpPort": 9221,
     "testVersion": {
       "Windows 10": "12.9.1027",
       "Ubuntu 22": "12.9.896"
@@ -15,7 +18,7 @@
       "Ubuntu 22",
       "Windows 7"
     ],
-    "notes": "本 spec 由 生产环境-12.9-148内核.xlsx 转写而来。name / 验证标准 / platforms 忠实于原表；type / url / expected 为自动化判定所需的补充元数据。Windows 7 列在原表中仅关注‘打开会话是否成功’。"
+    "notes": "本 spec 由 生产环境-12.9-148内核.xlsx 转写而来。name / 验证标准 / platforms 忠实于原表；type / url / expected 为自动化判定所需的补充元数据。Windows 7 列在原表中仅关注‘打开会话是否成功’。验证目标为团队 213505445724246 内的「UA152」分身（分身浏览器 CDP 端口 9221），内核版本期望 152（UA 含 Chrome/152.）。"
   },
   "cases": [
     {

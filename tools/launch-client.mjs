@@ -3,11 +3,14 @@
 //
 // 环境变量：
 //   CLIENT_BINARY        客户端可执行文件路径（必填，建议用 secret 提供）
-//   REMOTE_DEBUG_PORT    远程调试端口（默认 9222）
+//   REMOTE_DEBUG_PORT    远程调试端口（默认 9221 —— 分身浏览器 CDP 端口）
+//   TEAM_ID              验证目标团队 ID（默认取 matrix meta，或 env 覆盖）
+//   CLONE_NAME           验证目标分身名（默认取 matrix meta，或 env 覆盖）
 //   WAIT_MS              等待 CDP 就绪的超时（默认 30000）
 //
-// 说明：Electron/Chromium 均支持 --remote-debugging-port 启动参数；
-// 如项目 E2E 已在 main.js 注入 remoteDebugPort，则直接用该端口即可。
+// 说明：验证目标为团队内的「UA152」分身，分身浏览器 CDP 端口为 9221。
+// 客户端需已登录拥有该团队的账号，并打开目标分身。RELEASE/打包版若在 main.js
+// 已注入 remoteDebugPort，则直接用该端口；否则用 --remote-debugging-port 启动参数。
 
 import { spawn } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
@@ -18,8 +21,11 @@ if (!binary) {
   console.error('[launch] CLIENT_BINARY 未设置（建议用 repository secret 提供）');
   process.exit(2);
 }
-const port = process.env.REMOTE_DEBUG_PORT || '9222';
+const port = process.env.REMOTE_DEBUG_PORT || '9221';
 const waitMs = Number(process.env.WAIT_MS || 30000);
+const teamId = process.env.TEAM_ID || '';
+const cloneName = process.env.CLONE_NAME || '';
+console.log(`[launch] 目标分身: team=${teamId || '(未指定)'} clone=${cloneName || '(未指定)'} port=${port}`);
 
 function waitCdp() {
   const url = `http://127.0.0.1:${port}/json/version`;
@@ -45,6 +51,7 @@ function waitCdp() {
 const child = spawn(binary, [`--remote-debugging-port=${port}`], {
   stdio: 'ignore',
   detached: true,
+  env: { ...process.env, TEAM_ID: teamId, CLONE_NAME: cloneName },
 });
 child.unref();
 
