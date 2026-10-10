@@ -66,6 +66,13 @@ permissions:
   contents: read
   actions: write
 
+# 2026-10-10 教训：每次 push 都触发新 run，多轮并行时多台 runner 同时开同一分身
+# （互相踢「继续访问」+ 争抢分身 Webshare 代理 → cookie-sync ERR_PROXY_CONNECTION_FAILED）。
+# 同一时刻只允许一轮完整验证（5 平台 + cookie 同步 + Win7），旧的排队不取消（保留诊断）。
+concurrency:
+  group: browser-kernel-verify
+  cancel-in-progress: false
+
 jobs:
   verify:
     name: 验证 ${{ matrix.platform }}
