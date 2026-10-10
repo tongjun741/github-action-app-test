@@ -70,6 +70,11 @@ on:
         required: false
         default: false
         type: boolean
+      skip_win7:
+        description: '跳过 Win7 Docker job（默认 true——Win7 搁置中；需验证 Win7 时手动填 false）。'
+        required: false
+        default: true
+        type: boolean
   schedule:
     - cron: '0 9 * * 1' # 每周一 09:00 UTC 自动跑一轮
   # 2026-10-10 用户纠偏：不再 push 自动触发——修复期间每次 push 都起全量验证轮，
@@ -401,8 +406,9 @@ jobs:
 
   verify-win7:
     name: 验证 Windows 7 (Docker)
-    # Win7 无 GitHub 托管 runner，用 Docker/VM 方案；随 push / dispatch / schedule 一同触发（全 5 平台覆盖）
-    if: inputs.debug_hold != true && inputs.debug_verify != true
+    # Win7 无 GitHub 托管 runner，用 Docker/VM 方案。
+    # 2026-10-10 用户指令：Win7 搁置（skip_win7 输入默认 true；要跑时手动 dispatch 填 false）
+    if: inputs.skip_win7 != false && inputs.debug_hold != true && inputs.debug_verify != true
     runs-on: ubuntu-latest
     env:
       TEAM_ID: ${{ github.event.inputs.team_id || '213505445724246' }}
