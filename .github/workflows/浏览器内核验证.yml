@@ -257,8 +257,10 @@ jobs:
         run: node tests/e2e-verify.cjs
 
       # 调试模式附加：主壳 UI 探测（详情页 DOM/密码入口/按钮区）
+      # continue-on-error：探测失败不许杀 job——挂起保活步必须执行（调试环境不能意外关闭）
       - name: UI 探测 (详情页 DOM)
         if: inputs.debug_hold == true && inputs.ui_probe == true
+        continue-on-error: true
         timeout-minutes: 15
         env:
           DISPLAY: ${{ matrix.install == 'ubuntu' && ':99' || '' }}

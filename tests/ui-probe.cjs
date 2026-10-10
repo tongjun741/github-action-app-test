@@ -75,8 +75,49 @@ async function main() {
     await browser.$('.icon-chrome_outline').click();
     await sleep(3000);
 
-    // 点 UA152 进详情页
-    await browser.$(`//a[contains(.,"${CLONE}")]`).waitForExist({ timeout: 90 * 1000 });
+    // 点 UA152 进详情页 —— 复用 e2e-verify 的「放大每页条数 + 翻页」逻辑
+    //（UA152 在第 2 页；首探 run 实测直接 //a[contains(.,"UA152")] 90s 超时即此因）
+    let entered = false;
+    // 1) 放大每页条数（Ant Design size-changer）
+    try {
+      const sel = browser.$('.ant-pagination-options .ant-select');
+      if (await sel.isExisting()) {
+        await sel.click();
+        await sleep(600);
+        const opts = await browser.$$('.ant-select-item-option');
+        let best = null, bestV = -1;
+        for (const o of opts) {
+          const m = (((await o.getText()) || '').trim()).match(/(\d+)/);
+          if (m && Number(m[1]) > bestV) { bestV = Number(m[1]); best = o; }
+        }
+        if (best) { await best.click(); await sleep(2500); log(`分页每页条数 -> ${bestV}`); }
+      }
+    } catch (_) {}
+    // 2) 尝试点分身
+    try {
+      await browser.$(`//a[contains(.,"${CLONE}")]`).waitForExist({ timeout: 8000 });
+      entered = true;
+    } catch (_) {
+      // 3) 翻页找（最多 10 页）
+      for (let i = 0; i < 10 && !entered; i++) {
+        try {
+          const moved = await browser.execute(() => {
+            const cont = document.querySelector('.ant-pagination');
+            if (!cont) return false;
+            const next = cont.querySelector('.ant-pagination-next');
+            if (next && !next.className.includes('ant-pagination-disabled')) {
+              (next.querySelector('button') || next).click(); return true;
+            }
+            return false;
+          });
+          if (!moved) break;
+          await sleep(2000);
+          await browser.$(`//a[contains(.,"${CLONE}")]`).waitForExist({ timeout: 4000 });
+          entered = true;
+        } catch (_) { /* 下一页 */ }
+      }
+    }
+    if (!entered) throw new Error(`列表中未找到分身 ${CLONE}（翻页后仍无）`);
     await browser.$(`//a[contains(.,"${CLONE}")]`).click();
     // 等详情页特征（打开浏览器按钮）
     await browser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 30 * 1000 });

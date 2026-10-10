@@ -178,9 +178,30 @@ async function fingerprint_ipbinding(page, c, opts) {
   return { status: /webrtc blocked/i.test(text) ? 'pass' : 'fail', detail: text.slice(0, 140).replace(/\n/g, ' ') };
 }
 
-// 8) nopecha —— 需人工过验证码
-async function manual_captcha() {
-  return { status: 'manual', detail: '需人工打开三个验证码链接并手工通过' };
+// 8) nopecha —— 验证码可加载性检测（脚本化，2026-10-10 用户要求去人工）
+// 判定口径：打开 demo 页，检测三类验证码组件（hCaptcha iframe / reCAPTCHA / Turnstile）
+// 是否正常渲染。验证码组件能加载 = 站点与浏览器兼容正常（能不能「过」验证码依赖真人/AI，
+// 无头自动化环境本就无法通过，故只验证「可加载、可交互」——这是 CI 能自动判定的边界）。
+// 进阶：给 Chromium 注入 accessibility cookie（hcaptcha accessibility）可自动通过 hCaptcha，
+// 需要账号注册获取，暂未启用。
+async function manual_captcha(page, c, opts) {
+  await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
+  await new Promise((r) => setTimeout(r, 8000)); // 验证码 iframe 渲染慢
+  const probe = await page.evaluate(() => {
+    const out = { iframes: [], hcaptcha: false, recaptcha: false, turnstile: false, text: '' };
+    try {
+      out.iframes = Array.from(document.querySelectorAll('iframe'))
+        .map((f) => f.src || '').filter(Boolean).slice(0, 10);
+      out.hcaptcha = out.iframes.some((s) => /hcaptcha/i.test(s));
+      out.recaptcha = out.iframes.some((s) => /recaptcha|google\.com\/recaptcha/i.test(s));
+      out.turnstile = out.iframes.some((s) => /challenges\.cloudflare\.com/i.test(s));
+      out.text = (document.body ? document.body.innerText : '').slice(0, 200);
+    } catch (_) {}
+    return out;
+  }).catch(() => ({ iframes: [], hcaptcha: false, recaptcha: false, turnstile: false, text: '' }));
+  const loaded = probe.hcaptcha || probe.recaptcha || probe.turnstile;
+  const detail = `hCaptcha=${probe.hcaptcha} reCAPTCHA=${probe.recaptcha} Turnstile=${probe.turnstile} iframes=${probe.iframes.length}`;
+  return { status: loaded ? 'pass' : 'fail', detail };
 }
 
 // 9) fingerprint-scan —— 分数 < 50
