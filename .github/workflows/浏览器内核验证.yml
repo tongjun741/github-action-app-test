@@ -116,7 +116,6 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Use Node.js 24
-        if: matrix.install == 'ubuntu' || ((inputs.debug_hold != true && inputs.debug_verify != true) && matrix.install == 'ubuntu' || inputs.debug_hold != true
         uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -228,7 +227,7 @@ jobs:
         run: sudo node modifyMain.js
 
       - name: 修改 main.js (其他平台)
-        if: matrix.install == 'ubuntu' || ((inputs.debug_hold != true && inputs.debug_verify != true) && !startsWith(matrix.install, 'mac'))
+        if: matrix.install == 'ubuntu' || (inputs.debug_hold != true && inputs.debug_verify != true)
         continue-on-error: true
         run: node modifyMain.js
 
