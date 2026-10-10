@@ -100,8 +100,8 @@ async function pageDiag(page) {
   }
 }
 
-// DOM 快照存证：outerHTML 截断 200KB 上传 Cloudinary（.txt），返回 URL
-// 用于"不猜测"地拿到登录页/详情页真实 DOM（用户要求 2026-10-10：开调试端口实测，不要猜）
+// DOM 快照存证：outerHTML 截断 2MB 上传 Cloudinary（.txt），返回 URL
+// （Run#39 教训：详情页 DOM >200KB，面板在 SVG path 后面被截掉）
 async function domSnapshot(target, tag) {
   try {
     let html = '';
@@ -112,7 +112,7 @@ async function domSnapshot(target, tag) {
     }
     if (!html) return null;
     const p = path.join(process.cwd(), `dom-${tag}-${Date.now()}.txt`);
-    fs.writeFileSync(p, html.slice(0, 200 * 1024));
+    fs.writeFileSync(p, html.slice(0, 2 * 1024 * 1024));
     if (!process.env.CLOUDINARY_URL) {
       console.log(`[dom-snapshot] ${tag}: 本地 ${p}（未配置 CLOUDINARY_URL，不上传）`);
       return null;
@@ -226,6 +226,11 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       await sleep(12000); // 密码管理器落库宽限
       const url = page.url();
       log(`提交后 URL: ${url}`);
+      // 关浏览器前先探测：Chromium 原生 save-password 气泡是否出现（Run#39 后加）
+      // 气泡是浏览器级 UI（不在页面 DOM）——用 CDP PasswordManager 域不可用（需 devtools 协议前端），
+      // 改查间接证据：密码是否已写入 Chromium 登录库（chrome://settings/passwords 打不开 headless），
+      // 落到最可靠的观测点：登录页密码框若在重开后自动填充（B 阶段）即证明已保存。
+      // 这里只记录 wdku 登录页是否离开（已记录 URL）。
       loginOk = true;
       loginDetail = `已提交登录表单，当前URL=${url}`;
     });
@@ -430,24 +435,33 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
         await shotToCloudinary(page, `autofill-miss-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
         throw new Error(`登录页未找到密码框（代填验证）（${diag}）`);
       }
-      // 触发 autofill：聚焦+点击账号框（Chromium 常在用户名框获得焦点后才填密码框），再轮询检测
+      // 触发 autofill 三连：① 聚焦账号框 ② 重载页面（Chromium autofill 常需导航事件触发）③ 再聚焦
       try {
         if (inputs.userInput) {
           await page.click(inputs.userInput).catch(() => {});
           await page.focus(inputs.userInput).catch(() => {});
           await sleep(1500);
-          await page.click(inputs.passInput).catch(() => {});
-          await sleep(1500);
         }
       } catch (_) { }
+      try {
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+        await sleep(4000);
+      } catch (_) { }
+      try {
+        const inputs2 = await findLoginInputs(page);
+        if (inputs2.userInput) { await page.focus(inputs2.userInput).catch(() => {}); await sleep(1500); }
+        if (inputs2.passInput) { await page.click(inputs2.passInput).catch(() => {}); await sleep(1500); }
+      } catch (_) { }
       let filled = { value: false, autofill: false };
+      const freshInputs = await findLoginInputs(page).catch(() => inputs);
+      const passSel = (freshInputs && freshInputs.passInput) || inputs.passInput;
       for (let t = 0; t < 5; t++) {
-        filled = await page.evaluate((passSel) => {
-          const p = document.querySelector(passSel);
+        filled = await page.evaluate((sel) => {
+          const p = document.querySelector(sel);
           if (!p) return { value: false, autofill: false };
           const isAuto = !!(p && p.matches && p.matches(':-webkit-autofill'));
           return { value: !!(p.value && p.value.length > 0), autofill: isAuto };
-        }, inputs.passInput);
+        }, passSel);
         if (filled.value || filled.autofill) break;
         await sleep(2000);
       }
