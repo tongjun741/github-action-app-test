@@ -226,6 +226,8 @@ jobs:
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
           CLOUDINARY_MASK: ${{ secrets.CLOUDINARY_MASK }}
+          WDKU_USERNAME: ${{ secrets.WDKU_USERNAME }}
+          WDKU_PASSWORD: ${{ secrets.WDKU_PASSWORD }}
           OUT: results-${{ matrix.slug }}.json
         run: node tests/e2e-verify.cjs
 
@@ -237,6 +239,79 @@ jobs:
             results-${{ matrix.slug }}.json
             screenshot-${{ matrix.slug }}.png
             iphey-*.png
+          if-no-files-found: warn
+
+  # ===== Cookie 同步：在另一台电脑（独立 job = 不同 runner 机器）验证登录态同步 =====
+  # 前置：verify job 内 password-flow 已完成 wdku.net 登录（Cookie 落到分身云端）。
+  verify-cookie-sync:
+    name: 验证 Cookie 同步 (第二台设备)
+    needs: verify          # 必须等第一台机器登录完成，Cookie 才有同步源
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-22.04  # 与 verify 的 Ubuntu job 物理不同机（GitHub 每次分配新 runner）
+    env:
+      CLIENT_BINARY: /opt/花漾客户端/huayoung
+      TEAM_ID: ${{ github.event.inputs.team_id || '213505445724246' }}
+      CLONE_NAME: ${{ github.event.inputs.clone_name || 'UA152' }}
+      REMOTE_DEBUG_PORT: ${{ github.event.inputs.cdp_port || '9221' }}
+      E2E_PLATFORM: Windows 10   # 详情页 UI 与 Win10 一致；runner 本身是 Ubuntu
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 安装客户端 (Ubuntu)
+        shell: bash
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils
+          if [ -z "${{ github.event.inputs.software_download_url }}" ]; then
+            ver=$(curl -fsSL https://www.szdamai.com/static.config.json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).linuxAppVersion)}catch(e){console.log('12.9.902')}})") || ver="12.9.902"
+            dl="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_${ver}_zh_setup.deb"
+          else
+            dl="${{ github.event.inputs.software_download_url }}"
+          fi
+          echo "下载客户端: $dl"
+          for i in 1 2 3 4 5; do
+            curl -fSL --retry 3 --retry-delay 5 -o /tmp/hy.deb "$dl" && break
+            echo "下载失败(第 $i 次)"; sleep 5
+          done
+          [ -f /tmp/hy.deb ] || { echo "客户端下载失败"; exit 1; }
+          sudo dpkg -i /tmp/hy.deb || sudo apt-get -f install -y
+          sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
+          mkdir -p ~/.config/HuaYoung
+          if [ -f /opt/花漾客户端/resources/app.asar ]; then sudo chmod a+w /opt/花漾客户端/resources/app.asar; fi
+          if [ -d /opt/花漾客户端/resources/app ]; then sudo chmod -R a+w /opt/花漾客户端/resources/app; fi
+
+      - name: 修改 main.js
+        continue-on-error: true
+        run: node modifyMain.js
+
+      - name: Cookie 同步验证（第二台设备开同一分身）
+        timeout-minutes: 30
+        env:
+          DISPLAY: ':99'
+          E2E_PLATFORM: Windows 10
+          TEAM_NAME: ${{ secrets.TEAM_NAME }}
+          WDIO_USERNAME: ${{ secrets.WDIO_USERNAME }}
+          PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          OUT: results-Cookie_Sync.json
+        run: node tests/cookie-sync.cjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-Cookie_Sync
+          path: |
+            results-Cookie_Sync.json
+            cookie-sync-*.png
           if-no-files-found: warn
 
   verify-win7:
@@ -310,6 +385,8 @@ jobs:
           PRODUCT_WDIO_PASSWORD=${{ secrets.PRODUCT_WDIO_PASSWORD }}
           CLOUDINARY_URL=${{ secrets.CLOUDINARY_URL }}
           CLOUDINARY_MASK=${{ secrets.CLOUDINARY_MASK }}
+          WDKU_USERNAME=${{ secrets.WDKU_USERNAME }}
+          WDKU_PASSWORD=${{ secrets.WDKU_PASSWORD }}
           EOF
           echo "--- e2e-env.txt (密码已脱敏) ---"
           sed 's/^PRODUCT_WDIO_PASSWORD=.*/PRODUCT_WDIO_PASSWORD=***/' win7/shared/work/e2e-env.txt
@@ -430,7 +507,7 @@ jobs:
 
   report:
     name: 合并生成 Excel 报告
-    needs: [verify, verify-win7]
+    needs: [verify, verify-cookie-sync, verify-win7]
     # 关键：只要有任意平台是红（例如 iphey 判 fail、Win7 未产出），report 就会被默认跳过。
     # 加 always() 保证无论验证结果如何都能合并出 report.xlsx（业务项 fail 也要体现在报告里）。
     if: always()
