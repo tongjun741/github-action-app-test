@@ -107,6 +107,8 @@ async function fingerprint_iphey(page, c, opts) {
     await page.screenshot({ path: shotPath, fullPage: true });
     console.log(`[iphey-screenshot] 已保存本地截图: ${shotPath}`);
     shotUrl = await uploadShotToCloudinary(shotPath, `iphey(${process.env.E2E_PLATFORM || '?'})`);
+    // GitHub Actions 注解：URL 进 notice —— 公共仓库 annotations API 匿名可读，无需 token 即可取回链接
+    if (shotUrl) console.log(`::notice title=iphey截图(${process.env.E2E_PLATFORM || '?'})::${shotUrl}`);
   } catch (e) {
     console.log(`[iphey-screenshot] 截图失败(忽略): ${e.message}`);
   }
