@@ -316,7 +316,7 @@ jobs:
         run: node tests/e2e-verify.cjs
 
       - uses: actions/upload-artifact@v4
-        if: always() && inputs.debug_hold != true
+        if: always() && inputs.debug_hold != true && inputs.debug_verify != true
         with:
           name: results-${{ matrix.slug }}
           path: |
@@ -330,7 +330,7 @@ jobs:
   verify-cookie-sync:
     name: 验证 Cookie 同步 (第二台设备)
     needs: verify          # 必须等第一台机器登录完成，Cookie 才有同步源
-    if: ${{ !cancelled() && inputs.debug_hold != true }}
+    if: ${{ !cancelled() && inputs.debug_hold != true && inputs.debug_verify != true }}
     runs-on: ubuntu-22.04  # 与 verify 的 Ubuntu job 物理不同机（GitHub 每次分配新 runner）
     env:
       CLIENT_BINARY: /opt/花漾客户端/huayoung
@@ -401,7 +401,7 @@ jobs:
   verify-win7:
     name: 验证 Windows 7 (Docker)
     # Win7 无 GitHub 托管 runner，用 Docker/VM 方案；随 push / dispatch / schedule 一同触发（全 5 平台覆盖）
-    if: inputs.debug_hold != true
+    if: inputs.debug_hold != true && inputs.debug_verify != true
     runs-on: ubuntu-latest
     env:
       TEAM_ID: ${{ github.event.inputs.team_id || '213505445724246' }}
@@ -635,7 +635,7 @@ jobs:
     needs: [verify, verify-cookie-sync, verify-win7]
     # 调试模式不出报告（验证没跑）；关键：只要有任意平台是红（例如 iphey 判 fail、Win7 未产出），
     # report 就会被默认跳过——加 always() 保证无论验证结果如何都能合并出 report.xlsx。
-    if: always() && inputs.debug_hold != true
+    if: always() && inputs.debug_hold != true && inputs.debug_verify != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
