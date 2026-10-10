@@ -325,11 +325,30 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       log(`分身浏览器已${cdpDown ? '关闭' : '未确认关闭（继续验证密码记录）'}`);
 
       log('A4 详情页查密码记录');
-      // Run#24/25 实测：主壳停在分身列表页 → 点目标分身进详情页，并等「打开浏览器」按钮确认真的到了详情页
+      // Run#31 实测：关分身后主壳回列表页且 UA152 在第 2 页，//a 点 UA152 报 not interactable。
+      // 修复：放大每页条数（16 分身一页放下）→ 页面上下文内原子点击 → 等「打开浏览器」确认详情页。
       try {
-        await wdioBrowser.$(`//a[contains(.,"${process.env.CLONE_NAME || 'UA152'}")]`).waitForExist({ timeout: 8000 });
-        await wdioBrowser.$(`//a[contains(.,"${process.env.CLONE_NAME || 'UA152'}")]`).click();
-        // 确认详情页就绪（打开/正在访问按钮二选一）
+        try {
+          const sel = wdioBrowser.$('.ant-pagination-options .ant-select');
+          if (await sel.isExisting()) {
+            await sel.click();
+            await sleep(600);
+            const opts = await wdioBrowser.$$('.ant-select-item-option');
+            let best = null, bestV = -1;
+            for (const o of opts) {
+              const m = (((await o.getText()) || '').trim()).match(/(\d+)/);
+              if (m && Number(m[1]) > bestV) { bestV = Number(m[1]); best = o; }
+            }
+            if (best) { await best.click(); await sleep(2500); }
+          }
+        } catch (_) {}
+        const clicked = await wdioBrowser.execute((name) => {
+          const el = Array.from(document.querySelectorAll('a,span,div'))
+            .find((e) => (e.textContent || '').trim() === name && e.children.length === 0);
+          if (el) { el.click(); return true; }
+          return false;
+        }, process.env.CLONE_NAME || 'UA152');
+        if (clicked) log('已在页面上下文点击 UA152');
         try {
           await wdioBrowser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 8000 });
         } catch (_) {
@@ -339,15 +358,16 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       } catch (e) {
         log(`进详情页确认失败（继续尝试找密码入口）: ${e.message.slice(0, 80)}`);
       }
-      // 详情页找「密码」tab/入口（多选择器兜底；Run#25 dump 未见「密码」字样 → 词表扩大到 账号/密码记录/凭据）
+      // 详情页找「密码」tab/入口（Run#31 dump 显示详情页有「Cookie 5站点 ，7cookies」类 tab 栏；
+      // 密码入口大概率同区域。候选词表 + 兜底把详情页 tab 全 dump）
       const pwdEntrySels = [
         '//span[text()="密码"]',
-        '//div[contains(@class,"tab")][contains(text(),"密码")]',
-        '//a[contains(text(),"密码")]',
-        '//*[contains(@class,"menu")]//*[contains(text(),"密码")]',
         '//*[contains(text(),"密码记录")]',
         '//*[contains(text(),"账号密码")]',
         '//*[contains(text(),"已保存密码")]',
+        '//div[contains(@class,"tab")][contains(text(),"密码")]',
+        '//a[contains(text(),"密码")]',
+        '//*[contains(@class,"menu")]//*[contains(text(),"密码")]',
         '//span[contains(text(),"凭据")]',
       ];
       let entryFound = false;

@@ -186,19 +186,24 @@ async function fingerprint_ipbinding(page, c, opts) {
 // 需要账号注册获取，暂未启用。
 async function manual_captcha(page, c, opts) {
   await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
-  await new Promise((r) => setTimeout(r, 8000)); // 验证码 iframe 渲染慢
-  const probe = await page.evaluate(() => {
-    const out = { iframes: [], hcaptcha: false, recaptcha: false, turnstile: false, text: '' };
-    try {
-      out.iframes = Array.from(document.querySelectorAll('iframe'))
-        .map((f) => f.src || '').filter(Boolean).slice(0, 10);
-      out.hcaptcha = out.iframes.some((s) => /hcaptcha/i.test(s));
-      out.recaptcha = out.iframes.some((s) => /recaptcha|google\.com\/recaptcha/i.test(s));
-      out.turnstile = out.iframes.some((s) => /challenges\.cloudflare\.com/i.test(s));
-      out.text = (document.body ? document.body.innerText : '').slice(0, 200);
-    } catch (_) {}
-    return out;
-  }).catch(() => ({ iframes: [], hcaptcha: false, recaptcha: false, turnstile: false, text: '' }));
+  // 验证码 iframe 渲染慢（Run#31 实测 8s 不够，iframes=0）→ 轮询最多 30s
+  let probe = { iframes: [], hcaptcha: false, recaptcha: false, turnstile: false, text: '' };
+  const deadline = Date.now() + 30000;
+  for (;;) {
+    probe = await page.evaluate(() => {
+      const out = { iframes: [], hcaptcha: false, recaptcha: false, turnstile: false, text: '' };
+      try {
+        out.iframes = Array.from(document.querySelectorAll('iframe'))
+          .map((f) => f.src || '').filter(Boolean).slice(0, 10);
+        out.hcaptcha = out.iframes.some((s) => /hcaptcha/i.test(s));
+        out.recaptcha = out.iframes.some((s) => /recaptcha|google\.com\/recaptcha/i.test(s));
+        out.turnstile = out.iframes.some((s) => /challenges\.cloudflare\.com/i.test(s));
+      } catch (_) {}
+      return out;
+    }).catch(() => probe);
+    if (probe.hcaptcha || probe.recaptcha || probe.turnstile || Date.now() > deadline) break;
+    await new Promise((r) => setTimeout(r, 3000));
+  }
   const loaded = probe.hcaptcha || probe.recaptcha || probe.turnstile;
   const detail = `hCaptcha=${probe.hcaptcha} reCAPTCHA=${probe.recaptcha} Turnstile=${probe.turnstile} iframes=${probe.iframes.length}`;
   return { status: loaded ? 'pass' : 'fail', detail };
