@@ -87,6 +87,13 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
     results.push({ caseId, name, type, status, detail, criteria });
     const tag = { pass: '✓', fail: '✗', manual: '人工', error: '错误' }[status] || status;
     log(`[${tag}] ${name} — ${detail}`);
+    // GitHub Actions 注解：每用例判定结果进 annotations（匿名可读，免 token 诊断）
+    const cmd = status === 'pass' ? 'notice' : 'error';
+    try {
+      const t = `${caseId}(${process.env.E2E_PLATFORM || '?'})`;
+      const m = String(detail).replace(/\r?\n/g, ' ').slice(0, 200);
+      console.log(`::${cmd} title=${t}::${m}`);
+    } catch (_) { }
   };
   const shot = async (name) => {
     try {

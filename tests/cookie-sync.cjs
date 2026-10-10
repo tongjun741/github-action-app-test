@@ -120,6 +120,11 @@ async function main() {
   };
   fs.writeFileSync(OUT, JSON.stringify(result, null, 2));
   log(`已写出 ${OUT}（status=${status}）`);
+  // GitHub Actions 注解：判定结果进 annotations（匿名可读）
+  try {
+    const cmd = status === 'pass' ? 'notice' : 'error';
+    console.log(`::${cmd} title=cookie_sync(第二台设备)::${detail.replace(/\r?\n/g, ' ').slice(0, 200)}`);
+  } catch (_) { }
   process.exit(status === 'pass' ? 0 : 1);
 }
 
