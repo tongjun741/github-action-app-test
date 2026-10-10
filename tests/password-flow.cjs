@@ -325,14 +325,23 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       log(`分身浏览器已${cdpDown ? '关闭' : '未确认关闭（继续验证密码记录）'}`);
 
       log('A4 详情页查密码记录');
-      // Run#31 实测：关分身后主壳回列表页且 UA152 在第 2 页，//a 点 UA152 报 not interactable。
-      // 修复：放大每页条数（16 分身一页放下）→ 页面上下文内原子点击 → 等「打开浏览器」确认详情页。
+      // Run#32 实测：原子点击命中右侧面板标题（未导航），分页放大没生效（仍 2/2 页）。
+      // 修复：严格复刻 e2e-verify 的导航 —— 点分身 nav 确保列表 → 放大每页并【验证生效】→
+      // 失败则点第 2 页 → 专点 <a> 元素 → 等「打开浏览器」确认详情页。
       try {
+        // 1) 确保在分身列表
+        try {
+          await wdioBrowser.$('.icon-chrome_outline').waitForExist({ timeout: 5000 });
+          await wdioBrowser.$('.icon-chrome_outline').click();
+          await sleep(2500);
+        } catch (_) { }
+        // 2) 放大每页条数并验证（dump 出现「1 / 1页」或「共 16 条记录」单页才算生效）
+        let singlePage = false;
         try {
           const sel = wdioBrowser.$('.ant-pagination-options .ant-select');
           if (await sel.isExisting()) {
             await sel.click();
-            await sleep(600);
+            await sleep(800);
             const opts = await wdioBrowser.$$('.ant-select-item-option');
             let best = null, bestV = -1;
             for (const o of opts) {
@@ -340,23 +349,45 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
               if (m && Number(m[1]) > bestV) { bestV = Number(m[1]); best = o; }
             }
             if (best) { await best.click(); await sleep(2500); }
+            const pgText = await wdioBrowser.execute(() => (document.querySelector('.ant-pagination') || {}).innerText || '');
+            singlePage = !/2\s*\/\s*2页/.test(pgText);
+            log(`分页放大后: ${singlePage ? '单页生效' : `仍多页(${pgText.replace(/\n/g, ' ').slice(0, 40)})`}`);
           }
-        } catch (_) {}
-        const clicked = await wdioBrowser.execute((name) => {
-          const el = Array.from(document.querySelectorAll('a,span,div'))
-            .find((e) => (e.textContent || '').trim() === name && e.children.length === 0);
-          if (el) { el.click(); return true; }
-          return false;
-        }, process.env.CLONE_NAME || 'UA152');
-        if (clicked) log('已在页面上下文点击 UA152');
-        try {
-          await wdioBrowser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 8000 });
-        } catch (_) {
-          await wdioBrowser.$('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 4000 });
+        } catch (_) { }
+        // 3) 多页则点第 2 页页码
+        if (!singlePage) {
+          try {
+            await wdioBrowser.execute(() => {
+              const items = Array.from(document.querySelectorAll('.ant-pagination-item'));
+              const p2 = items.find((li) => (li.textContent || '').trim() === '2');
+              if (p2) p2.click();
+            });
+            await sleep(2500);
+          } catch (_) { }
         }
-        await sleep(2000);
+        // 4) 点 <a>UA152（专挑 a 元素，避免命中右侧面板文本）→ 等详情页特征
+        let onDetail = false;
+        for (let t = 0; t < 3 && !onDetail; t++) {
+          const clicked = await wdioBrowser.execute((name) => {
+            const el = Array.from(document.querySelectorAll('a'))
+              .find((e) => (e.textContent || '').trim() === name || (e.textContent || '').trim().startsWith(name));
+            if (el) { el.click(); return true; }
+            return false;
+          }, process.env.CLONE_NAME || 'UA152');
+          if (!clicked) { await sleep(2000); continue; }
+          try {
+            await wdioBrowser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 6000 });
+            onDetail = true;
+          } catch (_) {
+            try {
+              await wdioBrowser.$('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 3000 });
+              onDetail = true;
+            } catch (_) { await sleep(2000); }
+          }
+        }
+        log(onDetail ? '已确认进入 UA152 详情页' : '未能确认详情页（继续找密码入口）');
       } catch (e) {
-        log(`进详情页确认失败（继续尝试找密码入口）: ${e.message.slice(0, 80)}`);
+        log(`进详情页异常(继续): ${e.message.slice(0, 80)}`);
       }
       // 详情页找「密码」tab/入口（Run#31 dump 显示详情页有「Cookie 5站点 ，7cookies」类 tab 栏；
       // 密码入口大概率同区域。候选词表 + 兜底把详情页 tab 全 dump）
@@ -469,13 +500,27 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
         await shotToCloudinary(page, `autofill-miss-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
         throw new Error(`登录页未找到密码框（代填验证）（${diag}）`);
       }
-      const filled = await page.evaluate((passSel) => {
-        const p = document.querySelector(passSel);
-        if (!p) return { value: false, autofill: false };
-        // :-webkit-autofill 伪类检测 Chrome 自动填充
-        const isAuto = !!(p && p.matches && p.matches(':-webkit-autofill'));
-        return { value: !!(p.value && p.value.length > 0), autofill: isAuto };
-      }, inputs.passInput);
+      // 触发 autofill：聚焦+点击账号框（Chromium 常在用户名框获得焦点后才填密码框），再轮询检测
+      try {
+        if (inputs.userInput) {
+          await page.click(inputs.userInput).catch(() => {});
+          await page.focus(inputs.userInput).catch(() => {});
+          await sleep(1500);
+          await page.click(inputs.passInput).catch(() => {});
+          await sleep(1500);
+        }
+      } catch (_) { }
+      let filled = { value: false, autofill: false };
+      for (let t = 0; t < 5; t++) {
+        filled = await page.evaluate((passSel) => {
+          const p = document.querySelector(passSel);
+          if (!p) return { value: false, autofill: false };
+          const isAuto = !!(p && p.matches && p.matches(':-webkit-autofill'));
+          return { value: !!(p.value && p.value.length > 0), autofill: isAuto };
+        }, inputs.passInput);
+        if (filled.value || filled.autofill) break;
+        await sleep(2000);
+      }
       log(`代填检测: ${JSON.stringify(filled)}`);
       autoStatus = (filled.value || filled.autofill) ? 'pass' : 'fail';
       autoDetail = `密码框 value=${filled.value} webkitAutofill=${filled.autofill}`;

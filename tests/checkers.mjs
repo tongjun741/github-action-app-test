@@ -184,29 +184,37 @@ async function fingerprint_ipbinding(page, c, opts) {
 // 无头自动化环境本就无法通过，故只验证「可加载、可交互」——这是 CI 能自动判定的边界）。
 // 进阶：给 Chromium 注入 accessibility cookie（hcaptcha accessibility）可自动通过 hCaptcha，
 // 需要账号注册获取，暂未启用。
+// 8) nopecha —— 验证码 demo 三个子页可加载性检测（脚本化）
+// 判定口径：原表是「打开右边截图中的三个链接手工过验证码」——demo 首页只是链接列表（Run#32 实测
+// iframes=0）。脚本化改为访问三个 demo 子页（hCaptcha/reCAPTCHA/Turnstile），
+// 各页检测对应 iframe 注入。能加载 = 浏览器/站点兼容正常（过码本身超出 CI 边界）。
+const NOPECHA_DEMOS = [
+  { name: 'hCaptcha', url: 'https://nopecha.com/demo/hcaptcha', re: /hcaptcha/i },
+  { name: 'reCAPTCHA', url: 'https://nopecha.com/demo/recaptcha', re: /recaptcha/i },
+  { name: 'Turnstile', url: 'https://nopecha.com/demo/turnstile', re: /challenges\.cloudflare\.com/i },
+];
 async function manual_captcha(page, c, opts) {
-  await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
-  // 验证码 iframe 渲染慢（Run#31 实测 8s 不够，iframes=0）→ 轮询最多 30s
-  let probe = { iframes: [], hcaptcha: false, recaptcha: false, turnstile: false, text: '' };
-  const deadline = Date.now() + 30000;
-  for (;;) {
-    probe = await page.evaluate(() => {
-      const out = { iframes: [], hcaptcha: false, recaptcha: false, turnstile: false, text: '' };
-      try {
-        out.iframes = Array.from(document.querySelectorAll('iframe'))
-          .map((f) => f.src || '').filter(Boolean).slice(0, 10);
-        out.hcaptcha = out.iframes.some((s) => /hcaptcha/i.test(s));
-        out.recaptcha = out.iframes.some((s) => /recaptcha|google\.com\/recaptcha/i.test(s));
-        out.turnstile = out.iframes.some((s) => /challenges\.cloudflare\.com/i.test(s));
-      } catch (_) {}
-      return out;
-    }).catch(() => probe);
-    if (probe.hcaptcha || probe.recaptcha || probe.turnstile || Date.now() > deadline) break;
-    await new Promise((r) => setTimeout(r, 3000));
+  const found = {};
+  for (const d of NOPECHA_DEMOS) {
+    found[d.name] = false;
+    await gotoSafe(page, d.url, 'networkidle', 45000, opts?.engine).catch(() => {});
+    // 轮询最多 25s 等对应 iframe 出现
+    const deadline = Date.now() + 25000;
+    for (;;) {
+      const hit = await page.evaluate((reSrc) => {
+        try {
+          return Array.from(document.querySelectorAll('iframe'))
+            .some((f) => reSrc.test(f.src || ''));
+        } catch (_) { return false; }
+      }, d.re).catch(() => false);
+      if (hit) { found[d.name] = true; break; }
+      if (Date.now() > deadline) break;
+      await new Promise((r) => setTimeout(r, 3000));
+    }
   }
-  const loaded = probe.hcaptcha || probe.recaptcha || probe.turnstile;
-  const detail = `hCaptcha=${probe.hcaptcha} reCAPTCHA=${probe.recaptcha} Turnstile=${probe.turnstile} iframes=${probe.iframes.length}`;
-  return { status: loaded ? 'pass' : 'fail', detail };
+  const loadedCount = Object.values(found).filter(Boolean).length;
+  const detail = Object.entries(found).map(([k, v]) => `${k}=${v}`).join(' ');
+  return { status: loadedCount === 3 ? 'pass' : (loadedCount > 0 ? 'fail' : 'error'), detail: `${detail} (${loadedCount}/3 加载)` };
 }
 
 // 9) fingerprint-scan —— 分数 < 50
