@@ -125,12 +125,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # 调试阶段只跑目标平台：非 debug_platform 平台的 job 全部 step skip（秒级空结束）
       - name: Use Node.js 24
+        if: (inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform
         uses: actions/setup-node@v6
         with:
           node-version: '24'
 
       - name: 安装依赖
+        if: (inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform
         run: npm install
 
       # ---------- 按平台安装真实客户端 ----------
