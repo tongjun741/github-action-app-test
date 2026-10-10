@@ -500,6 +500,30 @@ jobs:
           chmod +x frpc
           ./frpc -c ./win7/frpc_16020852.ini > /tmp/frpc.log 2>&1 &
 
+      # frpc 日志上传公网（用户要求 2026-10-10）：诊断时免登录看 frp 隧道状态。
+      # 等 30s 让 frpc 跑一会儿再传；URL 进 ::notice（b64 防掩码），匿名可读。
+      - name: 上传 frpc.log 到公网
+        if: always()
+        continue-on-error: true
+        env:
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+        run: |
+          sleep 30
+          if [ -f /tmp/frpc.log ]; then
+            node -e "
+              const cloudinary = require('cloudinary').v2;
+              cloudinary.config({ secure: true });
+              cloudinary.uploader.upload('/tmp/frpc.log', {
+                asset_folder: 'e2eTest_frpc', use_filename: false, unique_filename: false, resource_type: 'raw'
+              }).then(r => {
+                console.log('::notice title=frpc日志::' + Buffer.from(r.url).toString('base64'));
+                console.log('frpc.log uploaded: ' + r.url);
+              }).catch(e => { console.log('frpc.log upload failed: ' + e.message); process.exit(0); });
+            "
+          else
+            echo "(无 /tmp/frpc.log)"
+          fi
+
       - name: 等待测试开始
         # Win7 每次都是「从零重装系统」：装机 + OEM + 重启 + 登录自启本身就要十几分钟，属常态，不是缺陷。
         # 真正要盯的是 start.log 出现后 VM 内脚本能不能往下走。这里放宽到 40 分钟并每 30s 打点；
