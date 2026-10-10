@@ -90,6 +90,39 @@ async function gotoLoginPage(page) {
   return target;
 }
 
+// 页面诊断信息（url + 首行文本）——失败时拼进 error，看清实际加载了什么页
+async function pageDiag(page) {
+  try {
+    return await page.evaluate(() => {
+      const text = (document.body ? document.body.innerText : '') || '';
+      const first = text.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 4).join(' / ');
+      return `url=${location.href} 首行=${first.slice(0, 150)}`;
+    });
+  } catch (e) {
+    return `diag失败(${e.message.slice(0, 60)})`;
+  }
+}
+
+// 截图上传 Cloudinary（有 CLOUDINARY_URL 时），返回 URL（失败 null）
+async function shotToCloudinary(page, tag) {
+  try {
+    const p = path.join(process.cwd(), `${tag}-${Date.now()}.png`);
+    await page.screenshot({ path: p }).catch(() => {});
+    if (!process.env.CLOUDINARY_URL) return null;
+    const mod = require('cloudinary');
+    const cloudinary = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+    cloudinary.config({ secure: true });
+    const now = new Date();
+    const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const result = await cloudinary.uploader.upload(p, {
+      asset_folder: `e2eTest_${mm}`, use_filename: false, unique_filename: false,
+    });
+    console.log(`[password-flow] ${tag} 截图: ${result.url}`);
+    console.log(`::notice title=${tag}截图::${Buffer.from(result.url).toString('base64')}`);
+    return result.url;
+  } catch (_) { return null; }
+}
+
 // ---------- 主流程 ----------
 /**
  * @param {object} wdioBrowser  e2e-verify 传入的 WDIO browser（主壳）
@@ -128,8 +161,15 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       loginPageUrl = await gotoLoginPage(page);
       const inputs = await findLoginInputs(page);
       log(`登录框探测: user=${inputs.userInput} pass=${inputs.passInput} all=${JSON.stringify(inputs.all).slice(0, 200)}`);
-      if (!inputs.passInput) throw new Error('登录页未找到密码输入框');
-      if (!inputs.userInput) throw new Error('登录页未找到账号输入框');
+      if (!inputs.passInput) {
+        const diag = await pageDiag(page);
+        await shotToCloudinary(page, `wdku-login-miss-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
+        throw new Error(`登录页未找到密码输入框（${diag}）`);
+      }
+      if (!inputs.userInput) {
+        const diag = await pageDiag(page);
+        throw new Error(`登录页未找到账号输入框（${diag}）`);
+      }
       // 填写并提交
       await page.type(inputs.userInput, USERNAME, { delay: 30 });
       await page.type(inputs.passInput, PASSWORD, { delay: 30 });
@@ -250,18 +290,30 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       log(`分身浏览器已${cdpDown ? '关闭' : '未确认关闭（继续验证密码记录）'}`);
 
       log('A4 详情页查密码记录');
-      // Run#24 实测：关分身后主壳停在分身列表页 → 先点目标分身进详情页
+      // Run#24/25 实测：主壳停在分身列表页 → 点目标分身进详情页，并等「打开浏览器」按钮确认真的到了详情页
       try {
         await wdioBrowser.$(`//a[contains(.,"${process.env.CLONE_NAME || 'UA152'}")]`).waitForExist({ timeout: 8000 });
         await wdioBrowser.$(`//a[contains(.,"${process.env.CLONE_NAME || 'UA152'}")]`).click();
-        await sleep(3000);
-      } catch (_) { /* 已在详情页则忽略 */ }
-      // 详情页找「密码」tab/入口（多选择器兜底）
+        // 确认详情页就绪（打开/正在访问按钮二选一）
+        try {
+          await wdioBrowser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 8000 });
+        } catch (_) {
+          await wdioBrowser.$('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 4000 });
+        }
+        await sleep(2000);
+      } catch (e) {
+        log(`进详情页确认失败（继续尝试找密码入口）: ${e.message.slice(0, 80)}`);
+      }
+      // 详情页找「密码」tab/入口（多选择器兜底；Run#25 dump 未见「密码」字样 → 词表扩大到 账号/密码记录/凭据）
       const pwdEntrySels = [
         '//span[text()="密码"]',
         '//div[contains(@class,"tab")][contains(text(),"密码")]',
         '//a[contains(text(),"密码")]',
         '//*[contains(@class,"menu")]//*[contains(text(),"密码")]',
+        '//*[contains(text(),"密码记录")]',
+        '//*[contains(text(),"账号密码")]',
+        '//*[contains(text(),"已保存密码")]',
+        '//span[contains(text(),"凭据")]',
       ];
       let entryFound = false;
       for (const sel of pwdEntrySels) {
@@ -354,7 +406,11 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       }
       await sleep(4000); // 给 autofill 时间
       const inputs = await findLoginInputs(page);
-      if (!inputs.passInput) throw new Error('登录页未找到密码框（代填验证）');
+      if (!inputs.passInput) {
+        const diag = await pageDiag(page);
+        await shotToCloudinary(page, `autofill-miss-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
+        throw new Error(`登录页未找到密码框（代填验证）（${diag}）`);
+      }
       const filled = await page.evaluate((passSel) => {
         const p = document.querySelector(passSel);
         if (!p) return { value: false, autofill: false };

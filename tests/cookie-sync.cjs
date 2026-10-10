@@ -61,7 +61,24 @@ async function main() {
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(45000);
-    // Run#24 实测首跳可能 ERR_PROXY_CONNECTION_FAILED（分身代理尚未就绪/抖动）→ 有界重试
+    // 先探网络/代理就绪：ipapi.co 轻量页，重试最多 60s（Run#25 实测分身代理需要就绪时间）
+    let netOk = false;
+    for (let i = 0; i < 6; i++) {
+      try {
+        await page.goto('https://ipapi.co/', { waitUntil: 'domcontentloaded', timeout: 15000 });
+        netOk = true;
+        log(`代理网络就绪（第 ${i + 1} 次探测）`);
+        break;
+      } catch (e) {
+        log(`网络探测失败(第 ${i + 1} 次): ${e.message.slice(0, 100)}`);
+        await sleep(10000);
+      }
+    }
+    if (!netOk) {
+      // 代理持续不可达 = 基础设施问题，判 error（区别于「到了页面但无登录态」的业务 fail）
+      throw new Error('分身代理网络持续不可达（ipapi 探测 6 次失败，疑似代理未就绪/多设备争抢）');
+    }
+    // wdku.net 导航（有界重试）
     let lastErr = '';
     let navOk = false;
     for (let i = 0; i < 4; i++) {
