@@ -156,17 +156,52 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       // 详情页「关闭」/「停止访问」按钮（与「打开浏览器」同区域的 open-btn-text 家族）
       const closeBtns = ['//span[contains(@class,"open-btn-text")][text()="关闭"]',
         '//span[contains(@class,"open-btn-tex")][text()="关闭"]',
-        '//span[contains(@class,"open-btn-text")][text()="停止访问"]'];
+        '//span[contains(@class,"open-btn-text")][text()="停止访问"]',
+        '//span[contains(@class,"open-btn-tex")][text()="停止访问"]',
+        '//span[contains(text(),"关闭浏览器")]',
+        '//span[contains(text(),"结束访问")]',
+        '//button[contains(text(),"关闭")]'];
       let closed = false;
       for (const sel of closeBtns) {
         try {
           await wdioBrowser.$(sel).waitForExist({ timeout: 5000 });
           await wdioBrowser.$(sel).click();
           closed = true;
+          log(`已点击关闭按钮: ${sel}`);
           break;
         } catch (_) { /* try next */ }
       }
-      if (!closed) throw new Error('未找到「关闭」按钮（分身可能未在访问状态）');
+      if (!closed) {
+        // 兜底：点「正在访问」按钮本身（新版 UI 里它可能就是关闭开关），点完确认 CDP 是否掉线
+        try {
+          const visiting = '//span[text()="正在访问"][contains(@class,"open-btn-text")]';
+          await wdioBrowser.$(visiting).waitForExist({ timeout: 5000 });
+          await wdioBrowser.$(visiting).click();
+          await sleep(3000);
+          // 若弹确认框，点掉
+          try {
+            await wdioBrowser.$('.ant-modal-confirm .ant-btn-primary').waitForExist({ timeout: 3000 });
+            await wdioBrowser.$('.ant-modal-confirm .ant-btn-primary').click();
+          } catch (_) { }
+          closed = await Promise.race([
+            (async () => { for (let i = 0; i < 10; i++) { if (!(await cdpAlive())) return true; await sleep(1500); } return false; })(),
+          ]);
+          if (closed) log('点「正在访问」成功关闭分身');
+        } catch (_) { /* ignore */ }
+      }
+      if (!closed) {
+        // 仍未关闭：dump 页面全部按钮/可点元素文本，供下轮修正选择器
+        let uiDump = '';
+        try {
+          uiDump = await wdioBrowser.execute(() => {
+            const t = (el) => (el.textContent || '').trim();
+            const spans = Array.from(document.querySelectorAll('span,button,a'))
+              .map(t).filter((x) => x && x.length <= 12);
+            return Array.from(new Set(spans)).slice(0, 60).join(' | ');
+          });
+        } catch (_) { }
+        throw new Error(`未找到「关闭」按钮。页面可见文本: ${String(uiDump).slice(0, 400)}`);
+      }
       // 等浏览器进程退出（CDP 掉线）
       let cdpDown = false;
       for (let i = 0; i < 20; i++) {
@@ -194,7 +229,18 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
           break;
         } catch (_) { /* try next */ }
       }
-      if (!entryFound) throw new Error('详情页未找到「密码」入口');
+      if (!entryFound) {
+        let uiDump = '';
+        try {
+          uiDump = await wdioBrowser.execute(() => {
+            const t = (el) => (el.textContent || '').trim();
+            const els = Array.from(document.querySelectorAll('span,div,a,li'))
+              .map(t).filter((x) => x && x.length <= 10);
+            return Array.from(new Set(els)).slice(0, 60).join(' | ');
+          });
+        } catch (_) { }
+        throw new Error(`详情页未找到「密码」入口。页面可见文本: ${String(uiDump).slice(0, 400)}`);
+      }
       await sleep(2000);
       // 密码记录列表中找 wdku
       const found = await wdioBrowser.execute(() => {
@@ -221,8 +267,17 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
   try {
     log('B1 重新打开分身浏览器');
     const openBtn = '//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]';
-    await wdioBrowser.$(openBtn).waitForExist({ timeout: 30000 });
-    await wdioBrowser.$(openBtn).click();
+    // 若分身仍处「正在访问」（A3 关闭失败未致命），跳过重开直接验证
+    let alreadyOpen = false;
+    try {
+      await wdioBrowser.$('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 3000 });
+      alreadyOpen = true;
+      log('分身仍处于「正在访问」状态（关闭未生效），直接进入代填验证');
+    } catch (_) { }
+    if (!alreadyOpen) {
+      await wdioBrowser.$(openBtn).waitForExist({ timeout: 30000 });
+      await wdioBrowser.$(openBtn).click();
+    }
     // 处理「继续访问」+ 等「正在访问」
     for (let n = 0; n < 60; n++) {
       try {

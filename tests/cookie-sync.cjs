@@ -64,7 +64,9 @@ async function main() {
     await page.goto('https://www.wdku.net/', { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
     await sleep(5000);
     const probe = await page.evaluate(() => {
+      // 页面可能未真正到达 wdku.net（about:blank / 错误页 / opaque origin）——全部信息带上
       const text = document.body ? document.body.innerText : '';
+      const firstLine = text.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 5).join(' / ');
       const loggedOut = /登录\s*\/?\s*注册|请登录|立即登录/i.test(text.slice(0, 2000));
       const loggedHints = /(退出|注销|我的账号|个人中心|welcome)/i.test(text.slice(0, 2000));
       let storageToken = false;
@@ -75,22 +77,30 @@ async function main() {
           if (/token|session|user/i.test(k) && v.length > 20) { storageToken = true; break; }
         }
       } catch (_) { }
+      let cookie = '';
+      try { cookie = document.cookie ? document.cookie.slice(0, 120) : ''; } catch (_) { cookie = '(cookie读取受限)'; }
       return {
         url: location.href,
+        origin: location.origin,
+        firstLine,
         loggedOut, loggedHints, storageToken,
-        cookie: document.cookie ? document.cookie.slice(0, 120) : '',
+        cookie,
       };
     });
     log(`探测结果: ${JSON.stringify(probe)}`);
     shotPath = path.join(process.cwd(), `cookie-sync-${Date.now()}.png`);
-    await page.screenshot({ path: shotPath });
-    // 判定：有登录痕迹（storage token 或页面元素）且没有「登录/注册」主导航 → pass
-    if (probe.storageToken || (probe.loggedHints && !probe.loggedOut)) {
+    await page.screenshot({ path: shotPath }).catch(() => { });
+    // 判定：URL 确实在 wdku.net 域 +（storage token 或页面元素）且没有「登录/注册」主导航 → pass
+    const onWdku = /wdku\.net/i.test(probe.url);
+    if (onWdku && (probe.storageToken || (probe.loggedHints && !probe.loggedOut))) {
       status = 'pass';
       detail = `检测到登录态（storageToken=${probe.storageToken} pageHint=${probe.loggedHints} url=${probe.url}）`;
+    } else if (!onWdku) {
+      status = 'error';
+      detail = `页面未到达 wdku.net（url=${probe.url} origin=${probe.origin} 首行=${probe.firstLine}）`;
     } else {
       status = 'fail';
-      detail = `未检测到登录态 url=${probe.url} cookie=${probe.cookie}`;
+      detail = `未检测到登录态 url=${probe.url} 首行=${probe.firstLine} cookie=${probe.cookie}`;
     }
   } catch (e) {
     status = 'error';
