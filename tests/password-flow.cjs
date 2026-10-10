@@ -58,7 +58,7 @@ async function withPage(fn) {
   }
 }
 
-// wdku.net 登录页探测：找邮箱/密码输入框（多选择器兜底）
+// wdku.net 登录框探测（真实结构 2026-10-10 实测：input[name=email] type=text / input[name=pass] type=password）
 async function findLoginInputs(page) {
   return page.evaluate(() => {
     const pick = (sels) => {
@@ -68,24 +68,21 @@ async function findLoginInputs(page) {
       }
       return null;
     };
-    const userInput = pick(['input[type="email"]', 'input[name="email"]', 'input[name="username"]', 'input[placeholder*="邮箱"]', 'input[placeholder*="邮件"]', 'input[placeholder*="账号"]']);
-    const passInput = pick(['input[type="password"]']);
+    const userInput = pick(['input[name="email"]', 'input#user', 'input[type="email"]', 'input[name="username"]']);
+    const passInput = pick(['input[name="pass"]', 'input#pass', 'input[type="password"]']);
     const all = Array.from(document.querySelectorAll('input')).map((i) => ({ type: i.type, name: i.name, id: i.id, placeholder: i.placeholder }));
     return { userInput, passInput, all };
   });
 }
 
-// wdku.net 登录页导航（公共路径）：首页 → 找「登录」入口 → 进登录页。
-// 不要硬编码 /login —— Run#24 实测该路径无密码框，真实入口以首页链接为准。
+// wdku.net 登录页导航（公共路径）。
+// 真实登录页 = https://www.wdku.net/user/login（用户提供 2026-10-10；/login 是 503 死链，
+// 首页 <a> 解析出来的 href 也是死链——均不可用）。user/login 为静态表单：
+//   input[name=email]（type=text） / input[name=pass]（type=password） / button#btn-login[type=submit]（立即登录）
 async function gotoLoginPage(page) {
-  await page.goto('https://www.wdku.net/', { waitUntil: 'domcontentloaded', timeout: 45000 });
-  const loginHref = await page.evaluate(() => {
-    const a = Array.from(document.querySelectorAll('a')).find((x) => /登录|log\s*in|sign\s*in/i.test(x.textContent || ''));
-    return a ? a.href : null;
-  });
-  const target = loginHref || 'https://www.wdku.net/login';
-  log(`登录入口: ${target}`);
-  await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
+  const target = 'https://www.wdku.net/user/login';
+  log(`登录入口(固定): ${target}`);
+  await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 45000 });
   await sleep(3000);
   return target;
 }
@@ -210,9 +207,10 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       // 填写并提交
       await page.type(inputs.userInput, USERNAME, { delay: 30 });
       await page.type(inputs.passInput, PASSWORD, { delay: 30 });
-      // 提交按钮：type=submit 或文本含 登录
+      // 提交按钮（真实结构：button#btn-login[type=submit]「立即登录」）
       const submitted = await page.evaluate(() => {
-        const btn = document.querySelector('button[type="submit"]')
+        const btn = document.querySelector('button#btn-login')
+          || document.querySelector('button[type="submit"]')
           || Array.from(document.querySelectorAll('button, input[type="submit"]')).find((b) => /登录|登 录|log\s*in/i.test(b.textContent || b.value || ''));
         if (btn) { btn.click(); return true; }
         return false;
