@@ -505,6 +505,23 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
   } catch (e) {
     log(`合并 results 失败: ${e.message}`);
   }
+
+  // ===== 收尾：优雅关闭分身浏览器（Run#31 教训）=====
+  // verify job 结束后分身浏览器若仍开着，会话成僵尸 → 下一个 job（cookie-sync 第二台设备）
+  // 经「继续访问」接管后代理不重建（ERR_PROXY_CONNECTION_FAILED 六连败的根因）。
+  // CDP Browser.close 释放会话，让云端把分身标记为「可干净打开」。
+  try {
+    if (await cdpAlive()) {
+      const puppeteer = require('puppeteer-core');
+      const b = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 30000 });
+      await b.close();
+      log('收尾：已 CDP 关闭分身浏览器（释放会话供 cookie-sync 接管）');
+    } else {
+      log('收尾：分身浏览器已关（CDP 不在线）');
+    }
+  } catch (e) {
+    log(`收尾关闭分身失败(忽略): ${e.message.slice(0, 80)}`);
+  }
   return results;
 }
 
