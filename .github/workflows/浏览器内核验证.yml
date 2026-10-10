@@ -86,7 +86,8 @@ jobs:
   verify:
     name: 验证 ${{ matrix.platform }}
     # 调试模式（debug_hold=true）时只保留 Ubuntu 平台开分身（多平台同时开同一分身 会互相踢+争抢代理）
-    if: (inputs.debug_hold != true) || (matrix.install == 'ubuntu')
+    # 注：job 级 if 里不能用 matrix（GitHub 解析限制），用 runner OS 判断
+    if: (inputs.debug_hold != true) || (runner.os == 'Linux')
     strategy:
       fail-fast: false
       matrix:
