@@ -158,12 +158,11 @@ async function main() {
     if (bsPattern.test(fileContent)) {
       fileContent = fileContent.replace(
         bsPattern,
-        // 2026-10-10 追加 --password-store=basic：Linux runner 无 gnome-keyring，Chromium 默认密码存储
-        // 静默不保存 → 花漾「网站密码」恒 0（Run#35/37/38 实证登录成功但面板 0站点）。
-        // --enable-automatic-password-saving：自动接受保存密码气泡（无人值守必配）。
-        '$1;s.push("--use-fake-ui-for-media-stream");s.push("--use-fake-device-for-media-stream");s.push("--remote-debugging-address=0.0.0.0");s.push("--remote-allow-origins=*");s.push("--password-store=basic");s.push("--enable-automatic-password-saving")'
+        // 注：--password-store=basic / --enable-automatic-password-saving 已按用户要求移除
+        //（2026-10-10：密码保存必须模拟人工点击气泡，不得改浏览器启动参数绕过）
+        '$1;s.push("--use-fake-ui-for-media-stream");s.push("--use-fake-device-for-media-stream");s.push("--remote-debugging-address=0.0.0.0");s.push("--remote-allow-origins=*")'
       );
-      console.log('✓ 已向 browserSwitches 注入 假媒体+CDP外网+密码保存(basic store+自动接受) 开关');
+      console.log('✓ 已向 browserSwitches 注入 假媒体+CDP外网 开关（不含密码相关参数，按用户要求）');
     } else {
       console.warn('⚠ 未在 browserSwitches 找到注入点，[diag] 上方已打印真实上下文');
     }

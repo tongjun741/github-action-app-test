@@ -226,13 +226,41 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       await sleep(12000); // 密码管理器落库宽限
       const url = page.url();
       log(`提交后 URL: ${url}`);
-      // 关浏览器前先探测：Chromium 原生 save-password 气泡是否出现（Run#39 后加）
-      // 气泡是浏览器级 UI（不在页面 DOM）——用 CDP PasswordManager 域不可用（需 devtools 协议前端），
-      // 改查间接证据：密码是否已写入 Chromium 登录库（chrome://settings/passwords 打不开 headless），
-      // 落到最可靠的观测点：登录页密码框若在重开后自动填充（B 阶段）即证明已保存。
-      // 这里只记录 wdku 登录页是否离开（已记录 URL）。
+      // 【模拟人工点击保存】用户要求 2026-10-10：不得用浏览器参数绕过，模拟真人点「保存」。
+      // 双路径探测气泡：
+      //   ① HuaYoung 若自实现 DOM 型保存提示（花漾是 Electron 壳+定制 Chromium，大概率）→ 找按钮点击
+      //   ② Chromium 原生气泡（浏览器级 UI，不在页面 DOM）→ 键盘 Enter（气泡默认焦点就是「保存」）
+      let bubbleAction = 'none';
+      // ① DOM 型提示按钮
+      try {
+        const domBtn = await page.evaluate(() => {
+          const cands = Array.from(document.querySelectorAll('button, div[role=button], a, span'))
+            .filter((e) => {
+              const t = (e.textContent || '').trim();
+              return /^(保存|保存密码|是|确定|Save.*password|Save)$/i.test(t) && e.offsetParent !== null;
+            });
+          if (cands.length) { cands[0].click(); return (cands[0].textContent || '').trim(); }
+          return null;
+        });
+        if (domBtn) { bubbleAction = `dom-click:${domBtn}`; log(`已点击 DOM 保存按钮: ${domBtn}`); }
+      } catch (_) { }
+      // ② Chromium 原生气泡：键盘 Enter（气泡默认焦点在「保存」）——通过 CDP Input 域派发
+      if (bubbleAction === 'none') {
+        try {
+          const client = await page.target().createCDPSession();
+          await client.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
+          await client.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
+          bubbleAction = 'keyboard-enter';
+          log('已发送键盘 Enter（针对 Chromium 原生保存气泡默认焦点）');
+          await client.detach();
+        } catch (_) { }
+      }
+      await sleep(5000); // 等保存动作生效
+      // 气泡现场取证（截图）
+      await shotToCloudinary(page, `save-bubble-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`).catch(() => { });
+      log(`气泡处理方式: ${bubbleAction}`);
       loginOk = true;
-      loginDetail = `已提交登录表单，当前URL=${url}`;
+      loginDetail = `已提交登录表单并尝试保存(气泡=${bubbleAction})，当前URL=${url}`;
     });
   } catch (e) {
     loginOk = false;
