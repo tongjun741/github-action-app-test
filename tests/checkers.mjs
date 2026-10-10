@@ -1,6 +1,36 @@
 // checkers.mjs — 每个测试用例的自动判定逻辑
 // 输入：Playwright / puppeteer-core page + case 定义 + opts（proxy / proxyIp / engine）
-// 输出：{ status: 'pass'|'fail'|'manual'|'error', detail: string }
+// 输出：{ status: 'pass'|'fail'|'manual'|'error'|'ignored', detail: string }
+
+import path from 'node:path';
+
+// 截图上传 Cloudinary（与 tests/include/tools.js 的 uploadFile 完全同参数：
+//   asset_folder: e2eTest_yyyy-MM / use_filename:false / unique_filename:false / CLOUDINARY_URL 环境变量）。
+// 未配置 CLOUDINARY_URL 或上传失败时只打日志、返回 null，绝不影响用例判定。
+async function uploadShotToCloudinary(filePath, tag) {
+  if (!process.env.CLOUDINARY_URL) {
+    console.log(`[iphey-screenshot] CLOUDINARY_URL 未配置，跳过上传（本地文件: ${filePath}）`);
+    return null;
+  }
+  try {
+    const mod = await import('cloudinary');
+    const cloudinary = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+    cloudinary.config({ secure: true });
+    const now = new Date();
+    const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const result = await cloudinary.uploader.upload(filePath, {
+      asset_folder: `e2eTest_${mm}`,
+      use_filename: false,
+      unique_filename: false,
+    });
+    console.log(`[iphey-screenshot] ${tag} 已上传 Cloudinary: ${result.url}`);
+    return result.url;
+  } catch (e) {
+    console.log(`[iphey-screenshot] 上传失败(忽略): ${e.message}`);
+    return null;
+  }
+}
+
 
 function isPublicIp(ip) {
   if (!ip) return false;
@@ -69,10 +99,22 @@ async function fingerprint_iphey(page, c, opts) {
     if (IPHEY_VERDICT_RE.test(text) || Date.now() > deadline) break;
     await new Promise((r) => setTimeout(r, 1500));
   }
+  // 判定词已渲染（或超时）→ 截图存证 + 按 tools.js uploadFile 同参数上传 Cloudinary（2026-10-10 用户要求）。
+  // 截图/上传失败不影响判定；URL 追加进 detail，CI 日志与 results JSON 里都能直接拿到图片链接。
+  let shotUrl = null;
+  try {
+    const shotPath = path.join(process.cwd(), `iphey-${Date.now()}.png`);
+    await page.screenshot({ path: shotPath, fullPage: true });
+    console.log(`[iphey-screenshot] 已保存本地截图: ${shotPath}`);
+    shotUrl = await uploadShotToCloudinary(shotPath, `iphey(${process.env.E2E_PLATFORM || '?'})`);
+  } catch (e) {
+    console.log(`[iphey-screenshot] 截图失败(忽略): ${e.message}`);
+  }
+  const shotSuffix = shotUrl ? ` [截图] ${shotUrl}` : '';
   const m = text.match(IPHEY_FAIL_RE);
-  if (m) return { status: 'fail', detail: `命中风险词「${m[0]}」; ${text.slice(0, 160).replace(/\n/g, ' ')}` };
-  if (/\blooks reliable\b|\breliable\b/i.test(text)) return { status: 'pass', detail: text.slice(0, 160).replace(/\n/g, ' ') };
-  return { status: 'manual', detail: `未解析到判定词（Unreliable/Reliable），需人工确认; ${text.slice(0, 160).replace(/\n/g, ' ')}` };
+  if (m) return { status: 'fail', detail: `命中风险词「${m[0]}」; ${text.slice(0, 160).replace(/\n/g, ' ')}${shotSuffix}` };
+  if (/\blooks reliable\b|\breliable\b/i.test(text)) return { status: 'pass', detail: `${text.slice(0, 160).replace(/\n/g, ' ')}${shotSuffix}` };
+  return { status: 'manual', detail: `未解析到判定词（Unreliable/Reliable），需人工确认; ${text.slice(0, 160).replace(/\n/g, ' ')}${shotSuffix}` };
 }
 
 // 5) browserleaks/ip —— 自采集 WebRTC IP，与代理 IP 比对
@@ -120,8 +162,9 @@ async function fingerprint_whoer(page, c, opts) {
 }
 
 // 7) ipbinding —— WebRTC blocked
-// 判定口径（用户确认 2026-10-09）：CI 无代理时，分身自配的 SOCKS 不可达 -> 导航抛错
-//   -> 保持 error（不降级为 manual/skipped）。
+// 判定口径变更（用户确认 2026-10-10）：CI 无代理、分身 SOCKS 不可达，导航必抛错；
+//   按用户要求【忽略】该用例（matrix.json 中 ipbinding 标 ignored:true，checkCase 直接返回 忽略，不再导航）。
+//   下方逻辑保留作离线/有代理环境的参考实现。
 async function fingerprint_ipbinding(page, c, opts) {
   await gotoSafe(page, c.url, 'domcontentloaded', 30000, opts?.engine);
   const text = await bodyText(page);

@@ -1,4 +1,4 @@
-name: HuaYoung 浏览器验证 (团队213505445724246 / UA152分身 / 152内核)
+name: 浏览器内核验证
 
 # 按 生产环境-12.9-148内核.xlsx 验证全部项目，并生成 Excel 报告。
 # 验证目标：团队 213505445724246 内的「UA152」分身（分身浏览器 CDP 端口 9221），
@@ -59,7 +59,7 @@ on:
       - 'tools/**'
       - 'modifyMain.js'
       - 'package.json'
-      - '.github/workflows/verify.yml'
+      - '.github/workflows/浏览器内核验证.yml'
       - 'win7/**'
 
 permissions:
@@ -224,6 +224,8 @@ jobs:
           TEAM_NAME: ${{ secrets.TEAM_NAME }}
           WDIO_USERNAME: ${{ secrets.WDIO_USERNAME }}
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          CLOUDINARY_MASK: ${{ secrets.CLOUDINARY_MASK }}
           OUT: results-${{ matrix.slug }}.json
         run: node tests/e2e-verify.cjs
 
@@ -234,6 +236,7 @@ jobs:
           path: |
             results-${{ matrix.slug }}.json
             screenshot-${{ matrix.slug }}.png
+            iphey-*.png
           if-no-files-found: warn
 
   verify-win7:
@@ -305,6 +308,8 @@ jobs:
           TEAM_NAME=${{ secrets.TEAM_NAME }}
           WDIO_USERNAME=${{ secrets.WDIO_USERNAME }}
           PRODUCT_WDIO_PASSWORD=${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          CLOUDINARY_URL=${{ secrets.CLOUDINARY_URL }}
+          CLOUDINARY_MASK=${{ secrets.CLOUDINARY_MASK }}
           EOF
           echo "--- e2e-env.txt (密码已脱敏) ---"
           sed 's/^PRODUCT_WDIO_PASSWORD=.*/PRODUCT_WDIO_PASSWORD=***/' win7/shared/work/e2e-env.txt
@@ -409,6 +414,8 @@ jobs:
           if [ -f "win7/shared/work/screenshot-Windows_7.png" ]; then
             cp win7/shared/work/screenshot-Windows_7.png screenshot-Windows_7.png || true
           fi
+          # iphey 截图（checkers 生成）也一并带回，上传 artifact 留档
+          cp win7/shared/work/iphey-*.png . 2>/dev/null || true
           exit $FAIL
 
       - uses: actions/upload-artifact@v4
@@ -418,6 +425,7 @@ jobs:
           path: |
             results-Windows_7.json
             screenshot-Windows_7.png
+            iphey-*.png
           if-no-files-found: warn
 
   report:
