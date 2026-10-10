@@ -190,20 +190,24 @@ async function fingerprint_ipbinding(page, c, opts) {
 const NOPECHA_DEMOS = [
   { name: 'hCaptcha', url: 'https://nopecha.com/captcha/hcaptcha', re: /hcaptcha/i },
   { name: 'reCAPTCHA', url: 'https://nopecha.com/captcha/recaptcha', re: /recaptcha/i },
-  { name: 'Turnstile', url: 'https://nopecha.com/captcha/turnstile', re: /challenges\.cloudflare\.com/i },
+  { name: 'Turnstile', url: 'https://nopecha.com/captcha/turnstile', re: /(challenges\.cloudflare|turnstile)/i },
 ];
 async function manual_captcha(page, c, opts) {
   const found = {};
   for (const d of NOPECHA_DEMOS) {
     found[d.name] = false;
     await gotoSafe(page, d.url, 'networkidle', 45000, opts?.engine).catch(() => {});
-    // 轮询最多 25s 等对应 iframe 出现
+    // 轮询最多 25s：双通道判定——① 对应 iframe 注入（JS 执行后）
+    // ② 站点脚本已加载（子页是 JS 渲染壳：hcaptcha api.js 动态建 iframe，脚本加载=组件能力可用）
     const deadline = Date.now() + 25000;
     for (;;) {
       const hit = await page.evaluate((reSrc) => {
         try {
-          return Array.from(document.querySelectorAll('iframe'))
-            .some((f) => reSrc.test(f.src || ''));
+          if (Array.from(document.querySelectorAll('iframe')).some((f) => reSrc.test(f.src || ''))) return true;
+          if (Array.from(document.querySelectorAll('script[src]')).some((s) => reSrc.test(s.src || ''))) return true;
+          const res = (performance.getEntriesByType('resource') || []).map((r) => r.name || '');
+          if (res.some((n) => reSrc.test(n))) return true;
+          return false;
         } catch (_) { return false; }
       }, d.re).catch(() => false);
       if (hit) { found[d.name] = true; break; }
