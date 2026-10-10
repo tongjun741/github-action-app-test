@@ -61,7 +61,21 @@ async function main() {
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(45000);
-    await page.goto('https://www.wdku.net/', { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
+    // Run#24 实测首跳可能 ERR_PROXY_CONNECTION_FAILED（分身代理尚未就绪/抖动）→ 有界重试
+    let lastErr = '';
+    let navOk = false;
+    for (let i = 0; i < 4; i++) {
+      try {
+        await page.goto('https://www.wdku.net/', { waitUntil: 'domcontentloaded', timeout: 45000 });
+        navOk = true;
+        break;
+      } catch (e) {
+        lastErr = e.message;
+        log(`导航失败(第 ${i + 1} 次): ${e.message.slice(0, 120)}，10s 后重试`);
+        await sleep(10000);
+      }
+    }
+    if (!navOk) throw new Error(`wdku.net 导航重试 4 次仍失败: ${lastErr.slice(0, 160)}`);
     await sleep(5000);
     const probe = await page.evaluate(() => {
       // 页面可能未真正到达 wdku.net（about:blank / 错误页 / opaque origin）——全部信息带上

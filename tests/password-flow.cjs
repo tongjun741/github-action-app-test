@@ -75,6 +75,21 @@ async function findLoginInputs(page) {
   });
 }
 
+// wdku.net 登录页导航（公共路径）：首页 → 找「登录」入口 → 进登录页。
+// 不要硬编码 /login —— Run#24 实测该路径无密码框，真实入口以首页链接为准。
+async function gotoLoginPage(page) {
+  await page.goto('https://www.wdku.net/', { waitUntil: 'domcontentloaded', timeout: 45000 });
+  const loginHref = await page.evaluate(() => {
+    const a = Array.from(document.querySelectorAll('a')).find((x) => /登录|log\s*in|sign\s*in/i.test(x.textContent || ''));
+    return a ? a.href : null;
+  });
+  const target = loginHref || 'https://www.wdku.net/login';
+  log(`登录入口: ${target}`);
+  await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
+  await sleep(3000);
+  return target;
+}
+
 // ---------- 主流程 ----------
 /**
  * @param {object} wdioBrowser  e2e-verify 传入的 WDIO browser（主壳）
@@ -107,19 +122,10 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
   log(`A1 登录 ${USERNAME} @ wdku.net（CDP=${CDP}）`);
   let loginOk = false;
   let loginDetail = '';
+  let loginPageUrl = '';
   try {
     await withPage(async (page) => {
-      // wdku.net 工具站登录入口：首页右上角「登录」或直接 /login 路径
-      await page.goto('https://www.wdku.net/', { waitUntil: 'domcontentloaded', timeout: 45000 });
-      // 找登录入口
-      const loginHref = await page.evaluate(() => {
-        const a = Array.from(document.querySelectorAll('a')).find((x) => /登录|log\s*in|sign\s*in/i.test(x.textContent || ''));
-        return a ? a.href : null;
-      });
-      const target = loginHref || 'https://www.wdku.net/login';
-      log(`登录入口: ${target}`);
-      await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
-      await sleep(3000);
+      loginPageUrl = await gotoLoginPage(page);
       const inputs = await findLoginInputs(page);
       log(`登录框探测: user=${inputs.userInput} pass=${inputs.passInput} all=${JSON.stringify(inputs.all).slice(0, 200)}`);
       if (!inputs.passInput) throw new Error('登录页未找到密码输入框');
@@ -152,40 +158,72 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
   let saveDetail = loginOk ? '' : loginDetail;
   if (loginOk) {
     try {
-      log('A3 关闭分身浏览器（主壳 UI）');
-      // 详情页「关闭」/「停止访问」按钮（与「打开浏览器」同区域的 open-btn-text 家族）
-      const closeBtns = ['//span[contains(@class,"open-btn-text")][text()="关闭"]',
-        '//span[contains(@class,"open-btn-tex")][text()="关闭"]',
-        '//span[contains(@class,"open-btn-text")][text()="停止访问"]',
-        '//span[contains(@class,"open-btn-tex")][text()="停止访问"]',
-        '//span[contains(text(),"关闭浏览器")]',
-        '//span[contains(text(),"结束访问")]',
-        '//button[contains(text(),"关闭")]'];
+      log('A3 关闭分身浏览器');
+      // 首选 CDP Browser.close() 直关分身内核（Run#24 实测主壳 UI 此时停在分身列表页，
+      // 详情页的「关闭」按钮根本不可见 —— 不再依赖 UI 按钮，UI 仅作兜底）。
       let closed = false;
-      for (const sel of closeBtns) {
-        try {
-          await wdioBrowser.$(sel).waitForExist({ timeout: 5000 });
-          await wdioBrowser.$(sel).click();
-          closed = true;
-          log(`已点击关闭按钮: ${sel}`);
-          break;
-        } catch (_) { /* try next */ }
+      try {
+        const puppeteer = require('puppeteer-core');
+        const b = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 30000 });
+        await b.close(); // 对 connect() 的远端浏览器：close = 关闭整个浏览器
+        closed = true;
+        log('已通过 CDP Browser.close 关闭分身浏览器');
+      } catch (e) {
+        log(`CDP 直关失败（${e.message}），回退 UI 路径`);
+      }
+      if (closed) {
+        // 等 CDP 掉线确认
+        for (let i = 0; i < 15; i++) {
+          if (!(await cdpAlive())) break;
+          await sleep(1500);
+        }
       }
       if (!closed) {
-        // 兜底：点「正在访问」按钮本身（新版 UI 里它可能就是关闭开关），点完确认 CDP 是否掉线
+        // UI 兜底：先回列表 → 进目标分身详情页 → 找关闭按钮（Run#24 dump 证实主壳此时在列表页）
+        const closeBtns = ['//span[contains(@class,"open-btn-text")][text()="关闭"]',
+          '//span[contains(@class,"open-btn-tex")][text()="关闭"]',
+          '//span[contains(@class,"open-btn-text")][text()="停止访问"]',
+          '//span[contains(@class,"open-btn-tex")][text()="停止访问"]',
+          '//span[contains(text(),"关闭浏览器")]',
+          '//span[contains(text(),"结束访问")]',
+          '//button[contains(text(),"关闭")]'];
+        // 进详情页：列表页点目标分身
         try {
+          await wdioBrowser.$(`//a[contains(.,"${process.env.CLONE_NAME || 'UA152'}")]`).waitForExist({ timeout: 8000 });
+          await wdioBrowser.$(`//a[contains(.,"${process.env.CLONE_NAME || 'UA152'}")]`).click();
+          await sleep(3000);
+        } catch (_) { /* 已在详情页则忽略 */ }
+        for (const sel of closeBtns) {
+          try {
+            await wdioBrowser.$(sel).waitForExist({ timeout: 5000 });
+            await wdioBrowser.$(sel).click();
+            closed = true;
+            log(`已点击关闭按钮: ${sel}`);
+            break;
+          } catch (_) { /* try next */ }
+        }
+      }
+      if (!closed) {
+        // 最后兜底：点「正在访问」按钮本身（新版 UI 里它可能就是关闭开关）
+        try {
+          // 先确保在详情页
+          try {
+            await wdioBrowser.$(`//a[contains(.,"${process.env.CLONE_NAME || 'UA152'}")]`).waitForExist({ timeout: 5000 });
+            await wdioBrowser.$(`//a[contains(.,"${process.env.CLONE_NAME || 'UA152'}")]`).click();
+            await sleep(3000);
+          } catch (_) { }
           const visiting = '//span[text()="正在访问"][contains(@class,"open-btn-text")]';
           await wdioBrowser.$(visiting).waitForExist({ timeout: 5000 });
           await wdioBrowser.$(visiting).click();
           await sleep(3000);
-          // 若弹确认框，点掉
           try {
             await wdioBrowser.$('.ant-modal-confirm .ant-btn-primary').waitForExist({ timeout: 3000 });
             await wdioBrowser.$('.ant-modal-confirm .ant-btn-primary').click();
           } catch (_) { }
-          closed = await Promise.race([
-            (async () => { for (let i = 0; i < 10; i++) { if (!(await cdpAlive())) return true; await sleep(1500); } return false; })(),
-          ]);
+          for (let i = 0; i < 10; i++) {
+            if (!(await cdpAlive())) { closed = true; break; }
+            await sleep(1500);
+          }
           if (closed) log('点「正在访问」成功关闭分身');
         } catch (_) { /* ignore */ }
       }
@@ -212,6 +250,12 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       log(`分身浏览器已${cdpDown ? '关闭' : '未确认关闭（继续验证密码记录）'}`);
 
       log('A4 详情页查密码记录');
+      // Run#24 实测：关分身后主壳停在分身列表页 → 先点目标分身进详情页
+      try {
+        await wdioBrowser.$(`//a[contains(.,"${process.env.CLONE_NAME || 'UA152'}")]`).waitForExist({ timeout: 8000 });
+        await wdioBrowser.$(`//a[contains(.,"${process.env.CLONE_NAME || 'UA152'}")]`).click();
+        await sleep(3000);
+      } catch (_) { /* 已在详情页则忽略 */ }
       // 详情页找「密码」tab/入口（多选择器兜底）
       const pwdEntrySels = [
         '//span[text()="密码"]',
@@ -301,8 +345,13 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
     }
     log('B2 验证代填');
     await withPage(async (page) => {
-      const loginHref = 'https://www.wdku.net/login';
-      await page.goto(loginHref, { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
+      // 复用 A1 的登录页导航（首页找入口，不硬编码 /login）
+      if (loginPageUrl) {
+        await page.goto(loginPageUrl, { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
+        await sleep(3000);
+      } else {
+        await gotoLoginPage(page);
+      }
       await sleep(4000); // 给 autofill 时间
       const inputs = await findLoginInputs(page);
       if (!inputs.passInput) throw new Error('登录页未找到密码框（代填验证）');
