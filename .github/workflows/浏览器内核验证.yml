@@ -66,10 +66,15 @@ on:
         default: false
         type: boolean
       debug_verify:
-        description: '调试验证：Ubuntu 单平台跑全项验证（含密码流程），完成后挂起保活不销毁——失败可连 CDP 现场查。全项 PASS 后再手动跑全量。'
+        description: '调试验证：单平台跑全项验证（含密码流程），完成后挂起保活不销毁——失败可连 CDP 现场查。全项 PASS 后再手动跑全量。'
         required: false
         default: false
         type: boolean
+      debug_platform:
+        description: '调试验证的目标平台（默认 win10；可选 ubuntu）。debug_hold/debug_verify 时其它平台全跳过。'
+        required: false
+        default: 'win10'
+        type: string
       skip_win7:
         description: '跳过 Win7 Docker job（默认 true——Win7 搁置中；需验证 Win7 时手动填 false）。'
         required: false
@@ -96,8 +101,8 @@ jobs:
   verify:
     name: 验证 ${{ matrix.platform }}
     # 注：job 级 if 不能引用 matrix/runner（GitHub 求值限制）——
-    # 调试模式（debug_hold）的平台筛选下沉到 step 级 if（见各步）：
-    # 非 Ubuntu 平台的所有 step 在调试模式下全部 skip，等价于该平台不跑。
+    # 调试模式（debug_hold/debug_verify）的平台筛选下沉到 step 级 if（见各步）：
+    # 非 debug_platform 平台的所有 step 在调试模式下全部 skip，等价于该平台不跑。
     strategy:
       fail-fast: false
       matrix:
@@ -130,7 +135,7 @@ jobs:
 
       # ---------- 按平台安装真实客户端 ----------
       - name: 安装客户端 (Windows)
-        if: (inputs.debug_hold != true && inputs.debug_verify != true) && startsWith(matrix.install, 'win')
+        if: ((inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform) && startsWith(matrix.install, 'win')
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -165,7 +170,7 @@ jobs:
           }
 
       - name: 安装客户端 (Ubuntu)
-        if: matrix.install == 'ubuntu'
+        if: (inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform
         shell: bash
         run: |
           set -e
@@ -232,7 +237,7 @@ jobs:
         run: sudo node modifyMain.js
 
       - name: 修改 main.js (其他平台)
-        if: matrix.install == 'ubuntu' || (inputs.debug_hold != true && inputs.debug_verify != true)
+        if: ((inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform) && !startsWith(matrix.install, 'mac')
         continue-on-error: true
         run: node modifyMain.js
 
@@ -241,8 +246,8 @@ jobs:
       #   debug_hold=true   → 只打开分身（OPEN_CLONE_ONLY）+ 可选 ui_probe，挂起
       #   debug_verify=true → 跑全项验证（14 项+密码流程，走正常 e2e-verify），跑完挂起——
       #                       失败可连 CDP 现场查；全项 PASS 后才手动 dispatch 全量定稿轮
-      - name: 开 CDP 调试隧道 (Ubuntu)
-        if: matrix.install == 'ubuntu' && (inputs.debug_hold == true || inputs.debug_verify == true)
+      - name: 开 CDP 调试隧道 (调试平台)
+        if: matrix.install == inputs.debug_platform && (inputs.debug_hold == true || inputs.debug_verify == true)
         continue-on-error: true
         run: |
           chmod +x tools/debug-tunnel.sh 2>/dev/null || true
