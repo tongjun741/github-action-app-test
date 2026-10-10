@@ -470,7 +470,56 @@ async function main() {
     if (process.env.PROXY_IP) runnerArgs.push('--proxy-ip', process.env.PROXY_IP);
     const r = spawnSync(process.execPath, runnerArgs, { stdio: 'inherit' });
     log(`runner 退出码=${r.status}`);
-    return r.status == null ? 1 : r.status;
+
+    // ===== 密码保存 / 代填（脚本化，用户要求 2026-10-10）=====
+    // 在同一 WDIO 会话内执行：登录 wdku → 关分身 → 详情页查密码记录 → 重开分身验证代填。
+    // 依赖 WDKU_PASSWORD secret（或 matrix.json criteria 内的测试账号兜底）；
+    // 缺密码或流程失败 → 两项记 fail 且**退出码置红**（脚本要求真跑，不降级 manual）。
+    let pwFail = 0;
+    if (OPEN_ONLY) {
+      log('OPEN_CLONE_ONLY=1 → 跳过密码流程');
+    } else {
+      const { runPasswordFlow } = require('./password-flow.cjs');
+      const hasMatrixCred = (() => {
+        try {
+          const m = JSON.parse(fs.readFileSync(path.join(__dirname, 'matrix.json'), 'utf8'));
+          const c = (m.cases || []).find((x) => x.id === 'password_save');
+          return !!(c && /和密码\s+\S+/.test(c.criteria || ''));
+        } catch (_) { return false; }
+      })();
+      if (!process.env.WDKU_PASSWORD && !hasMatrixCred) {
+        log('⚠️ 未配置 WDKU_PASSWORD 且 matrix 无兜底账号，密码保存/代填两项记 fail');
+        try {
+          const j = JSON.parse(fs.readFileSync(OUT, 'utf8'));
+          j.results = (j.results || []).filter((x) => !['password_save', 'password_autofill'].includes(x.caseId));
+          j.results.push(
+            { caseId: 'password_save', name: '普通会话能否保存密码', type: 'client_password_save', status: 'fail', detail: 'CI 未配置 WDKU_PASSWORD secret 且无兜底账号，无法执行登录', criteria: '（脚本化）' },
+            { caseId: 'password_autofill', name: '普通会话能否代填密码', type: 'client_password_autofill', status: 'fail', detail: 'CI 未配置 WDKU_PASSWORD secret 且无兜底账号，无法执行登录', criteria: '（脚本化）' },
+          );
+          fs.writeFileSync(OUT, JSON.stringify(j, null, 2));
+        } catch (e) { log(`写占位失败: ${e.message}`); }
+        pwFail = 1;
+      } else {
+        try {
+          const pwResults = await runPasswordFlow(browser, { outPath: OUT });
+          if (pwResults.some((x) => x.status === 'fail' || x.status === 'error')) pwFail = 1;
+        } catch (e) {
+          log(`密码流程整体失败: ${e.message}`);
+          try {
+            const j = JSON.parse(fs.readFileSync(OUT, 'utf8'));
+            j.results = (j.results || []).filter((x) => !['password_save', 'password_autofill'].includes(x.caseId));
+            j.results.push(
+              { caseId: 'password_save', name: '普通会话能否保存密码', type: 'client_password_save', status: 'fail', detail: `流程异常: ${e.message}`, criteria: '（脚本化）' },
+              { caseId: 'password_autofill', name: '普通会话能否代填密码', type: 'client_password_autofill', status: 'fail', detail: `流程异常: ${e.message}`, criteria: '（脚本化）' },
+            );
+            fs.writeFileSync(OUT, JSON.stringify(j, null, 2));
+          } catch (_) { /* ignore */ }
+          pwFail = 1;
+        }
+      }
+    }
+
+    return (r.status == null ? 1 : r.status) || pwFail;
   } finally {
     try { await browser.deleteSession(); } catch (_) { /* ignore */ }
   }

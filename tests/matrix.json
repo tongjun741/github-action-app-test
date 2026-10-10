@@ -115,10 +115,10 @@
     {
       "id": "plugins_load",
       "name": "分身自带插件是否正常加载",
-      "type": "client_plugins",
-      "url": null,
-      "expected": "manual",
-      "criteria": "打开浏览器后右上角应该能正常加载这四个插件，且都能正常点开",
+      "type": "fingerprint_plugins",
+      "url": "chrome://extensions/",
+      "expected": "extensions_ge_4",
+      "criteria": "打开浏览器后右上角应该能正常加载这四个插件，且都能正常点开（脚本化：chrome://extensions 枚举扩展数 ≥4）",
       "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
     },
     {

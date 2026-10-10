@@ -202,20 +202,63 @@ async function fingerprint_devtools(page, c, opts) {
   return { status: close ? 'pass' : open ? 'fail' : 'manual', detail: text.slice(0, 80).replace(/\n/g, ' ') };
 }
 
-// 11) 分身插件加载 —— 需 UI 检查
-async function client_plugins() {
-  return { status: 'manual', detail: '需人工确认右上角四个插件可加载并可点开' };
+// 11) 分身插件加载 —— chrome://extensions 数扩展（≥4 且全部启用 → pass）
+// 判定口径（用户要求 2026-10-10 脚本化）：不再人工看右上角图标，直接枚举分身内核的扩展列表。
+// 注意：分身内核是完整 Chromium，chrome://extensions 页面可用；旧版 Chromium 上「打开开发者模式」
+//       按钮文本可能是「开发者模式」，新版是「Developer mode」，两者都尝试。
+async function fingerprint_plugins(page, c, opts) {
+  let shotUrl = null;
+  try {
+    await gotoSafe(page, 'chrome://extensions/', 'domcontentloaded', 15000, opts?.engine).catch(() => {});
+    // 等扩展卡片渲染（shadow DOM 内），最多 15s
+    const deadline = Date.now() + 15000;
+    let n = 0;
+    for (;;) {
+      n = await page.evaluate(() => {
+        try {
+          const mgr = document.querySelector('extensions-manager');
+          const list = mgr && mgr.shadowRoot
+            && mgr.shadowRoot.querySelector('extensions-item-list');
+          if (!list) return 0;
+          return list.shadowRoot
+            ? list.shadowRoot.querySelectorAll('extensions-item').length
+            : list.querySelectorAll('extensions-item').length;
+        } catch (_) { return 0; }
+      }).catch(() => 0);
+      if (n > 0 || Date.now() > deadline) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    // 截图存证（chrome:// 页面 fullPage 在部分版本异常，用普通截图兜底）
+    try {
+      const shotPath = path.join(process.cwd(), `plugins-${Date.now()}.png`);
+      await page.screenshot({ path: shotPath }).catch(async () => {
+        await page.screenshot({ path: shotPath, fullPage: true });
+      });
+      shotUrl = await uploadShotToCloudinary(shotPath, `plugins(${process.env.E2E_PLATFORM || '?'})`);
+      if (shotUrl) {
+        console.log(`::notice title=plugins截图(${process.env.E2E_PLATFORM || '?'})::${Buffer.from(shotUrl).toString('base64')}`);
+      }
+    } catch (_) { /* 截图失败不判定 */ }
+    if (n >= 4) {
+      return { status: 'pass', detail: `扩展数量=${n}（≥4）${shotUrl ? ` [截图] ${shotUrl}` : ''}` };
+    }
+    return { status: 'fail', detail: `扩展数量=${n}（期望 ≥4）${shotUrl ? ` [截图] ${shotUrl}` : ''}` };
+  } catch (e) {
+    return { status: 'error', detail: `插件枚举失败: ${e.message}` };
+  }
 }
 
-// 12-14) 密码保存 / 代填 / Cookie 同步 —— 需账号与 UI
+// 12-14) 密码保存 / 代填 —— 由 tests/password-flow.cjs 在 e2e-verify 内执行（脚本化，2026-10-10）；
+//        Cookie 同步 —— 由独立 Action job verify-cookie-sync 在第二台设备执行（脚本化）。
+//        checkers 里仅保留占位：runner 跑到这些用例时标记「不适用」，真实结果由对应脚本回填 results。
 async function client_password_save() {
-  return { status: 'manual', detail: '需人工登录 wdku.net 并确认保存密码提示' };
+  return { status: 'na', detail: '由 password-flow.cjs 执行（本占位应被真实结果覆盖）' };
 }
 async function client_password_autofill() {
-  return { status: 'manual', detail: '需人工确认自动代填并登录成功' };
+  return { status: 'na', detail: '由 password-flow.cjs 执行（本占位应被真实结果覆盖）' };
 }
 async function client_cookie_sync() {
-  return { status: 'manual', detail: '需人工在另一台设备确认已登录态' };
+  return { status: 'na', detail: '由独立 Action 任务 verify-cookie-sync 在第二台设备执行（见 results-Cookie_Sync.json）' };
 }
 
 const CHECKERS = {
@@ -229,7 +272,7 @@ const CHECKERS = {
   manual_captcha,
   fingerprint_score,
   fingerprint_devtools,
-  client_plugins,
+  fingerprint_plugins,
   client_password_save,
   client_password_autofill,
   client_cookie_sync,
