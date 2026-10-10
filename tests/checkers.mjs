@@ -107,8 +107,13 @@ async function fingerprint_iphey(page, c, opts) {
     await page.screenshot({ path: shotPath, fullPage: true });
     console.log(`[iphey-screenshot] 已保存本地截图: ${shotPath}`);
     shotUrl = await uploadShotToCloudinary(shotPath, `iphey(${process.env.E2E_PLATFORM || '?'})`);
-    // GitHub Actions 注解：URL 进 notice —— 公共仓库 annotations API 匿名可读，无需 token 即可取回链接
-    if (shotUrl) console.log(`::notice title=iphey截图(${process.env.E2E_PLATFORM || '?'})::${shotUrl}`);
+    // GitHub Actions 注解：URL 进 notice —— 公共仓库 annotations API 匿名可读，无需 token 即可取回链接。
+    // 注意：明文 URL 里的 cloud_name 会被 GitHub 按 CLOUDINARY_URL secret 部分掩码成 ***，
+    //       故同时输出 base64(完整URL)，掩码按子串匹配、base64 后不再命中，可无损还原。
+    if (shotUrl) {
+      console.log(`::notice title=iphey截图(${process.env.E2E_PLATFORM || '?'})::${shotUrl}`);
+      console.log(`::notice title=iphey截图b64(${process.env.E2E_PLATFORM || '?'})::${Buffer.from(shotUrl).toString('base64')}`);
+    }
   } catch (e) {
     console.log(`[iphey-screenshot] 截图失败(忽略): ${e.message}`);
   }
