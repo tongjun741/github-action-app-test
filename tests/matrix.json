@@ -147,6 +147,60 @@
       "expected": "manual",
       "criteria": "‘普通会话能否保存密码’完成后，换一台电脑打开分身浏览器访问 https://www.wdku.net/，检查是否处于已登录状态",
       "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "localstorage_sync",
+      "name": "LocalStorage同步",
+      "type": "client_localstorage_sync",
+      "url": "https://qq.com/",
+      "expected": "manual",
+      "criteria": "新建一个分身，确保开启了LocalStorage同步。打开浏览器后访问https://qq.com，打开开发者工具控制台执行“写入LocalStorage”命令后关闭浏览器；换一台电脑打开同一个分身，再次访问https://qq.com，打开控制台执行“读取LocalStorage”，应该能读取到之前写入的数据（源表 R17，2026-10-10 补录）",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "indexdb_sync",
+      "name": "IndexDB同步",
+      "type": "client_indexdb_sync",
+      "url": "https://qq.com/",
+      "expected": "manual",
+      "criteria": "新建一个分身，确保开启了IndexDB同步。打开浏览器后访问https://qq.com，打开开发者工具控制台，执行“写入IndexDB”后关闭浏览器；换一台电脑打开同一个分身，读取IndexDB，应该能读取到之前写入的数据（源表 R18，2026-10-10 补录）",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "history_sync",
+      "name": "历史记录同步",
+      "type": "client_history_sync",
+      "url": "https://www.wdku.net/",
+      "expected": "manual",
+      "criteria": "访问https://www.wdku.net/后，换一台电脑打开同一个分身，应该能从历史记录中找到https://www.wdku.net（源表 R19，2026-10-10 补录）",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "bookmark_sync",
+      "name": "收藏夹同步",
+      "type": "client_bookmark_sync",
+      "url": "https://www.wdku.net/",
+      "expected": "manual",
+      "criteria": "访问https://www.wdku.net/并收藏到书签栏后，换一台电脑打开同一个分身，应该在收藏夹上看到https://www.wdku.net（源表 R20，2026-10-10 补录）",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "rpa_flow",
+      "name": "执行RPA流程",
+      "type": "client_rpa_flow",
+      "url": "about:blank",
+      "expected": "manual",
+      "criteria": "执行RPA流程“百度检索-教程示例”，输入变量为“ssd”和“知乎”，应该能在百度上搜索ssd，并点开知乎的链接（源表 R21，2026-10-10 补录）",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
+    },
+    {
+      "id": "google_translate",
+      "name": "右键Google翻译",
+      "type": "client_google_translate",
+      "url": "https://www.tiktok.com/support?lang=en",
+      "expected": "manual",
+      "criteria": "分身开启谷歌翻译加速，使用Webshare的IP访问https://www.tiktok.com/support?lang=en，右键选择翻译后应该能正常翻译页面（源表 R22，2026-10-10 补录）",
+      "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
     }
   ]
 }
