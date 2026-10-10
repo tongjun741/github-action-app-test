@@ -332,135 +332,40 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       log(`分身浏览器已${cdpDown ? '关闭' : '未确认关闭（继续验证密码记录）'}`);
 
       log('A4 详情页查密码记录');
-      // Run#35 实测：导航偶发不进详情页（时序抖动）。加固：整体导航重试 3 轮，
-      // 每轮 = 点「分身」nav 回列表 → 放大分页并验证（失败点第2页）→ 点 <a>UA152 → 等详情页特征。
-      let onDetail = false;
-      for (let round = 1; round <= 3 && !onDetail; round++) {
-        try {
-          try {
-            await wdioBrowser.$('.icon-chrome_outline').waitForExist({ timeout: 5000 });
-            await wdioBrowser.$('.icon-chrome_outline').click();
-            await sleep(3000);
-          } catch (_) { }
-          let singlePage = false;
-          try {
-            const sel = wdioBrowser.$('.ant-pagination-options .ant-select');
-            if (await sel.isExisting()) {
-              await sel.click();
-              await sleep(800);
-              const opts = await wdioBrowser.$$('.ant-select-item-option');
-              let best = null, bestV = -1;
-              for (const o of opts) {
-                const m = (((await o.getText()) || '').trim()).match(/(\d+)/);
-                if (m && Number(m[1]) > bestV) { bestV = Number(m[1]); best = o; }
-              }
-              if (best) { await best.click(); await sleep(2500); }
-              const pgText = await wdioBrowser.execute(() => (document.querySelector('.ant-pagination') || {}).innerText || '');
-              singlePage = !/2\s*\/\s*2页/.test(pgText);
-            }
-          } catch (_) { }
-          if (!singlePage) {
-            try {
-              await wdioBrowser.execute(() => {
-                const items = Array.from(document.querySelectorAll('.ant-pagination-item'));
-                const p2 = items.find((li) => (li.textContent || '').trim() === '2');
-                if (p2) p2.click();
-              });
-              await sleep(2500);
-            } catch (_) { }
-          }
-          const clicked = await wdioBrowser.execute((name) => {
-            const el = Array.from(document.querySelectorAll('a'))
-              .find((e) => (e.textContent || '').trim() === name || (e.textContent || '').trim().startsWith(name));
-            if (el) { el.click(); return true; }
-            return false;
-          }, process.env.CLONE_NAME || 'UA152');
-          if (!clicked) {
-            // Run#36 三轮均找不到 <a>——dump 页面真实状态（所有 a 文本 + body 前 300 字）供定位
-            try {
-              const stateDump = await wdioBrowser.execute(() => {
-                const as = Array.from(document.querySelectorAll('a')).map((e) => (e.textContent || '').trim()).filter(Boolean).slice(0, 30);
-                const body = (document.body ? document.body.innerText : '').replace(/\n+/g, '|').slice(0, 300);
-                return `a=[${as.join(',')}] body=${body}`;
-              });
-              log(`第 ${round} 轮：未找到 UA152 <a>。页面状态: ${String(stateDump).slice(0, 400)}`);
-            } catch (e2) { log(`第 ${round} 轮：未找到 UA152 <a>（dump 失败 ${e2.message.slice(0, 40)}）`); }
-            await shot('a4-round-fail');
-            await sleep(2000); continue;
-          }
-          try {
-            await wdioBrowser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 8000 });
-            onDetail = true;
-          } catch (_) {
-            try {
-              await wdioBrowser.$('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 3000 });
-              onDetail = true;
-            } catch (_) { log(`第 ${round} 轮：点击后未见详情页特征`); }
-          }
-        } catch (e) {
-          log(`第 ${round} 轮导航异常: ${e.message.slice(0, 60)}`);
-        }
-      }
-      log(onDetail ? '已确认进入 UA152 详情页' : '3 轮导航均未进详情页（继续找密码入口兜底）');
-      // 详情页找「网站密码」入口（Run#33 dump 实证：详情页右侧面板叫「网站密码 0站点，0对」，
-      // 不是「密码」——一词之差导致历轮失败）
-      const pwdEntrySels = [
-        '//*[contains(text(),"网站密码")]',
-        '//span[text()="网站密码"]',
-        '//*[contains(text(),"密码记录")]',
-        '//*[contains(text(),"账号密码")]',
-        '//span[text()="密码"]',
-        '//*[contains(@class,"tab")][contains(text(),"密码")]',
-      ];
-      let entryFound = false;
-      for (const sel of pwdEntrySels) {
-        try {
-          const el = wdioBrowser.$(sel);
-          await el.waitForExist({ timeout: 4000 });
-          await el.click();
-          entryFound = true;
-          break;
-        } catch (_) { /* try next */ }
-      }
-      if (!entryFound) {
-        let uiDump = '';
-        try {
-          uiDump = await wdioBrowser.execute(() => {
-            const t = (el) => (el.textContent || '').trim();
-            const els = Array.from(document.querySelectorAll('span,div,a,li'))
-              .map(t).filter((x) => x && x.length <= 10);
-            return Array.from(new Set(els)).slice(0, 60).join(' | ');
-          });
-        } catch (_) { }
-        await domSnapshot(wdioBrowser, `detail-page-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
-        throw new Error(`详情页未找到「密码」入口。页面可见文本: ${String(uiDump).slice(0, 400)}`);
-      }
-      await sleep(2000);
-      // 入口点开后 dump 密码记录列表 DOM（拿到真实列表结构，不再猜选择器）
-      await domSnapshot(wdioBrowser, `pwd-list-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
-      // 密码记录列表中找 wdku
-      // 判定：点开「网站密码」入口后，查站点计数是否从 0 变为 ≥1（Run#33 实证面板格式「N站点，N对」）
+      // Run#37 dump 决定性发现：A3 关分身后主壳【本来就在 UA152 详情页】——
+      // body 含完整详情面板（UA152|全球|Cookie N站点|网站密码 N站点，N对|打开浏览器|正在访问…），
+      // UA152 不是 <a> 元素（历轮「找不到 <a>」即此因）。无需导航，直接解析面板计数。
+      let panelDump = '';
+      try {
+        panelDump = await wdioBrowser.execute(() => (document.body ? document.body.innerText : '').replace(/\n+/g, '|'));
+      } catch (_) { }
+      const onDetail = /网站密码/.test(panelDump) && /打开浏览器|正在访问/.test(panelDump);
+      log(onDetail ? '确认已在 UA152 详情页（网站密码面板可见）' : `未检出详情页特征，面板片段: ${panelDump.slice(200, 400)}`);
+      // 直接解析「网站密码」面板计数（面板静态文本带计数，无需点开任何入口）
       let pwText = '';
       try {
         pwText = await wdioBrowser.execute(() => {
-          const el = Array.from(document.querySelectorAll('*')).find((e) => {
-            const t = (e.textContent || '').trim();
-            return e.children.length === 0 && /^\d+站点/.test(t);
-          });
-          // 找「网站密码」附近的计数（Cookie 面板也是 N站点格式，取包含「密码」上下文的一个）
-          const all = Array.from(document.querySelectorAll('*'))
-            .filter((e) => e.children.length === 0 && /^\d+站点,\d+对$/.test((e.textContent || '').trim()))
-            .map((e) => (e.textContent || '').trim());
-          return all.join('|');
+          const els = Array.from(document.querySelectorAll('*')).filter((e) => e.children.length === 0);
+          const idx = els.findIndex((e) => (e.textContent || '').trim() === '网站密码');
+          if (idx < 0) return '';
+          for (let k = idx + 1; k < Math.min(idx + 12, els.length); k++) {
+            const t = (els[k].textContent || '').trim();
+            if (/^\d+站点/.test(t)) return t;
+            if (/^\d+$/.test(t)) {
+              const nxt = (els[k + 1] ? els[k + 1].textContent : '').trim();
+              if (nxt.startsWith('站点')) return `${t}${nxt}`;
+            }
+          }
+          return '';
         });
       } catch (_) { }
-      const found = /wdku\.net/i.test(await wdioBrowser.execute(() => document.body.innerText || '').catch(() => ''))
-        || /^[1-9]\d*站点/.test(pwText.split('|')[0] || '');
-      log(`网站密码面板计数: ${pwText || '(未解析到)'}`);
+      const found = /wdku\.net/i.test(panelDump) || /^[1-9]\d*站点/.test(pwText || '');
+      log(`网站密码面板计数: ${pwText || '(未解析到)'}（Cookie: ${(panelDump.match(/\d+站点[，,]\d+cookies?/) || [''])[0]}）`);
       saveStatus = found ? 'pass' : 'fail';
       saveDetail = found
         ? `网站密码记录已出现（面板: ${pwText || '含 wdku.net'}）`
-        : `网站密码面板计数为 0（${pwText || '未解析'}）`;
+        : `网站密码面板计数为 0（${pwText || '未解析'}——密码管理器未捕获或未落库）`;
+      await domSnapshot(wdioBrowser, `a4-panel-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
       await shot('password-flow-save');
     } catch (e) {
       saveStatus = 'fail';

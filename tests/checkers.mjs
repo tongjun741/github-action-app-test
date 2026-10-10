@@ -188,9 +188,11 @@ async function fingerprint_ipbinding(page, c, opts) {
 // 真实子页 URL = /captcha/<type>（本机实测 2026-10-10 抓取 nopecha.com/demo 页面链接得出；
 // /demo/<type> 是 404——Run#33 误猜）。脚本化：访问三个子页，各查对应 iframe 注入。
 const NOPECHA_DEMOS = [
-  { name: 'hCaptcha', url: 'https://nopecha.com/captcha/hcaptcha', re: /hcaptcha/i },
-  { name: 'reCAPTCHA', url: 'https://nopecha.com/captcha/recaptcha', re: /recaptcha/i },
-  { name: 'Turnstile', url: 'https://nopecha.com/captcha/turnstile', re: /(challenges\.cloudflare|turnstile)/i },
+  // re 用字符串（非 RegExp）：Run#37 实测 RegExp 传入 page.evaluate 序列化后
+  // reSrc.test 抛错走 catch → 恒 false（diag 里 iframe/脚本明明全在）
+  { name: 'hCaptcha', url: 'https://nopecha.com/captcha/hcaptcha', re: 'hcaptcha' },
+  { name: 'reCAPTCHA', url: 'https://nopecha.com/captcha/recaptcha', re: 'recaptcha' },
+  { name: 'Turnstile', url: 'https://nopecha.com/captcha/turnstile', re: 'challenges.cloudflare.com/turnstile' },
 ];
 async function manual_captcha(page, c, opts) {
   const found = {};
@@ -202,12 +204,13 @@ async function manual_captcha(page, c, opts) {
     const deadline = Date.now() + 25000;
     let diag = '';
     for (;;) {
-      const hit = await page.evaluate((reSrc) => {
+      const hit = await page.evaluate((reStr) => {
         try {
-          if (Array.from(document.querySelectorAll('iframe')).some((f) => reSrc.test(f.src || ''))) return true;
-          if (Array.from(document.querySelectorAll('script[src]')).some((s) => reSrc.test(s.src || ''))) return true;
+          const re = new RegExp(reStr, 'i');
+          if (Array.from(document.querySelectorAll('iframe')).some((f) => re.test(f.src || ''))) return true;
+          if (Array.from(document.querySelectorAll('script[src]')).some((s) => re.test(s.src || ''))) return true;
           const res = (performance.getEntriesByType('resource') || []).map((r) => r.name || '');
-          if (res.some((n) => reSrc.test(n))) return true;
+          if (res.some((n) => re.test(n))) return true;
           return false;
         } catch (_) { return false; }
       }, d.re).catch(() => false);
