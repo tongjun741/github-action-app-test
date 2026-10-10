@@ -404,12 +404,27 @@ jobs:
           OUT: results-Cookie_Sync.json
         run: node tests/cookie-sync.cjs
 
+      # 同步类 4 用例（源表 R17-R20）：历史记录/收藏夹/LocalStorage/IndexDB——同一第二台设备
+      - name: 同步类验证 (历史/收藏/LS/IDB)
+        timeout-minutes: 25
+        continue-on-error: true   # 探测失败不杀 job（4 项各有独立判定）
+        env:
+          DISPLAY: ':99'
+          E2E_PLATFORM: Windows 10
+          TEAM_NAME: ${{ secrets.TEAM_NAME }}
+          WDIO_USERNAME: ${{ secrets.WDIO_USERNAME }}
+          PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          OUT: results-Sync_Flows.json
+        run: node tests/sync-flows.cjs
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: results-Cookie_Sync
           path: |
             results-Cookie_Sync.json
+            results-Sync_Flows.json
             cookie-sync-*.png
           if-no-files-found: warn
 

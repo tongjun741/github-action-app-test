@@ -327,6 +327,14 @@ const CHECKERS = {
   client_password_save,
   client_password_autofill,
   client_cookie_sync,
+  // 同步类四项 + RPA + 右键翻译：由 sync-flows.cjs（第二台设备）或 password-flow 后置段执行；
+  // runner 内无独立 checker 时落 manual（报告不缺行）。
+  client_localstorage_sync: null,
+  client_indexdb_sync: null,
+  client_history_sync: null,
+  client_bookmark_sync: null,
+  client_rpa_flow: null,
+  client_google_translate: null,
 };
 
 async function checkCase(page, caseDef, opts) {
@@ -337,6 +345,11 @@ async function checkCase(page, caseDef, opts) {
   }
   const fn = CHECKERS[caseDef.type];
   try {
+    if (fn === null) {
+      // 显式占位类型（同步类/RPA/翻译）：由独立脚本执行（sync-flows.cjs 等），
+      // runner 内仅落 manual 占位保持报告行齐全，不误触导航。
+      return { status: 'manual', detail: '由独立脚本执行（sync-flows/password-flow 后置段）——本轮占位' };
+    }
     if (!fn) {
       if (caseDef.url) return await navigation(page, caseDef, opts);
       return { status: 'manual', detail: '未实现自动判定，需人工确认' };
