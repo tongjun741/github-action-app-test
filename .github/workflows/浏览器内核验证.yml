@@ -60,6 +60,11 @@ on:
         description: '调试挂起时长（分钟，默认 30，上限 300）。挂起期间可随时取消 job 结束调试。'
         required: false
         default: '30'
+      ui_probe:
+        description: '调试模式附加：跑 ui-probe.cjs 探测主壳详情页 DOM（密码入口/按钮区），产出上传 Cloudinary。'
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '0 9 * * 1' # 每周一 09:00 UTC 自动跑一轮
   push:
@@ -250,6 +255,19 @@ jobs:
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
           OPEN_CLONE_ONLY: '1'
         run: node tests/e2e-verify.cjs
+
+      # 调试模式附加：主壳 UI 探测（详情页 DOM/密码入口/按钮区）
+      - name: UI 探测 (详情页 DOM)
+        if: inputs.debug_hold == true && inputs.ui_probe == true
+        timeout-minutes: 15
+        env:
+          DISPLAY: ${{ matrix.install == 'ubuntu' && ':99' || '' }}
+          E2E_PLATFORM: ${{ matrix.platform }}
+          TEAM_NAME: ${{ secrets.TEAM_NAME }}
+          WDIO_USERNAME: ${{ secrets.WDIO_USERNAME }}
+          PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+        run: node tests/ui-probe.cjs
 
       # 调试模式：挂起 runner（保活隧道），由 Agent 从外网连 CDP 隧道自动探测；
       # 每 5 分钟重发隧道 URL notice（Agent 轮询 annotations 即可拿到最新链接），到时自动结束。
