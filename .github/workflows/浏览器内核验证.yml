@@ -170,7 +170,7 @@ jobs:
           }
 
       - name: 安装客户端 (Ubuntu)
-        if: (inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform
+        if: matrix.install == 'ubuntu' && ((inputs.debug_hold != true && inputs.debug_verify != true) || inputs.debug_platform == 'ubuntu')
         shell: bash
         run: |
           set -e
