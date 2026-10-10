@@ -319,9 +319,9 @@ jobs:
           ./frpc -c ./win7/frpc_16020852.ini > /tmp/frpc.log 2>&1 &
 
       - name: 等待测试开始
-        # Win7 走的是「非受支持」的嵌套虚拟化：镜像拉取 + Win7 安装 + OEM 装驱动 + 重启 + 登录自启，
-        # 实测 8.5~12 分钟且波动大（Run#9 11.8min / Run#10 8.5min）。20 分钟过紧 → 曾多次超时且
-        # 不留任何诊断。这里放宽到 40 分钟，并每 30s 打点；超时则 dump 容器日志/共享目录再失败。
+        # Win7 每次都是「从零重装系统」：装机 + OEM + 重启 + 登录自启本身就要十几分钟，属常态，不是缺陷。
+        # 真正要盯的是 start.log 出现后 VM 内脚本能不能往下走。这里放宽到 40 分钟并每 30s 打点；
+        # 超时则 dump 容器日志 / shared 目录 / oem.log / boots.log 再失败。
         timeout-minutes: 45
         run: |
           deadline=$((SECONDS + 2400)) # 40 分钟
@@ -329,9 +329,10 @@ jobs:
             if [ "$SECONDS" -ge "$deadline" ]; then
               echo "::error::Win7 VM 未在 40 分钟内写入 start.log（等待测试开始超时）"
               echo "----- docker ps -a -----"; docker ps -a || true
-              echo "----- docker logs windows (tail 250) -----"; docker logs --tail 250 windows 2>&1 || true
+              echo "----- docker logs windows (tail 300) -----"; docker logs --tail 300 windows 2>&1 || true
               echo "----- win7/shared -----"; ls -la win7/shared || true
               echo "----- win7/shared/oem.log (VM OEM 阶段心跳) -----"; cat win7/shared/oem.log 2>/dev/null || echo "(无 oem.log：VM 尚未跑到 OEM install.bat)"
+              echo "----- win7/shared/boots.log (VM 开机脚印) -----"; cat win7/shared/boots.log 2>/dev/null || echo "(无 boots.log)"
               exit 1
             fi
             if [ $((SECONDS % 30)) -lt 10 ]; then
@@ -340,26 +341,54 @@ jobs:
             sleep 10
           done
           echo "start.log 已出现（等待 ${SECONDS}s）"
-          tail -n 40 win7/shared/start.log || true
+          echo "----- oem.log -----"; cat win7/shared/oem.log 2>/dev/null || echo "(无 oem.log)"
+          echo "----- boots.log -----"; cat win7/shared/boots.log 2>/dev/null || echo "(无 boots.log)"
+          echo "----- start.log (tail 40) -----"; tail -n 40 win7/shared/start.log || true
 
       - name: 等待测试完成
-        # 每 60s 回显 start.log 尾部（恢复上游 Windows7-docker.yml 的做法）：VM 内若卡住，
-        # 日志里能看到卡在哪一步，而不是又一段 30 分钟的黑盒。
-        timeout-minutes: 35
+        # 每 60s 回显 start.log 尾部：start.log 里每步都有 [时间] 打点，可据此判断
+        #   ① 只见表头且时间戳不变 ⇒ VM 内脚本卡住（卡在哪行看最后一条打点）
+        #   ② 出现多条表头 ⇒ VM 反复重启（再去 boots.log 数开机次数）
+        timeout-minutes: 45
         run: |
-          for i in $(seq 1 33); do
+          for i in $(seq 1 43); do
             [ -f "win7/shared/done.log" ] && break
             sleep 60
             echo "----- [第 ${i} 分钟] start.log 尾部 -----"
-            tail -n 25 win7/shared/start.log 2>/dev/null || echo "(start.log 尚不可读)"
+            tail -n 12 win7/shared/start.log 2>/dev/null || echo "(start.log 尚不可读)"
           done
           if [ ! -f "win7/shared/done.log" ]; then
-            echo "::error::VM 未在 33 分钟内写完 done.log"
-            echo "----- docker logs windows (tail 120) -----"; docker logs --tail 120 windows 2>&1 || true
+            echo "::error::VM 未在 43 分钟内写完 done.log"
             exit 1
           fi
           echo "测试结束"
           cat win7/shared/start.log
+
+      - name: 收集 Win7 诊断 (始终)
+        # 无论成功/失败都落盘，避免「只有超时才发现拿不到证据」（Run#16 就吃了这个亏）。
+        if: always()
+        continue-on-error: true
+        run: |
+          echo "===== boots.log (VM 开机脚印，判断是否反复重启) ====="; cat win7/shared/boots.log 2>/dev/null || echo "(无 boots.log)"
+          echo "===== oem.log (OEM 装机阶段心跳) ====="; cat win7/shared/oem.log 2>/dev/null || echo "(无 oem.log)"
+          echo "===== start.log (VM 内逐步打点) ====="; cat win7/shared/start.log 2>/dev/null || echo "(无 start.log)"
+          echo "===== done.log ====="; cat win7/shared/done.log 2>/dev/null || echo "(无 done.log)"
+          echo "===== docker ps -a ====="; docker ps -a || true
+          echo "===== docker logs windows (全量落盘 win7-docker.log) ====="
+          docker logs windows > win7-docker.log 2>&1 || true
+          tail -n 400 win7-docker.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: win7-diagnostics
+          path: |
+            win7-docker.log
+            win7/shared/boots.log
+            win7/shared/oem.log
+            win7/shared/start.log
+            win7/shared/done.log
+          if-no-files-found: ignore
 
       - name: 取回 Win7 验证结果
         if: always()

@@ -59,7 +59,9 @@ set TARGET_PATH=C:\Windows6.1-KB3080149-x64.msu
 :: 安装更新包（KB3080149：SHA-2 代码签名支持，Win7 上客户端能跑起来的前提之一）
 echo Installing update package...
 echo [OEM] wusa KB3080149 开始 >> %LOG%
-wusa %TARGET_PATH% /quiet /forcerestart
+REM 用 /norestart 而不是 /forcerestart：避免「wusa 自己重启 + 下面 shutdown 再重启」的双重启。
+REM 双重启在 Win7 上容易掉进「配置更新→重启」循环（Run#16 疑似），届时 VM 反复重启、永不登录。
+wusa %TARGET_PATH% /quiet /norestart
 REM 无人值守：无论 wusa 成功与否都必须重启进入「登录自启」阶段，
 REM 绝不能用 pause（会让 VM 永久挂在无人应答的按键提示上）。
 if %errorlevel% equ 0 (
@@ -67,5 +69,6 @@ if %errorlevel% equ 0 (
 ) else (
     echo [OEM] 警告: KB3080149 返回 %errorlevel%，仍继续重启 >> %LOG%
 )
+echo [OEM] 触发重启 >> %LOG%
 shutdown /r /t 0
 

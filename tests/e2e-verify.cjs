@@ -262,6 +262,23 @@ async function clickNextPage(browser) {
   }
 }
 
+/** 轮询等待分身列表渲染出条目；返回命中的名字数组（可能为空数组） */
+async function pollCloneNames(browser, ms) {
+  let names = [];
+  const deadline = Date.now() + ms;
+  let lastDump = 0;
+  while (Date.now() < deadline) {
+    names = await listCloneNamesFromAnchors(browser);
+    if (names.length) break;
+    if (Date.now() - lastDump > 15000) {
+      lastDump = Date.now();
+      await dumpAnchorTexts(browser);
+    }
+    await sleep(2000);
+  }
+  return names;
+}
+
 /** 进入分身列表并打开目标分身（复用 origin e2eTest 的 UI 路径与选择器） */
 async function openClone(browser) {
   log('进入首页');
@@ -273,19 +290,23 @@ async function openClone(browser) {
   await browser.$('.icon-chrome_outline').click();
 
   // 分身列表在 12.9 为异步渲染 + 分页（默认 15条/页）：轮询等待第 1 页出现 UAxxx，最多 90s。
-  let names = [];
-  const deadline = Date.now() + 90 * 1000;
-  let lastDump = 0;
-  while (Date.now() < deadline) {
-    names = await listCloneNamesFromAnchors(browser);
-    if (names.length) break;
-    if (Date.now() - lastDump > 15000) {
-      lastDump = Date.now();
-      await dumpAnchorTexts(browser);
-    }
-    await sleep(2000);
-  }
+  let names = await pollCloneNames(browser, 90 * 1000);
   log(`[diag] 第 1 页分身名(<a> 中 ${names.length}): ${JSON.stringify(names)}`);
+
+  // 整页 0 条常见于「分身页在应用初始化完成前被打开」（页面停在加载动画，Run#16 Ubuntu 即此因）。
+  // 处理：退回首页再进分身页重试。注意是有界重试（最多 2 次）；重试后仍为空则照常报错，不掩盖真实失败。
+  for (let attempt = 1; !names.length && attempt <= 2; attempt++) {
+    log(`[diag] 分身列表为空，退回首页并重新进入分身页（第 ${attempt} 次重试）`);
+    try {
+      await browser.$('.icon-shouye_24').click();
+      await sleep(3000);
+      await browser.$('.icon-chrome_outline').click();
+    } catch (e) {
+      log(`[diag] 重进分身页失败: ${e.message}`);
+    }
+    names = await pollCloneNames(browser, 60 * 1000);
+    log(`[diag] 第 ${attempt} 次重试后分身名(${names.length}): ${JSON.stringify(names)}`);
+  }
 
   let target = matchClone(names, CLONE);
 

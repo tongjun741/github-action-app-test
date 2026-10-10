@@ -57,7 +57,9 @@ async function fingerprint_pixelscan(page, c, opts) {
 // 注意：页面含 “detected / bad” 等泛化词（页头页脚营销文案），不可作判定依据，已从 red 词表剔除
 //       （曾误命中 “detected”）；且判定词渲染较慢，需轮询等待出现，避免空文本/竞态误判。
 const IPHEY_VERDICT_RE = /unreliable|looks reliable|\breliable\b/i;
-const IPHEY_FAIL_RE = /unreliable|not good|mismatch|\bleak\b|暴露/i;
+// 注意：不要用 \bleak\b —— iphey 首页营销文案里就有「…detect tracking risks and hidden leaks」，
+// 会把站点自带介绍文当成风险结论（Run#16 误判 fail 即此因）。真正的判定词是 Unreliable。
+const IPHEY_FAIL_RE = /unreliable|not good|mismatch|暴露/i;
 async function fingerprint_iphey(page, c, opts) {
   await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
   let text = '';
