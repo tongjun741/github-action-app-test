@@ -200,6 +200,7 @@ async function manual_captcha(page, c, opts) {
     // 轮询最多 25s：双通道判定——① 对应 iframe 注入（JS 执行后）
     // ② 站点脚本已加载（子页是 JS 渲染壳：hcaptcha api.js 动态建 iframe，脚本加载=组件能力可用）
     const deadline = Date.now() + 25000;
+    let diag = '';
     for (;;) {
       const hit = await page.evaluate((reSrc) => {
         try {
@@ -211,9 +212,19 @@ async function manual_captcha(page, c, opts) {
         } catch (_) { return false; }
       }, d.re).catch(() => false);
       if (hit) { found[d.name] = true; break; }
-      if (Date.now() > deadline) break;
+      if (Date.now() > deadline) {
+        // 超时诊断：dump 页面 URL/title/iframe src 列表/脚本列表——Run#36 后不再盲猜
+        diag = await page.evaluate(() => JSON.stringify({
+          url: location.href, title: document.title,
+          iframes: Array.from(document.querySelectorAll('iframe')).map((f) => (f.src || '').slice(0, 80)).slice(0, 6),
+          scripts: Array.from(document.querySelectorAll('script[src]')).map((s) => s.src.slice(0, 80)).slice(0, 10),
+          body: (document.body ? document.body.innerText : '').slice(0, 100),
+        })).catch(() => '');
+        break;
+      }
       await new Promise((r) => setTimeout(r, 3000));
     }
+    if (!found[d.name] && diag) console.log(`[nopecha-diag] ${d.name} 超时页面: ${diag.slice(0, 400)}`);
   }
   const loadedCount = Object.values(found).filter(Boolean).length;
   const detail = Object.entries(found).map(([k, v]) => `${k}=${v}`).join(' ');

@@ -375,7 +375,19 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
             if (el) { el.click(); return true; }
             return false;
           }, process.env.CLONE_NAME || 'UA152');
-          if (!clicked) { log(`第 ${round} 轮：未找到 UA152 <a>`); await sleep(2000); continue; }
+          if (!clicked) {
+            // Run#36 三轮均找不到 <a>——dump 页面真实状态（所有 a 文本 + body 前 300 字）供定位
+            try {
+              const stateDump = await wdioBrowser.execute(() => {
+                const as = Array.from(document.querySelectorAll('a')).map((e) => (e.textContent || '').trim()).filter(Boolean).slice(0, 30);
+                const body = (document.body ? document.body.innerText : '').replace(/\n+/g, '|').slice(0, 300);
+                return `a=[${as.join(',')}] body=${body}`;
+              });
+              log(`第 ${round} 轮：未找到 UA152 <a>。页面状态: ${String(stateDump).slice(0, 400)}`);
+            } catch (e2) { log(`第 ${round} 轮：未找到 UA152 <a>（dump 失败 ${e2.message.slice(0, 40)}）`); }
+            await shot('a4-round-fail');
+            await sleep(2000); continue;
+          }
           try {
             await wdioBrowser.$('//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]').waitForExist({ timeout: 8000 });
             onDetail = true;
