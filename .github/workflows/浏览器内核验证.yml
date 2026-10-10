@@ -272,23 +272,6 @@ jobs:
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
         run: node tests/ui-probe.cjs
 
-      # 调试挂起（保持隧道在线，Agent 从外网连 CDP 隧道自动探测）；
-      # 每 5 分钟重发隧道 URL notice（Agent 轮询 annotations 即可拿到最新链接），到时自动结束。
-      - name: 调试挂起 (保持隧道在线, Agent 自动探测)
-        if: inputs.debug_hold == true || inputs.debug_verify == true
-        run: |
-          MINS=${{ inputs.debug_hold_minutes || '30' }}
-          [ "$MINS" -gt 300 ] 2>/dev/null && MINS=300
-          echo "::notice title=调试挂起::已挂起 ${MINS} 分钟。CDP 隧道 URL 见「调试隧道(ubuntu-cdp 端口9221)」notice"
-          for i in $(seq 1 "$MINS"); do
-            sleep 60
-            if [ $((i % 5)) -eq 0 ]; then
-              URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' cf_ubuntu-cdp.log 2>/dev/null | head -1)
-              echo "[debug-hold] 已挂起 ${i}/${MINS} 分钟 tunnel=${URL:-未知}"
-              [ -n "$URL" ] && echo "::notice title=CDP隧道在线(${i}min)::${URL}"
-            fi
-          done
-          echo "[debug-hold] 挂起结束"
 
       # 注：chromedriver 不再预置/自动下载 —— e2e-verify.cjs 会显式传
       # `wdio:chromedriverOptions.binary` 指向仓库内 tools/chromedriver/108.0.5359.71/<平台>，
@@ -314,6 +297,24 @@ jobs:
           WDKU_PASSWORD: ${{ secrets.WDKU_PASSWORD }}
           OUT: results-${{ matrix.slug }}.json
         run: node tests/e2e-verify.cjs
+
+      # 调试挂起（保持隧道在线，Agent 从外网连 CDP 隧道自动探测）；
+      # 每 5 分钟重发隧道 URL notice（Agent 轮询 annotations 即可拿到最新链接），到时自动结束。
+      - name: 调试挂起 (保持隧道在线, Agent 自动探测)
+        if: inputs.debug_hold == true || inputs.debug_verify == true
+        run: |
+          MINS=${{ inputs.debug_hold_minutes || '30' }}
+          [ "$MINS" -gt 300 ] 2>/dev/null && MINS=300
+          echo "::notice title=调试挂起::已挂起 ${MINS} 分钟。CDP 隧道 URL 见「调试隧道(ubuntu-cdp 端口9221)」notice"
+          for i in $(seq 1 "$MINS"); do
+            sleep 60
+            if [ $((i % 5)) -eq 0 ]; then
+              URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' cf_ubuntu-cdp.log 2>/dev/null | head -1)
+              echo "[debug-hold] 已挂起 ${i}/${MINS} 分钟 tunnel=${URL:-未知}"
+              [ -n "$URL" ] && echo "::notice title=CDP隧道在线(${i}min)::${URL}"
+            fi
+          done
+          echo "[debug-hold] 挂起结束"
 
       - uses: actions/upload-artifact@v4
         if: always() && inputs.debug_hold != true && inputs.debug_verify != true
