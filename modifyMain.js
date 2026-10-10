@@ -151,13 +151,16 @@ async function main() {
 
     // 尝试向分身浏览器(browserSwitches)注入假媒体开关：覆盖克隆浏览器启动参数
     // （app.commandLine 的开关不一定被独立的分身浏览器进程继承，故这里直接打它的启动参数）
+    // 2026-10-10 追加：--remote-debugging-address=0.0.0.0 —— 把分身浏览器 CDP 从 127.0.0.1
+    // 扩展到所有网卡，使 cloudflared/外网隧道可以访问（默认只听本地回环，隧道进不来）。
+    // --remote-allow-origins=* 放行 WebSocket 跨源（DevTools/工具直连需要）。
     const bsPattern = /(\.\.\.this\.browserSwitches\.split\(["'][^"']*["']\)\))/;
     if (bsPattern.test(fileContent)) {
       fileContent = fileContent.replace(
         bsPattern,
-        '$1;s.push("--use-fake-ui-for-media-stream");s.push("--use-fake-device-for-media-stream")'
+        '$1;s.push("--use-fake-ui-for-media-stream");s.push("--use-fake-device-for-media-stream");s.push("--remote-debugging-address=0.0.0.0");s.push("--remote-allow-origins=*")'
       );
-      console.log('✓ 已向 browserSwitches 注入假媒体开关（分身浏览器启动参数）');
+      console.log('✓ 已向 browserSwitches 注入假媒体开关 + CDP 外网监听（分身浏览器启动参数）');
     } else {
       console.warn('⚠ 未在 browserSwitches 找到注入点，[diag] 上方已打印真实上下文');
     }

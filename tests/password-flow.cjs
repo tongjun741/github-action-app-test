@@ -103,6 +103,41 @@ async function pageDiag(page) {
   }
 }
 
+// DOM 快照存证：outerHTML 截断 200KB 上传 Cloudinary（.txt），返回 URL
+// 用于"不猜测"地拿到登录页/详情页真实 DOM（用户要求 2026-10-10：开调试端口实测，不要猜）
+async function domSnapshot(target, tag) {
+  try {
+    let html = '';
+    if (target && typeof target.getPageSource === 'function') {
+      html = await target.getPageSource(); // WDIO browser（主壳页面）
+    } else if (target && typeof target.content === 'function') {
+      html = await target.content();       // puppeteer page（分身浏览器页面）
+    }
+    if (!html) return null;
+    const p = path.join(process.cwd(), `dom-${tag}-${Date.now()}.txt`);
+    fs.writeFileSync(p, html.slice(0, 200 * 1024));
+    if (!process.env.CLOUDINARY_URL) {
+      console.log(`[dom-snapshot] ${tag}: 本地 ${p}（未配置 CLOUDINARY_URL，不上传）`);
+      return null;
+    }
+    const mod = require('cloudinary');
+    const cloudinary = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+    cloudinary.config({ secure: true });
+    const now = new Date();
+    const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const result = await cloudinary.uploader.upload(p, {
+      asset_folder: `e2eTest_${mm}`, use_filename: false, unique_filename: false,
+      resource_type: 'raw',
+    });
+    console.log(`[dom-snapshot] ${tag}: ${result.url}`);
+    console.log(`::notice title=DOM快照-${tag}::${Buffer.from(result.url).toString('base64')}`);
+    return result.url;
+  } catch (e) {
+    console.log(`[dom-snapshot] ${tag} 失败(忽略): ${e.message}`);
+    return null;
+  }
+}
+
 // 截图上传 Cloudinary（有 CLOUDINARY_URL 时），返回 URL（失败 null）
 async function shotToCloudinary(page, tag) {
   try {
@@ -163,11 +198,13 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       log(`登录框探测: user=${inputs.userInput} pass=${inputs.passInput} all=${JSON.stringify(inputs.all).slice(0, 200)}`);
       if (!inputs.passInput) {
         const diag = await pageDiag(page);
-        await shotToCloudinary(page, `wdku-login-miss-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
+        await shotToCloudinary(page, `wdku-login-miss-${(process.env.E2_PLATFORM || 'x').replace(/\s+/g, '_')}`);
+        await domSnapshot(page, `wdku-login-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
         throw new Error(`登录页未找到密码输入框（${diag}）`);
       }
       if (!inputs.userInput) {
         const diag = await pageDiag(page);
+        await domSnapshot(page, `wdku-login-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
         throw new Error(`登录页未找到账号输入框（${diag}）`);
       }
       // 填写并提交
@@ -335,9 +372,12 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
             return Array.from(new Set(els)).slice(0, 60).join(' | ');
           });
         } catch (_) { }
+        await domSnapshot(wdioBrowser, `detail-page-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
         throw new Error(`详情页未找到「密码」入口。页面可见文本: ${String(uiDump).slice(0, 400)}`);
       }
       await sleep(2000);
+      // 入口点开后 dump 密码记录列表 DOM（拿到真实列表结构，不再猜选择器）
+      await domSnapshot(wdioBrowser, `pwd-list-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
       // 密码记录列表中找 wdku
       const found = await wdioBrowser.execute(() => {
         const t = document.body.innerText || '';

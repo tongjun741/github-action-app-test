@@ -214,6 +214,16 @@ jobs:
         continue-on-error: true
         run: node modifyMain.js
 
+      # ---------- 调试隧道（不猜测，用户要求 2026-10-10）----------
+      # Ubuntu job：分身浏览器 CDP(9221) 开 cloudflared 公网隧道，URL 进 notice（匿名可读）。
+      # 分身打开后即可从外网实时连 CDP 调试（modifyMain 已注入 0.0.0.0 监听 + remote-allow-origins）。
+      - name: 开 CDP 调试隧道 (Ubuntu)
+        if: matrix.install == 'ubuntu'
+        continue-on-error: true
+        run: |
+          chmod +x tools/debug-tunnel.sh 2>/dev/null || true
+          bash tools/debug-tunnel.sh 9221 ubuntu-cdp
+
       # 注：chromedriver 不再预置/自动下载 —— e2e-verify.cjs 会显式传
       # `wdio:chromedriverOptions.binary` 指向仓库内 tools/chromedriver/108.0.5359.71/<平台>，
       # 从根上避免 WDIO 去 Chrome for Testing 下载 v108（CfT 只提供 v115+ → 404）。
@@ -337,8 +347,24 @@ jobs:
           PRIVATE_DEPLOYMENT: ${{ inputs.private_deployment }}
           PRIVATE_DOWNLOAD_DIR: ${{ runner.temp }}/dockurr-windows
         run: |
+          # 调试需要：给 VM 加 CDP 端口映射（宿主 9221 -> VM 9221），失败不阻断（无 /dev/kvm 时照样跑）
+          if grep -q "9221:9221" win7/docker-compose.yml; then
+            echo "9221 映射已存在"
+          else
+            sed -i 's/- 8006:8006/- 8006:8006\n      - 9221:9221/' win7/docker-compose.yml || true
+            echo "已追加 9221 端口映射"
+          fi
           cd win7
           bash ./start-docker.sh
+
+      # ---------- Win7 调试隧道（不猜测，实时看 VM 桌面 + 分身 CDP）----------
+      # noVNC(8006)：浏览器直接看/操作 VM 桌面——start.bat 卡死时可实时看到 VM 里发生了什么
+      # CDP(9221)：分身浏览器远程调试（需 modifyMain 注入的 0.0.0.0 监听生效）
+      - name: 开 Win7 调试隧道 (noVNC + CDP)
+        continue-on-error: true
+        run: |
+          bash tools/debug-tunnel.sh 8006 win7-novnc
+          bash tools/debug-tunnel.sh 9221 win7-cdp
 
       - name: 下载 Win7 客户端
         run: |
