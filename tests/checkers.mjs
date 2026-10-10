@@ -185,13 +185,12 @@ async function fingerprint_ipbinding(page, c, opts) {
 // 进阶：给 Chromium 注入 accessibility cookie（hcaptcha accessibility）可自动通过 hCaptcha，
 // 需要账号注册获取，暂未启用。
 // 8) nopecha —— 验证码 demo 三个子页可加载性检测（脚本化）
-// 判定口径：原表是「打开右边截图中的三个链接手工过验证码」——demo 首页只是链接列表（Run#32 实测
-// iframes=0）。脚本化改为访问三个 demo 子页（hCaptcha/reCAPTCHA/Turnstile），
-// 各页检测对应 iframe 注入。能加载 = 浏览器/站点兼容正常（过码本身超出 CI 边界）。
+// 真实子页 URL = /captcha/<type>（本机实测 2026-10-10 抓取 nopecha.com/demo 页面链接得出；
+// /demo/<type> 是 404——Run#33 误猜）。脚本化：访问三个子页，各查对应 iframe 注入。
 const NOPECHA_DEMOS = [
-  { name: 'hCaptcha', url: 'https://nopecha.com/demo/hcaptcha', re: /hcaptcha/i },
-  { name: 'reCAPTCHA', url: 'https://nopecha.com/demo/recaptcha', re: /recaptcha/i },
-  { name: 'Turnstile', url: 'https://nopecha.com/demo/turnstile', re: /challenges\.cloudflare\.com/i },
+  { name: 'hCaptcha', url: 'https://nopecha.com/captcha/hcaptcha', re: /hcaptcha/i },
+  { name: 'reCAPTCHA', url: 'https://nopecha.com/captcha/recaptcha', re: /recaptcha/i },
+  { name: 'Turnstile', url: 'https://nopecha.com/captcha/turnstile', re: /challenges\.cloudflare\.com/i },
 ];
 async function manual_captcha(page, c, opts) {
   const found = {};

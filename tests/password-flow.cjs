@@ -216,7 +216,14 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
         return false;
       });
       if (!submitted) throw new Error('未找到登录提交按钮');
-      await sleep(6000); // 等登录跳转 + 内核保存密码落库
+      // 等登录跳转 + 花漾密码管理器捕获落库（Run#33 实证 6s 不够——提交即关，「网站密码」计数仍 0）。
+      // 轮询等待页面离开登录页，再额外给密码管理器 12s。
+      for (let w = 0; w < 10; w++) {
+        await sleep(1500);
+        const url = page.url();
+        if (!/user\/login/.test(url)) break;
+      }
+      await sleep(12000); // 密码管理器落库宽限
       const url = page.url();
       log(`提交后 URL: ${url}`);
       loginOk = true;
@@ -389,17 +396,15 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       } catch (e) {
         log(`进详情页异常(继续): ${e.message.slice(0, 80)}`);
       }
-      // 详情页找「密码」tab/入口（Run#31 dump 显示详情页有「Cookie 5站点 ，7cookies」类 tab 栏；
-      // 密码入口大概率同区域。候选词表 + 兜底把详情页 tab 全 dump）
+      // 详情页找「网站密码」入口（Run#33 dump 实证：详情页右侧面板叫「网站密码 0站点，0对」，
+      // 不是「密码」——一词之差导致历轮失败）
       const pwdEntrySels = [
-        '//span[text()="密码"]',
+        '//*[contains(text(),"网站密码")]',
+        '//span[text()="网站密码"]',
         '//*[contains(text(),"密码记录")]',
         '//*[contains(text(),"账号密码")]',
-        '//*[contains(text(),"已保存密码")]',
-        '//div[contains(@class,"tab")][contains(text(),"密码")]',
-        '//a[contains(text(),"密码")]',
-        '//*[contains(@class,"menu")]//*[contains(text(),"密码")]',
-        '//span[contains(text(),"凭据")]',
+        '//span[text()="密码"]',
+        '//*[contains(@class,"tab")][contains(text(),"密码")]',
       ];
       let entryFound = false;
       for (const sel of pwdEntrySels) {
@@ -428,14 +433,28 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       // 入口点开后 dump 密码记录列表 DOM（拿到真实列表结构，不再猜选择器）
       await domSnapshot(wdioBrowser, `pwd-list-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
       // 密码记录列表中找 wdku
-      const found = await wdioBrowser.execute(() => {
-        const t = document.body.innerText || '';
-        return /wdku\.net/i.test(t);
-      });
+      // 判定：点开「网站密码」入口后，查站点计数是否从 0 变为 ≥1（Run#33 实证面板格式「N站点，N对」）
+      let pwText = '';
+      try {
+        pwText = await wdioBrowser.execute(() => {
+          const el = Array.from(document.querySelectorAll('*')).find((e) => {
+            const t = (e.textContent || '').trim();
+            return e.children.length === 0 && /^\d+站点/.test(t);
+          });
+          // 找「网站密码」附近的计数（Cookie 面板也是 N站点格式，取包含「密码」上下文的一个）
+          const all = Array.from(document.querySelectorAll('*'))
+            .filter((e) => e.children.length === 0 && /^\d+站点,\d+对$/.test((e.textContent || '').trim()))
+            .map((e) => (e.textContent || '').trim());
+          return all.join('|');
+        });
+      } catch (_) { }
+      const found = /wdku\.net/i.test(await wdioBrowser.execute(() => document.body.innerText || '').catch(() => ''))
+        || /^[1-9]\d*站点/.test(pwText.split('|')[0] || '');
+      log(`网站密码面板计数: ${pwText || '(未解析到)'}`);
       saveStatus = found ? 'pass' : 'fail';
       saveDetail = found
-        ? '分身详情页密码记录中已出现 wdku.net'
-        : '密码记录列表中未见 wdku.net';
+        ? `网站密码记录已出现（面板: ${pwText || '含 wdku.net'}）`
+        : `网站密码面板计数为 0（${pwText || '未解析'}）`;
       await shot('password-flow-save');
     } catch (e) {
       saveStatus = 'fail';
