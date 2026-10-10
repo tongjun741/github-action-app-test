@@ -292,7 +292,8 @@ jobs:
       #       连上的是主壳而非分身内核（UA 会带 HuaYoung/... Electron/22，且不支持 newPage）。
       #       由 modifyMain.js 注入的 this.remoteDebugPort=9221 在「打开分身」时传给分身内核浏览器。
       - name: 打开分身并验证（连分身内核浏览器 CDP）
-        if: inputs.debug_hold != true   # debug_verify 也走此步（Ubuntu 单平台全项验证）；artifact 同条件
+        # 普通跑=全平台；调试（hold/verify）= 仅 debug_platform 平台跑（Ubuntu job 曾因缺此条件空跑报红——Run#40）
+        if: (inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform
         shell: bash   # Windows 默认 pwsh 不认 bash 的 `\` 续行符/管道，显式 bash
         timeout-minutes: 30
         env:
