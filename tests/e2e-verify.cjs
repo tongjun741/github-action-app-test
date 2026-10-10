@@ -481,5 +481,11 @@ main()
   .catch((e) => {
     console.error('[e2e-verify] 失败:', e && (e.stack || e.message));
     writePlaceholder(e && (e.stack || e.message));
+    // GitHub Actions 注解：失败原因进 error annotation —— 公共仓库 annotations API 匿名可读，
+    // 无需 token 即可从 CI 外获知 fatal 原因（Run#17 四平台同挂时曾因日志 403 无法诊断）。
+    try {
+      const msg = String((e && e.message) || e).replace(/\r?\n/g, ' ').slice(0, 220);
+      console.error(`::error title=e2e-verify失败(${PLATFORM})::${msg}`);
+    } catch (_) { /* 本地运行无影响 */ }
     process.exit(1);
   });
