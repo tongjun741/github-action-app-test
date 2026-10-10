@@ -18,15 +18,15 @@ import ExcelJS from 'exceljs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const STATUS_LABEL = {
-  pass: '通过', fail: '失败', manual: '人工', error: '错误', skipped: '跳过', na: '不适用',
+  pass: '通过', fail: '失败', manual: '人工', error: '错误', skipped: '跳过', na: '不适用', ignored: '忽略',
 };
 const STATUS_FILL = {
   pass: 'C6EFCE', fail: 'FFC7CE', manual: 'FFEB9C', error: 'F4B0B0',
-  skipped: 'D9D9D9', na: 'F2F2F2',
+  skipped: 'D9D9D9', na: 'F2F2F2', ignored: 'E7E6E6',
 };
 const STATUS_FONT = {
   pass: '006100', fail: '9C0006', manual: '9C6500', error: '9C0006',
-  skipped: '595959', na: '808080',
+  skipped: '595959', na: '808080', ignored: '808080',
 };
 
 function parseArgs(argv) {
@@ -118,6 +118,7 @@ async function buildReport(platformFiles, outPath) {
     { header: '失败', key: 'fail', width: 10 },
     { header: '人工', key: 'manual', width: 10 },
     { header: '跳过', key: 'skipped', width: 10 },
+    { header: '忽略', key: 'ignored', width: 10 },
     { header: '错误', key: 'error', width: 10 },
     { header: '不适用', key: 'na', width: 10 },
     { header: '通过率', key: 'rate', width: 12 },
@@ -127,9 +128,9 @@ async function buildReport(platformFiles, outPath) {
   h2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF305496' } };
   h2.alignment = { horizontal: 'center' };
 
-  let tot = { pass: 0, fail: 0, manual: 0, skipped: 0, error: 0, na: 0 };
+  let tot = { pass: 0, fail: 0, manual: 0, skipped: 0, error: 0, na: 0, ignored: 0 };
   for (const p of platforms) {
-    const cnt = { pass: 0, fail: 0, manual: 0, skipped: 0, error: 0, na: 0 };
+    const cnt = { pass: 0, fail: 0, manual: 0, skipped: 0, error: 0, na: 0, ignored: 0 };
     for (const cid of cases) {
       const s = (grid[cid]?.[p]?.status) || 'na';
       cnt[s] = (cnt[s] || 0) + 1;
@@ -137,7 +138,7 @@ async function buildReport(platformFiles, outPath) {
     const decided = cnt.pass + cnt.fail;
     const rate = decided ? Math.round((cnt.pass / decided) * 100) + '%' : '—';
     ws2.addRow({ platform: p, ...cnt, rate });
-    for (const k of ['pass', 'fail', 'manual', 'skipped', 'error', 'na']) tot[k] += cnt[k];
+    for (const k of ['pass', 'fail', 'manual', 'skipped', 'error', 'na', 'ignored']) tot[k] += cnt[k];
   }
   const tDecided = tot.pass + tot.fail;
   const tRate = tDecided ? Math.round((tot.pass / tDecided) * 100) + '%' : '—';

@@ -186,6 +186,11 @@ const CHECKERS = {
 };
 
 async function checkCase(page, caseDef, opts) {
+  // 用户要求忽略的用例（如 ipbinding：CI 无代理、分身 SOCKS 不可达、导航必抛错）直接返回「忽略」，
+  // 不执行任何导航，也不计入 CI 红/绿（runner.mjs 仅 fail/error 置红）。
+  if (caseDef.ignored) {
+    return { status: 'ignored', detail: '按用户要求忽略该用例（不执行、不计入红/绿）' };
+  }
   const fn = CHECKERS[caseDef.type];
   try {
     if (!fn) {

@@ -81,6 +81,7 @@
       "type": "fingerprint_ipbinding",
       "url": "https://ipbinding.online/index.html#",
       "expected": "webrtc_blocked",
+      "ignored": true,
       "criteria": "使用 Webshare 的 IP 访问时，页面右侧显示 WebRTC blocked 才是正确的",
       "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
     },
