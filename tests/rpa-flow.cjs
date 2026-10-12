@@ -405,13 +405,36 @@ async function main() {
       process.exit(1);
     }
 
-    // 4) 轮询分身浏览器 CDP：出现 baidu.com 页面且内容含 Apple
+    // 4) RPA 提交后：先取证主壳状态（Run#58 实证：240s 全程连不上 9221——RPA 引擎开分身不走
+    //    openClone 路径，不绑 9221；先看向导是否关闭/是否弹出执行确认/执行记录），
+    //    再轮询 CDP；若 60s 仍无 9221，尝试手动点开 UA152（openClone 同款路径）触发 9221。
+    log('RPA 已提交——取证主壳状态（向导是否关闭/执行提示）');
+    await sleep(3000);
+    try {
+      const bodyTxt = await browser.$('//body').getText().catch(() => '');
+      const wizardStill = /步骤|下一步/.test(bodyTxt);
+      log(`[post-submit] 向导残留=${wizardStill}；页面关键词: ${['执行中', '任务', '已创建', '开始', '成功'].filter((k) => bodyTxt.includes(k)).join(',') || '无'}`);
+      await uploadShot(browser, 'post-submit');
+      await dumpPageSource('post-submit');
+    } catch (_) {}
+
     log(`轮询 CDP ${CDP} 等待 RPA 结果（最长 ${TIMEOUT_MS / 1000}s）`);
     const puppeteer = require('puppeteer-core');
     const deadline = Date.now() + TIMEOUT_MS;
     let matched = null;
     let lastDiag = 0;
+    let openTried = false;
     while (Date.now() < deadline) {
+      // 60s 仍连不上 9221 → 主动点开 UA152（主壳分身列表→「正在访问」入口，与 openClone 同路径触发 9221）
+      if (!openTried && Date.now() - (deadline - TIMEOUT_MS) > 60000) {
+        openTried = true;
+        try {
+          log('[fallback] 60s 无 9221——尝试主壳点开 UA152 触发 CDP');
+          const { openClone } = require('./e2e-verify.cjs');
+          await openClone(browser);
+          log('[fallback] openClone 已执行（若分身已在跑则仅前置）');
+        } catch (e) { log(`[fallback] openClone 异常: ${e.message.slice(0, 60)}`); }
+      }
       let b = null;
       try {
         b = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 15000 });
