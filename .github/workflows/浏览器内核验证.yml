@@ -314,7 +314,7 @@ jobs:
 
       # R21 执行RPA流程（用户指定：百度检索-教程示例，关键词=ios，匹配 Apple）
       - name: RPA流程验证 (百度检索-教程示例)
-        if: (inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform
+        if: always() && ((inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform)
         continue-on-error: true   # 探测失败不杀 job（独立判定落 results）
         timeout-minutes: 15
         env:
@@ -332,7 +332,7 @@ jobs:
 
       # R22 右键Google翻译（翻译加速探活+CJK 判定）
       - name: 翻译验证 (Google翻译加速)
-        if: (inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform
+        if: always() && ((inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform)
         continue-on-error: true
         timeout-minutes: 12
         env:

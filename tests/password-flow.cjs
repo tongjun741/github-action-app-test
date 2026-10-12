@@ -415,9 +415,9 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
   try {
     log('B1 重新打开分身浏览器');
     const openBtn = '//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]';
+    // Run#43：B1 到失败 9 分钟无任何中间日志——探活/按钮/循环全部静默。全程加节点打点。
     // Run#42 实证：A3 已 CDP 关闭，但主壳按钮仍是「正在访问」残留态（点击态滞后）——
-    // 不能信按钮文字。正确策略：先探 CDP，活着=真开着（直接验证）；死了=一律走重开路径
-    //（点「正在访问」（残留态下点它=关闭/重开）或「打开浏览器」，然后处理「继续访问」）。
+    // 不能信按钮文字。正确策略：先探 CDP，活着=真开着（直接验证）；死了=一律走重开路径。
     let cdpUp = false;
     try {
       const puppeteerProbe = require('puppeteer-core');
@@ -425,6 +425,7 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       await pb.disconnect();
       cdpUp = true;
     } catch (_) { }
+    log(`[B1-a] CDP 探活: ${cdpUp ? '在线' : '离线'}`);
     let alreadyOpen = false;
     if (cdpUp) {
       alreadyOpen = true;
@@ -443,26 +444,33 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
           log('按钮为「正在访问」残留态（CDP 已死）——点击触发状态流转');
         } catch (_) { }
       }
+      log(`[B1-b] 目标按钮: ${btn ? btn.slice(0, 60) : '未找到任何按钮'}`);
       if (btn) {
-        try { await wdioBrowser.$(btn).click(); } catch (_) { }
+        try { await wdioBrowser.$(btn).click(); log('[B1-b] 已点击'); } catch (e) { log(`[B1-b] 点击失败: ${e.message.slice(0, 60)}`); }
       }
     }
-    // 处理「继续访问」+ 等「正在访问」
+    // 处理「继续访问」+ 等「正在访问」（带打点）
+    let resumed = false;
     for (let n = 0; n < 60; n++) {
       try {
         await wdioBrowser.$('//span[text()="继续访问"]').waitForExist({ timeout: 3000 });
         await wdioBrowser.$('//span[text()="继续访问"]').click();
+        log(`[B1-c] 第 ${n + 1} 次点击「继续访问」`);
+        resumed = true;
         try {
           await wdioBrowser.$('.ant-modal-confirm .ant-btn-primary').waitForExist({ timeout: 3000 });
           await wdioBrowser.$('.ant-modal-confirm .ant-btn-primary').click();
+          log('[B1-c] 已确认继续弹窗');
         } catch (_) { }
       } catch (_) { }
       try {
         await wdioBrowser.$('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 3000 });
+        log(`[B1-c] 按钮已变「正在访问」（n=${n + 1}）`);
         break;
       } catch (_) { }
       await sleep(1500);
     }
+    if (!resumed) log('[B1-c] 未出现「继续访问」（60 轮内）');
     // 等 CDP 起来（Run#41 教训：按钮态先变、cdpAlive 的 /json/version 偶尔先通一瞬——
     // 需「真连得上且能开页」才算就绪：puppeteer 实连+newPage 成功）
     const puppeteerB1 = require('puppeteer-core');
