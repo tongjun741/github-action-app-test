@@ -145,12 +145,12 @@ async function main() {
       '//button[.//span[text()="下一步"]]',
       '//div[contains(@class,"ant-pro-steps-form")]//button[contains(@class,"ant-btn-primary")]',
     ];
-    let filledVar = false;
+    let filledVar = false; let picked = false;
     for (let step = 1; step <= 3; step++) {
       log(`向导步骤 ${step}`);
       if (step === 1) {
         // 分身选择（Run#48/49：shop-picker 左侧空+「添加分身」；「选 择」弹窗列表异步加载慢且会挡住其它按钮）
-        let picked = false;
+        picked = false;
         for (const entrySel of [
           '//button[.//span[text()="选 择"]] | //span[text()="选 择"]/ancestor::button',
           '//button[.//span[contains(text(),"添加分身")]] | //span[contains(text(),"添加分身")]/ancestor::button',
@@ -164,7 +164,7 @@ async function main() {
             await sleep(2500);
             // 选择弹窗/面板：先搜索框输入 CLONE（触发过滤加载），再轮询列表项（最长 12s——列表异步加载慢）
             try {
-              const search = browser.$('//div[contains(@class,"ant-modal")]//input[contains(@placeholder,"搜索")] | //div[contains(@class,"ant-modal")]//input[@type="search"] | //div[contains(@class,"shop-picker")]//input[1]');
+              const search = browser.$(`//input[@id="keywords"] | //input[@placeholder="依据名称检索"] | //div[contains(@class,"ant-modal")]//input[contains(@placeholder,"搜索")] | //div[contains(@class,"ant-modal")]//input[@type="search"] | //div[contains(@class,"shop-picker")]//input[1]`);
               if (await search.isExisting()) {
                 await search.setValue(CLONE);
                 log(`已搜索 ${CLONE}`);
@@ -172,9 +172,12 @@ async function main() {
             } catch (_) {}
             for (let w = 0; w < 4 && !picked; w++) {
               for (const sel of [
+                `//div[contains(@class,"ant-list-item")][contains(.,"${CLONE}")]`,
+                `//*[contains(@class,"ant-list-item")][contains(.,"${CLONE}")]`,
+                `//li[contains(.,"${CLONE}")]`,
+                `//div[contains(@class,"ant-modal")]//*[contains(text(),"${CLONE}")]`,
                 `//div[contains(@class,"ant-modal")]//td[contains(.,"${CLONE}")]`,
                 `//div[contains(@class,"ant-modal")]//tr[contains(.,"${CLONE}")]`,
-                `//div[contains(@class,"ant-modal")]//*[contains(text(),"${CLONE}")]`,
                 `//div[contains(@class,"shop-picker")]//*[contains(text(),"${CLONE}")]`,
               ]) {
                 try {
@@ -186,6 +189,18 @@ async function main() {
               }
               if (!picked) await sleep(3000); // 等列表异步加载
             }
+            // 诊断：dump 内层弹窗文本+HTML，定位选择器（下一轮据此收紧）
+            try {
+              const mh = await browser.$('//div[contains(@class,"ant-modal")]');
+              if (await mh.isExisting()) {
+                const mt = await mh.getText().catch(() => '');
+                log(`[diag] 内层弹窗文本: ${String(mt).replace(/\s+/g, ' ').slice(0, 400)}`);
+                const html = await mh.getHTML(false).catch(() => '');
+                const p = path.join(process.cwd(), `rpa-modal-diag-${Date.now()}.html`);
+                fs.writeFileSync(p, html.slice(0, 1.5 * 1024 * 1024));
+                log(`[diag] 内层弹窗HTML已存 ${p}`);
+              }
+            } catch (_) {}
             if (picked) {
               for (const sel of ['//div[contains(@class,"ant-modal")]//button[.//span[text()="确 定"]]', '.ant-modal .ant-btn-primary']) {
                 try { const b = browser.$(sel); await b.waitForExist({ timeout: 2500 }); await b.click(); log('已确认分身选择'); break; } catch (_) {}
@@ -265,6 +280,13 @@ async function main() {
       } catch (_) { }
     }
 
+    if (!picked) {
+      push('fail', '分身未选中（步骤1 校验「请至少选择一个分身」），RPA 无法执行');
+      fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
+      await browser.close().catch(() => {});
+      process.exit(1);
+    }
+
     // 4) 轮询分身浏览器 CDP：出现 baidu.com 页面且内容含 Apple
     log(`轮询 CDP ${CDP} 等待 RPA 结果（最长 ${TIMEOUT_MS / 1000}s）`);
     const puppeteer = require('puppeteer-core');
@@ -297,7 +319,7 @@ async function main() {
     }
     fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
     log(`已写出 ${OUT}`);
-    process.exit(0);
+    process.exit(matched ? 0 : 1);
   } finally {
     try { await browser.deleteSession(); } catch (_) {}
   }

@@ -37,11 +37,18 @@ async function main() {
   };
 
   // 1) 打开分身（OPEN_CLONE_ONLY 复用）
+  // Win 平台：先杀残留客户端进程，避免 RPA 步重启后分身 CDP(9221) 起不来（Run#50 修复）
+  if (process.platform === 'win32') {
+    try { require('node:child_process').execSync('taskkill /F /IM HuaYoungApp.exe /T 2>nul || true'); } catch (_) {}
+    log('已尝试 taskkill 残留 HuaYoungApp.exe（Windows）');
+    await new Promise((s) => setTimeout(s, 2500));
+  }
   const { spawnSync } = require('node:child_process');
   const r = spawnSync(process.execPath, ['tests/e2e-verify.cjs'], {
     stdio: 'inherit',
     env: { ...process.env, OPEN_CLONE_ONLY: '1', OUT: `placeholder-gt-${PLATFORM.replace(/\s+/g, '_')}.json` },
   });
+  log(`e2e-verify OPEN_CLONE_ONLY 退出码=${r.status}`);
   if (r.status !== 0) throw new Error(`打开分身失败（exit ${r.status}）`);
 
   // Run#45/46 教训：RPA 步先跑完（重启过客户端），翻译步的 spawn 后分身起得慢——探活放宽到 180s
@@ -131,7 +138,7 @@ async function main() {
     fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
     log(`已写出 ${OUT}`);
     await browser.close().catch(() => {});
-    process.exit(0);
+    process.exit(finalRatio > 0.1 ? 0 : 1);
   } catch (e) {
     push('error', `异常: ${e.message.slice(0, 100)}`);
     fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
