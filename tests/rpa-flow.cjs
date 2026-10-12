@@ -160,101 +160,160 @@ async function main() {
       '//div[contains(@class,"ant-pro-steps-form")]//button[contains(@class,"ant-btn-primary")]',
     ];
     let filledVar = false; let picked = false;
+    // 取证辅助：全页 DOM 上传 Cloudinary（Run#54 起：本地盘在 CI 拿不回）
+    const dumpPageSource = async (tag) => {
+      try {
+        const html = await browser.getPageSource();
+        const p = path.join(process.cwd(), `rpa-page-${tag}-${Date.now()}.html`);
+        fs.writeFileSync(p, html.slice(0, 2 * 1024 * 1024));
+        if (process.env.CLOUDINARY_URL) {
+          const mod = require('cloudinary');
+          const cl = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+          cl.config({ secure: true });
+          const now = new Date();
+          const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          const r = await cl.uploader.upload(p, { asset_folder: `e2eTest_${mm}`, resource_type: 'raw' });
+          console.log(`[rpa-flow] 页面DOM(${tag}): ${r.url}`);
+          console.log(`::notice title=RPA-DOM-${tag.toUpperCase()}::${Buffer.from(r.url).toString('base64')}`);
+        }
+      } catch (e) { log(`[diag] 页面DOM dump(${tag}) 失败: ${e.message.slice(0, 60)}`); }
+    };
+    const modalTitles = async () => {
+      try {
+        const els = await browser.$$('//div[contains(@class,"ant-modal-root")]//div[contains(@class,"ant-modal-title")]');
+        const arr = [];
+        for (const e of els) arr.push(String(await e.getText().catch(() => '')).trim());
+        return arr;
+      } catch (_) { return []; }
+    };
     for (let step = 1; step <= 3; step++) {
       log(`向导步骤 ${step}`);
       if (step === 1) {
-        // 分身选择（Run#48/49：shop-picker 左侧空+「添加分身」；「选 择」弹窗列表异步加载慢且会挡住其它按钮）
+        // 分身选择（Run#48~54 迭代实证）。本轮修复三连环 bug：
+        //  A（Run#54 自伤）：失败后点「取 消」的 XPath 匹配文档序第一个 ant-modal=外层向导 → 关掉向导 →「添加分身」消失。
+        //     修法：不再点「取 消」文字按钮——重开「选 择」入口重试；确需关闭时只点最内层弹窗的 X。
+        //  B（打错框）：搜索框并集可能命中向导面板 input 而非分身弹窗 #keywords——严格作用域 + 打印实际属性取证。
+        //  C（分页）：UA152 在主客户端分身列表第 2 页；picker 若同构分页，第 1 页永远选不中——搜索后仍找不到时翻页。
         picked = false;
-        for (const entrySel of [
-          '//button[.//span[text()="选 择"]] | //span[text()="选 择"]/ancestor::button',
-          '//button[.//span[contains(text(),"添加分身")]] | //span[contains(text(),"添加分身")]/ancestor::button',
-        ]) {
-          if (picked) break;
+        for (let attempt = 1; attempt <= 3 && !picked; attempt++) {
+          // 1) 点「选 择」（重试轮里若弹窗还在则先点最内层 X 关掉再重开）
+          if (attempt > 1) {
+            try {
+              const xBtns = await browser.$$('//div[contains(@class,"ant-modal-root")]//button[contains(@class,"ant-modal-close")]');
+              if (xBtns.length) {
+                await xBtns[xBtns.length - 1].click(); // 文档序最后一个 = 最内层弹窗的 X
+                log(`[attempt ${attempt}] 已点最内层弹窗 X 关闭残留弹窗`);
+                await sleep(1500);
+              }
+            } catch (_) {}
+          }
+          let entryOk = false;
+          for (const entrySel of [
+            '//button[.//span[text()="选 择"]] | //span[text()="选 择"]/ancestor::button',
+          ]) {
+            try {
+              const eb = browser.$(entrySel);
+              await eb.waitForExist({ timeout: 3500 });
+              await eb.click();
+              entryOk = true; log(`[attempt ${attempt}] 已点入口按钮（选 择）`); break;
+            } catch (_) {}
+          }
+          if (!entryOk) { log(`[attempt ${attempt}] 「选 择」按钮未找到`); break; }
+          await sleep(2500);
+
+          // 2) 严格作用域找分身选择弹窗：标题应为 分身 相关（非向导「流程」标题），内含搜索框
+          let pickerModal = null; let pickerTitle = '';
+          const pickerModalXpaths = [
+            '//div[contains(@class,"ant-modal-root")][.//div[contains(@class,"ant-modal-title")][contains(.,"分身")]]',
+            '//div[contains(@class,"ant-modal-root")][.//input[@id="keywords"]]',
+            '//div[contains(@class,"ant-modal-root")][.//input[contains(@placeholder,"检索")]]',
+          ];
+          for (const px of pickerModalXpaths) {
+            try {
+              const cand = browser.$(px);
+              if (await cand.waitForExist({ timeout: 4000 }).then(() => true).catch(() => false)) {
+                pickerModal = cand; break;
+              }
+            } catch (_) {}
+          }
+          if (!pickerModal) {
+            const titles = await modalTitles();
+            log(`[attempt ${attempt}] 未找到分身选择弹窗；当前 modal 标题: ${JSON.stringify(titles)}`);
+            await dumpPageSource(`picker-miss-a${attempt}`);
+            continue; // 关掉残留再重试（attempt>1 分支会点 X）
+          }
+          try { pickerTitle = String(await pickerModal.$('.//div[contains(@class,"ant-modal-title")]').getText().catch(() => '')); } catch (_) {}
+          log(`[attempt ${attempt}] 分身选择弹窗已打开（title=${pickerTitle}）`);
+
+          // 3) 弹窗内搜索框（严格作用域，打印实际属性取证）
           try {
-            const eb = browser.$(entrySel);
-            await eb.waitForExist({ timeout: 3500 });
-            await eb.click();
-            log(`已点入口按钮（${entrySel.includes('添加') ? '添加分身' : '选 择'}）`);
-            await sleep(2500);
-            // 选择弹窗/面板：先搜索框输入 CLONE（触发过滤加载），再轮询列表项（最长 12s——列表异步加载慢）
-            try {
-              const search = browser.$(`//input[@id="keywords"] | //input[@placeholder="依据名称检索"] | //div[contains(@class,"ant-modal")]//input[contains(@placeholder,"搜索")] | //div[contains(@class,"ant-modal")]//input[@type="search"] | //div[contains(@class,"shop-picker")]//input[1]`);
-              if (await search.isExisting()) {
-                await search.setValue(CLONE);
-                // Run#51 实证：ant-modal 内回车=默认提交会把选择弹窗整个关掉（之后 #keywords 弹窗消失、
-                // 「添加分身」按钮也被关掉的弹窗层挡住而定位失败）——不再回车，改等异步过滤。
-                await sleep(4000);
-                log(`已搜索 ${CLONE}（不回车，等异步过滤）`);
-              }
-            } catch (_) {}
-            for (let w = 0; w < 4 && !picked; w++) {
-              for (const sel of [
-                `//div[contains(@class,"ant-modal")][.//input[@id="keywords"]]//*[contains(@class,"ant-list-item")][contains(.,"${CLONE}")]`,
-                `//div[contains(@class,"ant-modal")][.//input[@id="keywords"]]//*[contains(.,"${CLONE}")]`,
-                `//*[contains(@class,"ant-list-item")][contains(.,"${CLONE}")]`,
-                `//li[contains(.,"${CLONE}")]`,
-                `//div[contains(@class,"shop-picker")]//*[contains(.,"${CLONE}")]`,
-                `//div[contains(@class,"ant-modal")]//*[contains(text(),"${CLONE}")]`,
-              ]) {
-                try {
-                  const it = browser.$(sel);
-                  await it.waitForExist({ timeout: 3000 });
-                  await it.click();
-                  picked = true; log(`已选中分身 ${CLONE}（第 ${w + 1} 轮，${sel.slice(0, 40)}…）`); break;
-                } catch (_) {}
-              }
-              if (!picked) await sleep(3000); // 等列表异步加载
+            const search = pickerModal.$('.//input[@id="keywords"] | .//input[contains(@placeholder,"检索")] | .//input[@type="search"] | .//input[1]');
+            if (await search.isExisting()) {
+              const attr = await search.getAttribute('id').catch(() => '');
+              const ph = await search.getAttribute('placeholder').catch(() => '');
+              await search.setValue(CLONE);
+              await sleep(4000); // 等异步过滤，不回车（回车会触发默认提交关弹窗）
+              log(`[attempt ${attempt}] 已在弹窗内搜索 ${CLONE}（id=${attr} placeholder=${ph}）`);
+            } else {
+              log(`[attempt ${attempt}] 弹窗内无搜索框`);
             }
-            // 诊断：精准抓取「含 #keywords 的内层分身选择弹窗」文本+列表项+HTML（之前抓错层拿到向导外层）
-            try {
-              const picker = browser.$('//div[contains(@class,"ant-modal")][.//input[@id="keywords"]]');
-              const mh = (await picker.isExisting().catch(() => false)) ? picker
-                : await browser.$('//div[contains(@class,"ant-modal")][.//*[contains(@class,"ant-list-item")]]').catch(() => null);
-              if (mh && await mh.isExisting().catch(() => false)) {
-                const mt = await mh.getText().catch(() => '');
-                log(`[diag] 内层弹窗文本: ${String(mt).replace(/\s+/g, ' ').slice(0, 800)}`);
-                const itemEls = await mh.$$('//*[contains(@class,"ant-list-item")]').catch(() => []);
-                const items = await Promise.all(itemEls.slice(0, 12).map((e) => e.getText().catch(() => '')));
-                log(`[diag] 列表项(${items.length}): ${JSON.stringify(items.map((x) => String(x).replace(/\s+/g, ' ').slice(0, 40)))}`);
-                const html = await mh.getHTML(false).catch(() => '');
-                // Run#51：HTML 落本地盘在 CI 临时空间拿不回来——必须同步上传 Cloudinary 取证
-                const p = path.join(process.cwd(), `rpa-modal-diag-${Date.now()}.html`);
-                fs.writeFileSync(p, html.slice(0, 1.5 * 1024 * 1024));
-                log(`[diag] 内层弹窗HTML已存 ${p}`);
-                if (process.env.CLOUDINARY_URL) {
-                  try {
-                    const mod = require('cloudinary');
-                    const cl = (mod.default && mod.default.v2) || mod.v2 || mod.default;
-                    cl.config({ secure: true });
-                    const now = new Date();
-                    const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                    const r = await cl.uploader.upload(p, { asset_folder: `e2eTest_${mm}`, resource_type: 'raw' });
-                    console.log(`[rpa-flow] 内层弹窗DOM: ${r.url}`);
-                    console.log(`::notice title=RPA-DOM-PICKER::${Buffer.from(r.url).toString('base64')}`);
-                  } catch (e) { log(`[diag] 弹窗DOM上传失败(忽略): ${e.message.slice(0, 60)}`); }
-                }
-              } else {
-                log('[diag] 未找到含 #keywords 的内层弹窗（分身选择列表层）——可能搜索未出结果或列表未渲染');
-              }
-            } catch (_) {}
-            if (picked) {
-              for (const sel of ['//div[contains(@class,"ant-modal")]//button[.//span[text()="确 定"]]', '.ant-modal .ant-btn-primary']) {
-                try { const b = browser.$(sel); await b.waitForExist({ timeout: 2500 }); await b.click(); log('已确认分身选择'); break; } catch (_) {}
-              }
-              break;
-            }
-            // Run#49 关键：未选中时弹窗开着挡住其它按钮——先关弹窗（取 消/X）再试下一入口
-            log('该入口未选中分身——关闭弹窗后试下一入口');
-            for (const c of [
-              '//div[contains(@class,"ant-modal")]//button[.//span[text()="取 消"]]',
-              '//div[contains(@class,"ant-modal")]//button[contains(@class,"ant-modal-close")]',
-              '//button[contains(@class,"ant-modal-close")]',
+          } catch (e) { log(`[attempt ${attempt}] 搜索异常: ${e.message.slice(0, 50)}`); }
+
+          // 4) 弹窗内轮询找 UA152 行（严格作用域；兼容 ant-list-item / ant-table 行 / 任意元素）
+          for (let w = 0; w < 4 && !picked; w++) {
+            for (const sel of [
+              `.//div[contains(@class,"ant-list-item")][contains(.,"${CLONE}")]`,
+              `.//tr[contains(.,"${CLONE}")]`,
+              `.//li[contains(.,"${CLONE}")]`,
+              `.//*[contains(@class,"item")][contains(.,"${CLONE}")]`,
+              `.//*[contains(text(),"${CLONE}")]`,
             ]) {
-              try { const b = browser.$(c); await b.waitForExist({ timeout: 2000 }); await b.click(); log('已关闭选择弹窗'); await sleep(1200); break; } catch (_) {}
+              try {
+                const it = pickerModal.$(sel);
+                await it.waitForExist({ timeout: 2500 });
+                await it.click();
+                picked = true; log(`[attempt ${attempt}] 已选中分身 ${CLONE}（${sel.slice(0, 50)}…）`); break;
+              } catch (_) {}
             }
-          } catch (e) { log(`入口异常: ${e.message.slice(0, 50)}`); }
+            if (!picked) {
+              // 5) 分页翻页（Run#54 假设：picker 同主列表分页，UA152 在第 2 页）
+              try {
+                const nextPg = pickerModal.$('.//li[contains(@class,"ant-pagination-next")][not(contains(@class,"disabled"))]');
+                if (await nextPg.isExisting()) {
+                  await nextPg.click();
+                  log(`[attempt ${attempt}] 第 ${w + 1} 轮未见 ${CLONE}——已点分页下一页`);
+                  await sleep(2500);
+                  continue;
+                }
+              } catch (_) {}
+              await sleep(2500);
+            }
+          }
+          // 6) 未选中：取证弹窗内真实内容（文本+列表项数+空态）——本轮必须拿到真实结构
+          if (!picked) {
+            try {
+              const mt = String(await pickerModal.getText().catch(() => '')).replace(/\s+/g, ' ');
+              log(`[attempt ${attempt}][diag] picker 弹窗全文(前600): ${mt.slice(0, 600)}`);
+              const emptyEl = pickerModal.$('.//*[contains(@class,"ant-empty")]');
+              const hasEmpty = await emptyEl.isExisting().catch(() => false);
+              if (hasEmpty) log(`[attempt ${attempt}][diag] 列表为空态（ant-empty）——搜索词无结果或列表未加载`);
+            } catch (_) {}
+          }
+        } // end for attempt
+        if (picked) {
+          // 确认选择：优先分身弹窗内的「确 定」，兜底最内层弹窗主按钮
+          for (const sel of [
+            '//div[contains(@class,"ant-modal-root")][.//div[contains(@class,"ant-modal-title")][contains(.,"分身")]]//button[.//span[text()="确 定"]]',
+            '//div[contains(@class,"ant-modal-root")][.//input[@id="keywords"]]//button[.//span[text()="确 定"]]',
+          ]) {
+            try { const b = browser.$(sel); await b.waitForExist({ timeout: 2500 }); await b.click(); log('已确认分身选择（弹窗内确 定）'); await sleep(1200); break; } catch (_) {}
+          }
         }
-        if (!picked) { log('分身未能选中——截图取证'); await uploadShot(browser, 'clone-pick-miss'); }
+        if (!picked) {
+          log('分身未能选中——最终取证');
+          await dumpPageSource('clone-pick-final');
+          await uploadShot(browser, 'clone-pick-miss');
+        }
         await sleep(1500);
       }
       if (step === 2 && !filledVar) {
