@@ -157,9 +157,13 @@ async function main() {
     await sleep(2500);
     const nextBtnSels = [
       '//button[.//span[text()="下一步"]]',
+      '//button[.//span[contains(text(),"立即执行")]] | //span[text()="立即执行"]/ancestor::button',
       '//div[contains(@class,"ant-pro-steps-form")]//button[contains(@class,"ant-btn-primary")]',
     ];
     let filledVar = false; let picked = false;
+    // Run#59 post-submit DOM 定案：向导是 4 步——step3「下一步」后落在第 4 步「完成」页
+    // （「任务准备就绪…点击【立即执行】将为您创建任务并导航至流程任务」）。历史轮次只循环 3 步、
+    // 从未点「立即执行」→ 任务从未创建 → 9221 恒无 → openClone 又被第4步向导浮层拦截（click intercepted）。
     // 取证辅助：全页 DOM 上传 Cloudinary（Run#54 起：本地盘在 CI 拿不回）
     const dumpPageSource = async (tag) => {
       try {
@@ -186,7 +190,7 @@ async function main() {
         return arr;
       } catch (_) { return []; }
     };
-    for (let step = 1; step <= 3; step++) {
+    for (let step = 1; step <= 4; step++) {
       log(`向导步骤 ${step}`);
       if (step === 1) {
         // 分身选择（Run#48~54 迭代实证）。本轮修复三连环 bug：
