@@ -135,8 +135,24 @@ async function main() {
         try { const b = browser.$(sel); await b.waitForExist({ timeout: 3000 }); await b.click(); log('已确认执行'); break; } catch (_) {}
       }
     } else {
-      log('未找到参数表单（流程可能无参数直接执行或结构不同）——截图取证');
+      log('未找到参数表单（流程可能无参数直接执行或结构不同）——截图+DOM 取证');
       await uploadShot(browser, 'param-miss');
+      // Run#44 加：dump 执行点击后的页面 DOM（弹窗/表单真实结构上传，供下轮精修选择器）
+      try {
+        const html = await browser.getPageSource();
+        const p = path.join(process.cwd(), `rpa-dom-afterexec-${Date.now()}.txt`);
+        fs.writeFileSync(p, html.slice(0, 2 * 1024 * 1024));
+        if (process.env.CLOUDINARY_URL) {
+          const mod = require('cloudinary');
+          const cloudinary = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+          cloudinary.config({ secure: true });
+          const now = new Date();
+          const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          const r = await cloudinary.uploader.upload(p, { asset_folder: `e2eTest_${mm}`, resource_type: 'raw' });
+          console.log(`[rpa-flow] 点击执行后 DOM: ${r.url}`);
+          console.log(`::notice title=RPA-DOM::${Buffer.from(r.url).toString('base64')}`);
+        }
+      } catch (e) { log(`DOM dump 失败: ${e.message.slice(0, 60)}`); }
     }
 
     // 4) 轮询分身浏览器 CDP：出现 baidu.com 页面且内容含 Apple

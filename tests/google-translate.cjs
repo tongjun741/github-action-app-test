@@ -44,7 +44,23 @@ async function main() {
   });
   if (r.status !== 0) throw new Error(`打开分身失败（exit ${r.status}）`);
 
-  const browser = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 60000 });
+  // Run#44 教训：spawn 重启客户端后 CDP 有时序——puppeteer 实连+newPage 探活就绪（90s）
+  const puppeteer0 = require('puppeteer-core');
+  let browser = null;
+  for (let i = 0; i < 30; i++) {
+    try {
+      browser = await puppeteer0.connect({ browserURL: CDP, protocolTimeout: 30000 });
+      const p = await browser.newPage();
+      await p.goto('about:blank', { timeout: 10000 }).catch(() => {});
+      await p.close();
+      log('CDP 已实测就绪');
+      break;
+    } catch (_) {
+      if (browser) { try { browser.disconnect(); } catch (_) {} browser = null; }
+      await new Promise((s2) => setTimeout(s2, 3000));
+    }
+  }
+  if (!browser) throw new Error('分身 CDP 90s 内不可用（翻译用例前置失败）');
   const page = await browser.newPage();
   page.setDefaultTimeout(60000);
   try {
