@@ -137,40 +137,45 @@ async function main() {
     }
     if (!confirmed) log('未见「流程执行方式」弹窗（可能已直接执行）');
 
-    // 3b) 参数表单（确认后可能出现）：关键词=ios
+    // 3b) 三步向导（Run#46 DOM 实证）：①选择流程与分身 → ②设置流程输入变量 → ③设置执行策略
+    //     每步点「下一步」推进；步骤 2 填变量（关键词=ios）
     await sleep(2500);
-    let paramOk = false;
-    for (const sel of ['//input[@placeholder="关键词"]', '//label[contains(.,"关键词")]//following-sibling::div//input', '//input[contains(@placeholder,"关键词")]', '//div[contains(@class,"ant-modal")]//input[1]', '//div[contains(@class,"ant-drawer")]//input[1]']) {
-      try {
-        const inp = browser.$(sel);
-        await inp.waitForExist({ timeout: 3500 });
-        await inp.setValue(RPA_KEYWORD);
-        paramOk = true; log(`已填参数 关键词=${RPA_KEYWORD}（${sel.slice(0, 46)}…）`); break;
-      } catch (_) {}
-    }
-    if (paramOk) {
-      for (const sel of ['.ant-modal-confirm .ant-btn-primary', '//div[contains(@class,"ant-modal")]//button[.//span[text()="确 定"]]', '.ant-modal .ant-btn-primary']) {
-        try { const b = browser.$(sel); await b.waitForExist({ timeout: 3000 }); await b.click(); log('已确认参数执行'); break; } catch (_) {}
-      }
-    } else {
-      log('未找到参数表单（流程可能无参数直接执行或结构不同）——截图+DOM 取证');
-      await uploadShot(browser, 'param-miss');
-      // dump 执行点击后的页面 DOM（弹窗/表单真实结构上传，供下轮精修选择器）
-      try {
-        const html = await browser.getPageSource();
-        const p = path.join(process.cwd(), `rpa-dom-afterexec-${Date.now()}.txt`);
-        fs.writeFileSync(p, html.slice(0, 2 * 1024 * 1024));
-        if (process.env.CLOUDINARY_URL) {
-          const mod = require('cloudinary');
-          const cloudinary = (mod.default && mod.default.v2) || mod.v2 || mod.default;
-          cloudinary.config({ secure: true });
-          const now = new Date();
-          const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-          const r = await cloudinary.uploader.upload(p, { asset_folder: `e2eTest_${mm}`, resource_type: 'raw' });
-          console.log(`[rpa-flow] 点击执行后 DOM: ${r.url}`);
-          console.log(`::notice title=RPA-DOM::${Buffer.from(r.url).toString('base64')}`);
+    const nextBtnSels = [
+      '//button[.//span[text()="下一步"]]',
+      '//button[.//span[text()="执行任务"]]',
+      '//div[contains(@class,"ant-pro-steps-form")]//button[contains(@class,"ant-btn-primary")]',
+    ];
+    let filledVar = false;
+    for (let step = 1; step <= 3; step++) {
+      log(`向导步骤 ${step}`);
+      if (step === 2 && !filledVar) {
+        // 填输入变量：找 input（label/placeholder 含 关键词/keyword 优先，否则第一个可见 input）
+        for (const sel of [
+          '//input[@placeholder="关键词"]',
+          '//label[contains(.,"关键词")]//following-sibling::div//input',
+          '//div[contains(@class,"ant-pro-steps-form")]//input[contains(@placeholder,"关键词")]',
+          '//div[contains(@class,"ant-pro-steps-form")]//input[1]',
+        ]) {
+          try {
+            const inp = browser.$(sel);
+            await inp.waitForExist({ timeout: 3000 });
+            await inp.setValue(RPA_KEYWORD);
+            filledVar = true; log(`步骤2 已填变量=${RPA_KEYWORD}（${sel.slice(0, 40)}…）`); break;
+          } catch (_) {}
         }
-      } catch (e) { log(`DOM dump 失败: ${e.message.slice(0, 60)}`); }
+        if (!filledVar) log('步骤2 未找到变量输入框（流程可能无输入变量）——截图取证');
+      }
+      let advanced = false;
+      for (const sel of nextBtnSels) {
+        try {
+          const b = browser.$(sel);
+          await b.waitForExist({ timeout: 3000 });
+          await b.click();
+          advanced = true; log(`已点击「${sel.includes('执行任务') ? '执行任务' : '下一步'}」（步骤 ${step}）`); break;
+        } catch (_) {}
+      }
+      if (!advanced) { log(`步骤 ${step} 无下一步按钮（可能已到执行）`); break; }
+      await sleep(2000);
     }
 
     // 4) 轮询分身浏览器 CDP：出现 baidu.com 页面且内容含 Apple

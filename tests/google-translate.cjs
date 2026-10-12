@@ -44,10 +44,10 @@ async function main() {
   });
   if (r.status !== 0) throw new Error(`打开分身失败（exit ${r.status}）`);
 
-  // Run#44 教训：spawn 重启客户端后 CDP 有时序——puppeteer 实连+newPage 探活就绪（90s）
+  // Run#45/46 教训：RPA 步先跑完（重启过客户端），翻译步的 spawn 后分身起得慢——探活放宽到 180s
   const puppeteer0 = require('puppeteer-core');
   let browser = null;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++) {
     try {
       browser = await puppeteer0.connect({ browserURL: CDP, protocolTimeout: 30000 });
       const p = await browser.newPage();
@@ -60,7 +60,7 @@ async function main() {
       await new Promise((s2) => setTimeout(s2, 3000));
     }
   }
-  if (!browser) throw new Error('分身 CDP 90s 内不可用（翻译用例前置失败）');
+  if (!browser) throw new Error('分身 CDP 180s 内不可用（翻译用例前置失败）');
   const page = await browser.newPage();
   page.setDefaultTimeout(60000);
   try {
