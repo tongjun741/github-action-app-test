@@ -428,9 +428,10 @@ async function main() {
     let matched = null;
     let lastDiag = 0;
     let openTried = false;
+    let everConnected = false; // Run#60 实证：CDP 连上后 openClone 兜底仍按时间触发（「打开」按钮已不存在，白报异常）——改为从未连上才兜底
     while (Date.now() < deadline) {
-      // 60s 仍连不上 9221 → 主动点开 UA152（主壳分身列表→「正在访问」入口，与 openClone 同路径触发 9221）
-      if (!openTried && Date.now() - (deadline - TIMEOUT_MS) > 60000) {
+      // 仅当从未连上 9221（RPA 没开分身）才 60s 后 openClone 兜底
+      if (!openTried && !everConnected && Date.now() - (deadline - TIMEOUT_MS) > 60000) {
         openTried = true;
         try {
           log('[fallback] 60s 无 9221——尝试主壳点开 UA152 触发 CDP');
@@ -441,19 +442,28 @@ async function main() {
       }
       let b = null;
       try {
-        b = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 15000 });
+        b = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 60000 }); // Run#60 实证：15s 会 Page.enable timed out
+        everConnected = true;
         const pages = await b.pages();
         // 每 20s 一条诊断：连接 OK + 当前全部页面 URL（定位 RPA 是否真的开了检索页）
         if (Date.now() - lastDiag > 20000) {
           const urls = [];
-          for (const p of pages) { try { urls.push(p.url().slice(0, 60)); } catch (_) {} }
+          for (const p of pages) {
+            try {
+              const u = p.url().slice(0, 70);
+              const ti = await p.title().catch(() => '');
+              urls.push(`${u} | ${ti.slice(0, 20)}`);
+            } catch (_) { urls.push('?'); }
+          }
           log(`[cdp-diag] 连接OK，pages(${urls.length}): ${JSON.stringify(urls)}`);
           lastDiag = Date.now();
         }
         for (const p of pages) {
           try {
             const url = p.url();
-            if (!/baidu\.com|bing\.com|google/i.test(url)) continue;
+            // Run#60 实证：RPA 结果页不一定以 baidu 域名呈现（分身新 tab/内嵌页）；放宽为：
+            // baidu/bing/google 域名页直接查正文；其它非 chrome-error 页也查正文（兜底捕获任何含 Apple 的检索结果）
+            if (/chrome-error:|devtools:|szdamai\.local\/?$|about:blank/i.test(url)) continue;
             const text = await p.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 8000)).catch(() => '');
             if (text.includes(MATCH)) { matched = url; break; }
           } catch (_) {}
