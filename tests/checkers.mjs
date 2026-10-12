@@ -86,10 +86,13 @@ async function fingerprint_pixelscan(page, c, opts) {
 // 判定口径（用户确认 2026-10-09）：结果页出现 “Unreliable” 即算【真实失败 fail】，不降级。
 // 注意：页面含 “detected / bad” 等泛化词（页头页脚营销文案），不可作判定依据，已从 red 词表剔除
 //       （曾误命中 “detected”）；且判定词渲染较慢，需轮询等待出现，避免空文本/竞态误判。
-const IPHEY_VERDICT_RE = /unreliable|looks reliable|\breliable\b/i;
-// 注意：不要用 \bleak\b —— iphey 首页营销文案里就有「…detect tracking risks and hidden leaks」，
-// 会把站点自带介绍文当成风险结论（Run#16 误判 fail 即此因）。真正的判定词是 Unreliable。
-const IPHEY_FAIL_RE = /unreliable|not good|mismatch|暴露/i;
+const IPHEY_VERDICT_RE = /looks\s+(un)?reliable/i;
+// Run#51 复盘（误报根因）：首页 = 静态标题「Your Digital Identity Looks」+ 检测完成后才渲染的判定词。
+//   - 误报样本：判定词未渲染时，全文匹配命中营销/FAQ 文案（mismatch、hidden leaks、"our reliable IP tester"）；
+//   - 真失败样本：标题后紧跟「 Unreliable 」。
+// 修法：① fail/pass 都只认紧跟 Looks 的判定短语；② 泛词 mismatch/暴露/\breliable\b 全文匹配会命中文案，删除；
+//       ③ 轮询只等 Looks+判定词整体出现，超时 manual（附截图人工复核）。
+const IPHEY_FAIL_RE = /looks\s+unreliable/i;
 async function fingerprint_iphey(page, c, opts) {
   await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
   let text = '';
@@ -119,9 +122,10 @@ async function fingerprint_iphey(page, c, opts) {
   }
   const shotSuffix = shotUrl ? ` [截图] ${shotUrl}` : '';
   const m = text.match(IPHEY_FAIL_RE);
-  if (m) return { status: 'fail', detail: `命中风险词「${m[0]}」; ${text.slice(0, 160).replace(/\n/g, ' ')}${shotSuffix}` };
-  if (/\blooks reliable\b|\breliable\b/i.test(text)) return { status: 'pass', detail: `${text.slice(0, 160).replace(/\n/g, ' ')}${shotSuffix}` };
-  return { status: 'manual', detail: `未解析到判定词（Unreliable/Reliable），需人工确认; ${text.slice(0, 160).replace(/\n/g, ' ')}${shotSuffix}` };
+  if (m) return { status: 'fail', detail: `命中风险短语「${m[0]}」; ${text.slice(0, 160).replace(/\n/g, ' ')}${shotSuffix}` };
+  const mp = text.match(IPHEY_VERDICT_RE);
+  if (mp) return { status: 'pass', detail: `判定词「${mp[0]}」已渲染; ${text.slice(0, 160).replace(/\n/g, ' ')}${shotSuffix}` };
+  return { status: 'manual', detail: `轮询超时未见「Looks Reliable/Unreliable」判定词，需人工确认; ${text.slice(0, 160).replace(/\n/g, ' ')}${shotSuffix}` };
 }
 
 // 5) browserleaks/ip —— 自采集 WebRTC IP，与代理 IP 比对

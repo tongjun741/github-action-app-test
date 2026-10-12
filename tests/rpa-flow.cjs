@@ -167,8 +167,10 @@ async function main() {
               const search = browser.$(`//input[@id="keywords"] | //input[@placeholder="依据名称检索"] | //div[contains(@class,"ant-modal")]//input[contains(@placeholder,"搜索")] | //div[contains(@class,"ant-modal")]//input[@type="search"] | //div[contains(@class,"shop-picker")]//input[1]`);
               if (await search.isExisting()) {
                 await search.setValue(CLONE);
-                await browser.keys('Enter').catch(() => {});
-                log(`已搜索 ${CLONE}（并回车触发过滤）`);
+                // Run#51 实证：ant-modal 内回车=默认提交会把选择弹窗整个关掉（之后 #keywords 弹窗消失、
+                // 「添加分身」按钮也被关掉的弹窗层挡住而定位失败）——不再回车，改等异步过滤。
+                await sleep(4000);
+                log(`已搜索 ${CLONE}（不回车，等异步过滤）`);
               }
             } catch (_) {}
             for (let w = 0; w < 4 && !picked; w++) {
@@ -201,9 +203,22 @@ async function main() {
                 const items = await Promise.all(itemEls.slice(0, 12).map((e) => e.getText().catch(() => '')));
                 log(`[diag] 列表项(${items.length}): ${JSON.stringify(items.map((x) => String(x).replace(/\s+/g, ' ').slice(0, 40)))}`);
                 const html = await mh.getHTML(false).catch(() => '');
+                // Run#51：HTML 落本地盘在 CI 临时空间拿不回来——必须同步上传 Cloudinary 取证
                 const p = path.join(process.cwd(), `rpa-modal-diag-${Date.now()}.html`);
                 fs.writeFileSync(p, html.slice(0, 1.5 * 1024 * 1024));
                 log(`[diag] 内层弹窗HTML已存 ${p}`);
+                if (process.env.CLOUDINARY_URL) {
+                  try {
+                    const mod = require('cloudinary');
+                    const cl = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+                    cl.config({ secure: true });
+                    const now = new Date();
+                    const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                    const r = await cl.uploader.upload(p, { asset_folder: `e2eTest_${mm}`, resource_type: 'raw' });
+                    console.log(`[rpa-flow] 内层弹窗DOM: ${r.url}`);
+                    console.log(`::notice title=RPA-DOM-PICKER::${Buffer.from(r.url).toString('base64')}`);
+                  } catch (e) { log(`[diag] 弹窗DOM上传失败(忽略): ${e.message.slice(0, 60)}`); }
+                }
               } else {
                 log('[diag] 未找到含 #keywords 的内层弹窗（分身选择列表层）——可能搜索未出结果或列表未渲染');
               }
