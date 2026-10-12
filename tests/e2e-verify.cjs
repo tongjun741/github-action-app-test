@@ -122,6 +122,17 @@ function resolveChromedriver() {
   return p;
 }
 
+function buildCaps(binary, chromedriver) {
+  const caps = {
+    browserName: 'chrome',
+    browserVersion: '108',
+    'goog:chromeOptions': { binary },
+    'wdio:chromedriverOptions': { binary: chromedriver },
+  };
+  if (os.platform() === 'darwin') caps['wdio:chromedriverOptions'].cacheDir = '/tmp';
+  return caps;
+}
+
 function writePlaceholder(reason) {
   try {
     fs.writeFileSync(OUT, JSON.stringify({
@@ -414,16 +425,7 @@ async function main() {
   log(`客户端=${binary}`);
   log(`chromedriver=${chromedriver}`);
 
-  const caps = {
-    browserName: 'chrome',
-    browserVersion: '108',
-    'goog:chromeOptions': { binary },
-    // 必须显式指定，禁用 WDIO 自动下载（CfT 无 v108 → 404）
-    'wdio:chromedriverOptions': { binary: chromedriver },
-  };
-  if (os.platform() === 'darwin') {
-    caps['wdio:chromedriverOptions'].cacheDir = '/tmp';
-  }
+  const caps = buildCaps(binary, chromedriver);
 
   let browser;
   browser = await remote({ capabilities: caps, logLevel: 'warn' });
@@ -525,16 +527,22 @@ async function main() {
   }
 }
 
-main()
-  .then((code) => process.exit(code || 0))
-  .catch((e) => {
-    console.error('[e2e-verify] 失败:', e && (e.stack || e.message));
-    writePlaceholder(e && (e.stack || e.message));
-    // GitHub Actions 注解：失败原因进 error annotation —— 公共仓库 annotations API 匿名可读，
-    // 无需 token 即可从 CI 外获知 fatal 原因（Run#17 四平台同挂时曾因日志 403 无法诊断）。
-    try {
-      const msg = String((e && e.message) || e).replace(/\r?\n/g, ' ').slice(0, 220);
-      console.error(`::error title=e2e-verify失败(${PLATFORM})::${msg}`);
-    } catch (_) { /* 本地运行无影响 */ }
-    process.exit(1);
-  });
+// 导出内部能力，供 google-translate.cjs / rpa-flow.cjs 等复用（在同一进程内自起客户端+开分身，
+// 避免 OPEN_CLONE_ONLY 跨进程销毁竞态）。require.main 守卫确保 `node tests/e2e-verify.cjs` 仍自跑。
+module.exports = { openClone, login, resolveBinary, resolveChromedriver, buildCaps };
+
+if (require.main === module) {
+  main()
+    .then((code) => process.exit(code || 0))
+    .catch((e) => {
+      console.error('[e2e-verify] 失败:', e && (e.stack || e.message));
+      writePlaceholder(e && (e.stack || e.message));
+      // GitHub Actions 注解：失败原因进 error annotation —— 公共仓库 annotations API 匿名可读，
+      // 无需 token 即可从 CI 外获知 fatal 原因（Run#17 四平台同挂时曾因日志 403 无法诊断）。
+      try {
+        const msg = String((e && e.message) || e).replace(/\r?\n/g, ' ').slice(0, 220);
+        console.error(`::error title=e2e-verify失败(${PLATFORM})::${msg}`);
+      } catch (_) { /* 本地运行无影响 */ }
+      process.exit(1);
+    });
+}

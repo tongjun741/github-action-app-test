@@ -167,18 +167,18 @@ async function main() {
               const search = browser.$(`//input[@id="keywords"] | //input[@placeholder="依据名称检索"] | //div[contains(@class,"ant-modal")]//input[contains(@placeholder,"搜索")] | //div[contains(@class,"ant-modal")]//input[@type="search"] | //div[contains(@class,"shop-picker")]//input[1]`);
               if (await search.isExisting()) {
                 await search.setValue(CLONE);
-                log(`已搜索 ${CLONE}`);
+                await browser.keys('Enter').catch(() => {});
+                log(`已搜索 ${CLONE}（并回车触发过滤）`);
               }
             } catch (_) {}
             for (let w = 0; w < 4 && !picked; w++) {
               for (const sel of [
-                `//div[contains(@class,"ant-list-item")][contains(.,"${CLONE}")]`,
+                `//div[contains(@class,"ant-modal")][.//input[@id="keywords"]]//*[contains(@class,"ant-list-item")][contains(.,"${CLONE}")]`,
+                `//div[contains(@class,"ant-modal")][.//input[@id="keywords"]]//*[contains(.,"${CLONE}")]`,
                 `//*[contains(@class,"ant-list-item")][contains(.,"${CLONE}")]`,
                 `//li[contains(.,"${CLONE}")]`,
+                `//div[contains(@class,"shop-picker")]//*[contains(.,"${CLONE}")]`,
                 `//div[contains(@class,"ant-modal")]//*[contains(text(),"${CLONE}")]`,
-                `//div[contains(@class,"ant-modal")]//td[contains(.,"${CLONE}")]`,
-                `//div[contains(@class,"ant-modal")]//tr[contains(.,"${CLONE}")]`,
-                `//div[contains(@class,"shop-picker")]//*[contains(text(),"${CLONE}")]`,
               ]) {
                 try {
                   const it = browser.$(sel);
@@ -189,16 +189,23 @@ async function main() {
               }
               if (!picked) await sleep(3000); // 等列表异步加载
             }
-            // 诊断：dump 内层弹窗文本+HTML，定位选择器（下一轮据此收紧）
+            // 诊断：精准抓取「含 #keywords 的内层分身选择弹窗」文本+列表项+HTML（之前抓错层拿到向导外层）
             try {
-              const mh = await browser.$('//div[contains(@class,"ant-modal")]');
-              if (await mh.isExisting()) {
+              const picker = browser.$('//div[contains(@class,"ant-modal")][.//input[@id="keywords"]]');
+              const mh = (await picker.isExisting().catch(() => false)) ? picker
+                : await browser.$('//div[contains(@class,"ant-modal")][.//*[contains(@class,"ant-list-item")]]').catch(() => null);
+              if (mh && await mh.isExisting().catch(() => false)) {
                 const mt = await mh.getText().catch(() => '');
-                log(`[diag] 内层弹窗文本: ${String(mt).replace(/\s+/g, ' ').slice(0, 400)}`);
+                log(`[diag] 内层弹窗文本: ${String(mt).replace(/\s+/g, ' ').slice(0, 800)}`);
+                const itemEls = await mh.$$('//*[contains(@class,"ant-list-item")]').catch(() => []);
+                const items = await Promise.all(itemEls.slice(0, 12).map((e) => e.getText().catch(() => '')));
+                log(`[diag] 列表项(${items.length}): ${JSON.stringify(items.map((x) => String(x).replace(/\s+/g, ' ').slice(0, 40)))}`);
                 const html = await mh.getHTML(false).catch(() => '');
                 const p = path.join(process.cwd(), `rpa-modal-diag-${Date.now()}.html`);
                 fs.writeFileSync(p, html.slice(0, 1.5 * 1024 * 1024));
                 log(`[diag] 内层弹窗HTML已存 ${p}`);
+              } else {
+                log('[diag] 未找到含 #keywords 的内层弹窗（分身选择列表层）——可能搜索未出结果或列表未渲染');
               }
             } catch (_) {}
             if (picked) {
@@ -283,7 +290,7 @@ async function main() {
     if (!picked) {
       push('fail', '分身未选中（步骤1 校验「请至少选择一个分身」），RPA 无法执行');
       fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
-      await browser.close().catch(() => {});
+      try { await browser.deleteSession(); } catch (_) {}
       process.exit(1);
     }
 
