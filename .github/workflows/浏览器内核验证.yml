@@ -145,16 +145,11 @@ jobs:
           if ("${{ github.event.inputs.software_download_url }}") {
             $dl = "${{ github.event.inputs.software_download_url }}"
           } else {
+            # 2026-10-12 用户指定：固定客户端版本（不再动态读 static.config.json，避免线上版本漂移）
             if ("${{ matrix.install }}" -eq "win7") {
-              $dl = "https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_12.9.896_zh_setup.exe"
+              $dl = "https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_12.9.905_zh_setup.exe"
             } else {
-              try {
-                $v = (Invoke-RestMethod -Uri "https://www.szdamai.com/static.config.json").windows10AppVersion
-                $dl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_${v}_zh_setup.exe"
-                Write-Host "线上版本号: $v"
-              } catch {
-                Write-Warning "取版本号失败，回退固定版本"; $dl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_12.9.1033_zh_setup.exe"
-              }
+              $dl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_12.9.1042_zh_setup.exe"
             }
           }
           Write-Host "下载客户端: $dl"
@@ -180,9 +175,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils
           if [ -z "${{ github.event.inputs.software_download_url }}" ]; then
-            # 动态读取线上版本号（与 Windows10 步骤一致），避免写死旧版本导致 404
-            ver=$(curl -fsSL https://www.szdamai.com/static.config.json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).linuxAppVersion)}catch(e){console.log('12.9.902')}})") || ver="12.9.902"
-            dl="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_${ver}_zh_setup.deb"
+            # 2026-10-12 用户指定：固定客户端版本（ubuntu 12.9.911，不再动态读 static.config.json）
+            dl="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_12.9.911_zh_setup.deb"
           else
             dl="${{ github.event.inputs.software_download_url }}"
           fi
@@ -207,12 +201,11 @@ jobs:
         run: |
           set -e
           if [ -z "${{ github.event.inputs.software_download_url }}" ]; then
-            # 动态读取线上版本号（mac-x64 → macX64AppVersion，mac-arm64 → macArm64AppVersion）
-            ver=$(curl -fsSL https://www.szdamai.com/static.config.json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);console.log('${{ matrix.install }}'==='mac-x64'?j.macX64AppVersion:j.macArm64AppVersion)})") || ver="12.9.940"
+            # 2026-10-12 用户指定：固定客户端版本（mac arm64/x64 均为 12.9.949，不再动态读 static.config.json）
             if [ "${{ matrix.install }}" = "mac-x64" ]; then
-              dl="https://dl.szdamai.com/downloads/mac_x64_app_zh/HuaYoungApp_Mac_x64_${ver}_zh_setup.dmg"
+              dl="https://dl.szdamai.com/downloads/mac_x64_app_zh/HuaYoungApp_Mac_x64_12.9.949_zh_setup.dmg"
             else
-              dl="https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_${ver}_zh_setup.dmg"
+              dl="https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_12.9.949_zh_setup.dmg"
             fi
           else
             dl="${{ github.event.inputs.software_download_url }}"
@@ -404,8 +397,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils
           if [ -z "${{ github.event.inputs.software_download_url }}" ]; then
-            ver=$(curl -fsSL https://www.szdamai.com/static.config.json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).linuxAppVersion)}catch(e){console.log('12.9.902')}})") || ver="12.9.902"
-            dl="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_${ver}_zh_setup.deb"
+            # 2026-10-12 用户指定：固定客户端版本（ubuntu 12.9.911，第二台设备与首台一致）
+            dl="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_12.9.911_zh_setup.deb"
           else
             dl="${{ github.event.inputs.software_download_url }}"
           fi
@@ -501,9 +494,8 @@ jobs:
       - name: 下载 Win7 客户端
         run: |
           if [ -z "${{ inputs.software_download_url }}" ]; then
-            # 动态读取线上版本号（windows7AppVersion），避免写死旧版本导致 404
-            ver=$(curl -fsSL https://www.szdamai.com/static.config.json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).windows7AppVersion)}catch(e){console.log('12.9.896')}})") || ver="12.9.896"
-            download_url="https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_${ver}_zh_setup.exe"
+            # 2026-10-12 用户指定：固定客户端版本（Win7 12.9.905，不再动态读 static.config.json）
+            download_url="https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_12.9.905_zh_setup.exe"
           else
             download_url="${{ inputs.software_download_url }}"
           fi
