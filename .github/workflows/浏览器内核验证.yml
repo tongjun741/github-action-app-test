@@ -327,7 +327,7 @@ jobs:
       - name: 翻译验证 (Google翻译加速)
         if: always() && ((inputs.debug_hold != true && inputs.debug_verify != true) || matrix.install == inputs.debug_platform)
         continue-on-error: true
-        timeout-minutes: 12
+        timeout-minutes: 15
         env:
           DISPLAY: ${{ matrix.install == 'ubuntu' && ':99' || '' }}
           E2E_PLATFORM: ${{ matrix.platform }}

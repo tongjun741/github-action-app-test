@@ -47,23 +47,39 @@ async function main() {
   }
 
   // 2) 起客户端并登录、开分身（同进程内保活，9221 由 openClone 绑定）
+  //    Run#61 实证：R19 RPA 先跑完会占用 UA152（浏览器已开）——先探测 9221，已可用则跳过整个起客户端流程
   const binary = resolveBinary();
   if (!fs.existsSync(binary)) throw new Error(`客户端可执行文件不存在: ${binary}`);
-  const chromedriver = resolveChromedriver();
-  if (!fs.existsSync(chromedriver)) throw new Error(`chromedriver 不存在: ${chromedriver}`);
-  const browser = await remote({ capabilities: buildCaps(binary, chromedriver), logLevel: 'warn' });
-  log('客户端已启动');
+  let browser = null;
+  let alreadyOpen = false;
   try {
-    const config = {
-      ...productConfig,
-      teamName: process.env.TEAM_NAME || productConfig.teamName,
-      username: process.env.WDIO_USERNAME || productConfig.username,
-    };
-    const password = process.env.PRODUCT_WDIO_PASSWORD || 'password';
-    await login(config, password, browser);
-    log('登录完成');
-    await openClone(browser); // 分身内核浏览器打开，9221 绑定
-    log('分身已打开，9221 应已监听');
+    const t0 = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 20000 }).catch(() => null);
+    if (t0) {
+      const ps = await t0.pages().catch(() => []);
+      log(`9221 已可用（RPA 步可能已开分身，pages=${ps.length}）——跳过起客户端，直接复用`);
+      t0.disconnect();
+      alreadyOpen = true;
+    }
+  } catch (_) {}
+  if (!alreadyOpen) {
+    const chromedriver = resolveChromedriver();
+    if (!fs.existsSync(chromedriver)) throw new Error(`chromedriver 不存在: ${chromedriver}`);
+    browser = await remote({ capabilities: buildCaps(binary, chromedriver), logLevel: 'warn' });
+    log('客户端已启动');
+  }
+  try {
+    if (!alreadyOpen) {
+      const config = {
+        ...productConfig,
+        teamName: process.env.TEAM_NAME || productConfig.teamName,
+        username: process.env.WDIO_USERNAME || productConfig.username,
+      };
+      const password = process.env.PRODUCT_WDIO_PASSWORD || 'password';
+      await login(config, password, browser);
+      log('登录完成');
+      await openClone(browser); // 分身内核浏览器打开，9221 绑定
+      log('分身已打开，9221 应已监听');
+    }
 
     // 3) 同进程内连 9221（客户端仍存活，CDP 不会因跨进程退出而消失）
     let pptr = null;
@@ -164,7 +180,7 @@ async function main() {
       process.exit(1);
     }
   } finally {
-    try { await browser.deleteSession(); } catch (_) {}
+    if (browser) { try { await browser.deleteSession(); } catch (_) {} }
   }
 }
 
