@@ -137,24 +137,56 @@ async function main() {
     }
     if (!confirmed) log('未见「流程执行方式」弹窗（可能已直接执行）');
 
-    // 3b) 三步向导（Run#46 DOM 实证）：①选择流程与分身 → ②设置流程输入变量 → ③设置执行策略
-    //     每步点「下一步」推进；步骤 2 填变量（关键词=ios）
+    // 3b) 三步向导（Run#46 DOM 实证）。Run#47 关键发现：卡在步骤1——「请至少选择一个分身」
+    //     红色校验错误（下一步没通过校验，脚本误以为进了步骤2）。
+    //     步骤1 必须：① 点「选 择」打开分身选择器 ② 选中 UA152 ③ 校验通过后下一步。
     await sleep(2500);
     const nextBtnSels = [
       '//button[.//span[text()="下一步"]]',
-      '//button[.//span[text()="执行任务"]]',
       '//div[contains(@class,"ant-pro-steps-form")]//button[contains(@class,"ant-btn-primary")]',
     ];
     let filledVar = false;
     for (let step = 1; step <= 3; step++) {
       log(`向导步骤 ${step}`);
+      if (step === 1) {
+        // 分身选择：点「选 择」→ 分身选择弹窗 → 选 CLONE → 确定
+        try {
+          const pickBtn = browser.$('//button[.//span[text()="选 择"]] | //span[text()="选 择"]/ancestor::button');
+          await pickBtn.waitForExist({ timeout: 4000 });
+          await pickBtn.click();
+          log('已点「选 择」（分身选择器）');
+          await sleep(2000);
+          // 选择弹窗里选目标分身（列表项/复选框含 CLONE 名）
+          let picked = false;
+          for (const sel of [
+            `//div[contains(@class,"ant-modal")]//td[contains(.,"${CLONE}")]`,
+            `//div[contains(@class,"ant-modal")]//tr[contains(.,"${CLONE}")]//input`,
+            `//div[contains(@class,"ant-modal")]//*[contains(text(),"${CLONE}")]`,
+            `//div[contains(@class,"shop-picker")]//*[contains(text(),"${CLONE}")]`,
+          ]) {
+            try {
+              const it = browser.$(sel);
+              await it.waitForExist({ timeout: 3500 });
+              await it.click();
+              picked = true; log(`已选中分身 ${CLONE}（${sel.slice(0, 44)}…）`); break;
+            } catch (_) {}
+          }
+          if (!picked) log(`分身选择器中未见 ${CLONE}——截图取证`);
+          // 选择器确认按钮
+          for (const sel of ['//div[contains(@class,"ant-modal")]//button[.//span[text()="确 定"]]', '.ant-modal .ant-btn-primary']) {
+            try { const b = browser.$(sel); await b.waitForExist({ timeout: 2500 }); await b.click(); log('已确认分身选择'); break; } catch (_) {}
+          }
+          await sleep(1500);
+        } catch (e) { log(`步骤1 分身选择异常: ${e.message.slice(0, 60)}`); }
+      }
       if (step === 2 && !filledVar) {
-        // 填输入变量：找 input（label/placeholder 含 关键词/keyword 优先，否则第一个可见 input）
+        // 填输入变量：input（placeholder/label 含 关键词 优先，否则 steps-form 内第一个可见 input）
         for (const sel of [
           '//input[@placeholder="关键词"]',
           '//label[contains(.,"关键词")]//following-sibling::div//input',
           '//div[contains(@class,"ant-pro-steps-form")]//input[contains(@placeholder,"关键词")]',
           '//div[contains(@class,"ant-pro-steps-form")]//input[1]',
+          '//div[contains(@class,"ant-pro-steps-form")]//textarea[1]',
         ]) {
           try {
             const inp = browser.$(sel);
@@ -181,32 +213,29 @@ async function main() {
               console.log(`::notice title=RPA-DOM-STEP2::${Buffer.from(r2.url).toString('base64')}`);
             }
           } catch (e) { log(`步骤2 DOM dump 失败: ${e.message.slice(0, 60)}`); }
-          // 兜底：textarea/select 也试（变量控件类型未知）
-          for (const sel of [
-            '//div[contains(@class,"ant-pro-steps-form")]//textarea[1]',
-            '//textarea[@placeholder="关键词"]',
-            '//div[contains(@class,"ant-pro-steps-form")]//select[1]',
-          ]) {
-            try {
-              const inp = browser.$(sel);
-              await inp.waitForExist({ timeout: 2500 });
-              await inp.setValue(RPA_KEYWORD);
-              filledVar = true; log(`步骤2 兜底控件已填=${RPA_KEYWORD}（${sel.slice(0, 44)}…）`); break;
-            } catch (_) {}
-          }
         }
       }
+      // 下一步（带校验确认：点完检查是否出现红色错误）
       let advanced = false;
       for (const sel of nextBtnSels) {
         try {
           const b = browser.$(sel);
           await b.waitForExist({ timeout: 3000 });
           await b.click();
-          advanced = true; log(`已点击「${sel.includes('执行任务') ? '执行任务' : '下一步'}」（步骤 ${step}）`); break;
+          advanced = true; log(`已点击「下一步」（步骤 ${step}）`); break;
         } catch (_) {}
       }
       if (!advanced) { log(`步骤 ${step} 无下一步按钮（可能已到执行）`); break; }
       await sleep(2000);
+      // 校验错误检测（下一步没过校验时停留原步骤）
+      try {
+        const errEl = browser.$('//div[contains(@class,"ant-form-item-explain-error")]');
+        if (await errEl.isExisting()) {
+          const errText = await browser.$('//div[contains(@class,"ant-form-item-explain-error")]').getText().catch(() => '');
+          log(`步骤 ${step} 校验错误: ${String(errText).slice(0, 60)}——重试或继续`);
+          await uploadShot(browser, `step${step}-valid-err`);
+        }
+      } catch (_) { }
     }
 
     // 4) 轮询分身浏览器 CDP：出现 baidu.com 页面且内容含 Apple
