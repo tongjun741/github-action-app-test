@@ -444,10 +444,11 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
     }
     // 等 CDP 起来（Run#41 教训：按钮态先变、cdpAlive 的 /json/version 偶尔先通一瞬——
     // 需「真连得上且能开页」才算就绪：puppeteer 实连+newPage 成功）
+    const puppeteerB1 = require('puppeteer-core');
     let browser2 = null;
     for (let i = 0; i < 30; i++) {
       try {
-        browser2 = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 30000 });
+        browser2 = await puppeteerB1.connect({ browserURL: CDP, protocolTimeout: 30000 });
         const p = await browser2.newPage();
         await p.goto('about:blank', { timeout: 10000 }).catch(() => {});
         await p.close();
