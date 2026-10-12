@@ -477,11 +477,21 @@ async function main() {
       await sleep(5000);
     }
 
+    // Run#62 实证：RPA 间歇性只开百度首页不执行检索（Run#61 出结果页 / Run#62 停首页）——
+    // 超时 fail 前读主壳「流程任务」状态，把 RPA 任务真实状态（执行中/成功/失败）带进判定
+    let taskState = '';
+    try {
+      const bt = await browser.$('//body').getText().catch(() => '');
+      const hits = ['执行中', '执行成功', '执行失败', '排队中', '已完成', '已暂停'].filter((k) => bt.includes(k));
+      taskState = hits.join('/');
+      log(`[task-state] 主壳流程任务状态关键词: ${taskState || '未见'}`);
+    } catch (_) {}
+
     await uploadShot(browser, 'final');
     if (matched) {
       push('pass', `RPA「${FLOW_NAME}」(关键词=${RPA_KEYWORD}) 执行完成，页面命中「${MATCH}」（${matched.slice(0, 60)}）`);
     } else {
-      push('fail', `RPA 执行后 ${TIMEOUT_MS / 1000}s 内未见含「${MATCH}」的检索结果页`);
+      push('fail', `RPA 执行后 ${TIMEOUT_MS / 1000}s 内未见含「${MATCH}」的检索结果页${taskState ? `；主壳任务状态: ${taskState}` : ''}`);
     }
     fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
     log(`已写出 ${OUT}`);
