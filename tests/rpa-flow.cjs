@@ -149,35 +149,52 @@ async function main() {
     for (let step = 1; step <= 3; step++) {
       log(`向导步骤 ${step}`);
       if (step === 1) {
-        // 分身选择：点「选 择」→ 分身选择弹窗 → 选 CLONE → 确定
-        try {
-          const pickBtn = browser.$('//button[.//span[text()="选 择"]] | //span[text()="选 择"]/ancestor::button');
-          await pickBtn.waitForExist({ timeout: 4000 });
-          await pickBtn.click();
-          log('已点「选 择」（分身选择器）');
-          await sleep(2000);
-          // 选择弹窗里选目标分身（列表项/复选框含 CLONE 名）
-          let picked = false;
-          for (const sel of [
-            `//div[contains(@class,"ant-modal")]//td[contains(.,"${CLONE}")]`,
-            `//div[contains(@class,"ant-modal")]//tr[contains(.,"${CLONE}")]//input`,
-            `//div[contains(@class,"ant-modal")]//*[contains(text(),"${CLONE}")]`,
-            `//div[contains(@class,"shop-picker")]//*[contains(text(),"${CLONE}")]`,
-          ]) {
+        // 分身选择（Run#48 DOM 实证：shop-picker 左侧空列表+右侧「添加分身」——「选 择」按钮无效果，真入口是「添加分身」）
+        let picked = false;
+        for (const entrySel of [
+          '//button[.//span[text()="选 择"]] | //span[text()="选 择"]/ancestor::button',
+          '//button[.//span[contains(text(),"添加分身")]] | //span[contains(text(),"添加分身")]/ancestor::button',
+        ]) {
+          if (picked) break;
+          try {
+            const eb = browser.$(entrySel);
+            await eb.waitForExist({ timeout: 3500 });
+            await eb.click();
+            log(`已点入口按钮（${entrySel.includes('添加') ? '添加分身' : '选 择'}）`);
+            await sleep(2500);
+            // 选择弹窗/面板里选目标分身：先试搜索框（输 CLONE），再试点列表项
             try {
-              const it = browser.$(sel);
-              await it.waitForExist({ timeout: 3500 });
-              await it.click();
-              picked = true; log(`已选中分身 ${CLONE}（${sel.slice(0, 44)}…）`); break;
+              const search = browser.$('//div[contains(@class,"ant-modal")]//input[contains(@placeholder,"搜索")] | //div[contains(@class,"ant-modal")]//input[@type="search"] | //div[contains(@class,"shop-picker")]//input[1]');
+              if (await search.isExisting()) {
+                await search.setValue(CLONE);
+                await sleep(1500);
+                log(`已搜索 ${CLONE}`);
+              }
             } catch (_) {}
-          }
-          if (!picked) log(`分身选择器中未见 ${CLONE}——截图取证`);
-          // 选择器确认按钮
-          for (const sel of ['//div[contains(@class,"ant-modal")]//button[.//span[text()="确 定"]]', '.ant-modal .ant-btn-primary']) {
-            try { const b = browser.$(sel); await b.waitForExist({ timeout: 2500 }); await b.click(); log('已确认分身选择'); break; } catch (_) {}
-          }
-          await sleep(1500);
-        } catch (e) { log(`步骤1 分身选择异常: ${e.message.slice(0, 60)}`); }
+            for (const sel of [
+              `//div[contains(@class,"ant-modal")]//td[contains(.,"${CLONE}")]`,
+              `//div[contains(@class,"ant-modal")]//tr[contains(.,"${CLONE}")]`,
+              `//div[contains(@class,"ant-modal")]//*[contains(text(),"${CLONE}")]`,
+              `//div[contains(@class,"shop-picker")]//*[contains(text(),"${CLONE}")]`,
+            ]) {
+              try {
+                const it = browser.$(sel);
+                await it.waitForExist({ timeout: 3500 });
+                await it.click();
+                picked = true; log(`已选中分身 ${CLONE}（${sel.slice(0, 44)}…）`); break;
+              } catch (_) {}
+            }
+            if (picked) {
+              for (const sel of ['//div[contains(@class,"ant-modal")]//button[.//span[text()="确 定"]]', '.ant-modal .ant-btn-primary']) {
+                try { const b = browser.$(sel); await b.waitForExist({ timeout: 2500 }); await b.click(); log('已确认分身选择'); break; } catch (_) {}
+              }
+              break;
+            }
+            log('该入口未选中分身——试下一入口');
+          } catch (e) { log(`入口异常: ${e.message.slice(0, 50)}`); }
+        }
+        if (!picked) { log('分身未能选中——截图取证'); await uploadShot(browser, 'clone-pick-miss'); }
+        await sleep(1500);
       }
       if (step === 2 && !filledVar) {
         // 填输入变量：input（placeholder/label 含 关键词 优先，否则 steps-form 内第一个可见 input）
