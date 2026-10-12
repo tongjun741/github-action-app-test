@@ -3,6 +3,7 @@
 // 输出：{ status: 'pass'|'fail'|'manual'|'error'|'ignored', detail: string }
 
 import path from 'node:path';
+import fs from 'node:fs';
 
 // 截图上传 Cloudinary（与 tests/include/tools.js 的 uploadFile 完全同参数：
 //   asset_folder: e2eTest_yyyy-MM / use_filename:false / unique_filename:false / CLOUDINARY_URL 环境变量）。
@@ -73,13 +74,38 @@ async function kernel_version(page, c, opts) {
 }
 
 // 3) pixelscan —— 允许“使用了代理”，但不应有其它红色警告
+// Run#52 修（历史 15+ 轮全 manual 根因）：pixelscan 首页已改版为 landing（需点 "Scan My Browser"），
+//   首页正文永远不含 "very likely"——老逻辑在首页读一次性文本必然 manual。
+//   修法：① 直达 /fingerprint-check 扫描页（自动开始扫描）② 轮询等结果渲染 ③ dump 全文上传取证。
 async function fingerprint_pixelscan(page, c, opts) {
-  await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
-  const text = await bodyText(page);
+  const url = /pixelscan\.net\/?$/i.test(c.url) ? 'https://pixelscan.net/fingerprint-check' : c.url;
+  await gotoSafe(page, url, 'networkidle', 45000, opts?.engine).catch(() => {});
+  let text = '';
+  const deadline = Date.now() + 30000;
+  for (;;) {
+    text = await bodyText(page);
+    if (/very likely|not using (?:a )?proxy|consistent|inconsistent/i.test(text) || Date.now() > deadline) break;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
   const proxy = /very likely you are using proxy/i.test(text);
   const other = /very likely/i.test(text.replace(/very likely you are using proxy/i, ''));
-  if (!proxy) return { status: 'manual', detail: '未检测到代理提示，需人工确认（本机直连场景）' };
-  return { status: other ? 'fail' : 'pass', detail: `proxyHint=${proxy} otherWarn=${other}` };
+  // 全文 dump 取证（下一轮据真实文案收紧判定词）
+  let dumpUrl = '';
+  try {
+    const p = path.join(process.cwd(), `pixelscan-${Date.now()}.txt`);
+    fs.writeFileSync(p, text.slice(0, 30000));
+    if (process.env.CLOUDINARY_URL) {
+      const mod = await import('cloudinary');
+      const cl = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+      cl.config({ secure: true });
+      const r = await cl.uploader.upload(p, { asset_folder: 'e2eTest_pixelscan', resource_type: 'raw' });
+      dumpUrl = r.url;
+      console.log(`::notice title=pixelscan-dump::${Buffer.from(r.url).toString('base64')}`);
+    }
+  } catch (_) {}
+  if (proxy) return { status: other ? 'fail' : 'pass', detail: `proxyHint=${proxy} otherWarn=${other}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
+  if (/consistent/i.test(text) && !/inconsistent/i.test(text)) return { status: 'pass', detail: `一致性提示 consistent（未见代理警告）${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
+  return { status: 'manual', detail: `未见代理/一致性判定词（30s 轮询超时），需人工确认; ${text.slice(0, 120).replace(/\n/g, ' ')}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
 }
 
 // 4) iphey —— 全绿（无 Unreliable / leak / mismatch）
@@ -163,13 +189,35 @@ async function fingerprint_webrtc(page, c, opts) {
 }
 
 // 6) whoer —— 解析匿名得分 >= 90
+// Run#52 修（历史 15+ 轮全 manual 根因）：得分由 JS 异步渲染，一次性读文本必然读不到数字。
+//   修法：① 轮询等 "XX%" 数字出现 ② 命中多个数字时取「anonymity/匿名」上下文优先 ③ dump 取证。
 async function fingerprint_whoer(page, c, opts) {
   await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
-  const text = await bodyText(page);
-  const m = text.match(/(\d{1,3})\s*%/);
-  if (!m) return { status: 'manual', detail: '无法从页面解析得分，需人工确认' };
+  let text = '';
+  let m = null;
+  const deadline = Date.now() + 30000;
+  for (;;) {
+    text = await bodyText(page);
+    m = text.match(/(?:anonymity|匿名)[^\d%]{0,20}(\d{1,3})\s*%/i) || text.match(/(\d{1,3})\s*%/);
+    if (m || Date.now() > deadline) break;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  let dumpUrl = '';
+  try {
+    const p = path.join(process.cwd(), `whoer-${Date.now()}.txt`);
+    fs.writeFileSync(p, text.slice(0, 30000));
+    if (process.env.CLOUDINARY_URL) {
+      const mod = await import('cloudinary');
+      const cl = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+      cl.config({ secure: true });
+      const r = await cl.uploader.upload(p, { asset_folder: 'e2eTest_whoer', resource_type: 'raw' });
+      dumpUrl = r.url;
+      console.log(`::notice title=whoer-dump::${Buffer.from(r.url).toString('base64')}`);
+    }
+  } catch (_) {}
+  if (!m) return { status: 'manual', detail: `30s 轮询未解析到得分，需人工确认; ${text.slice(0, 120).replace(/\n/g, ' ')}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
   const score = parseInt(m[1], 10);
-  return { status: score >= 90 ? 'pass' : 'fail', detail: `score=${score}%` };
+  return { status: score >= 90 ? 'pass' : 'fail', detail: `score=${score}%${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
 }
 
 // 7) ipbinding —— WebRTC blocked
