@@ -442,12 +442,24 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       } catch (_) { }
       await sleep(1500);
     }
-    // 等 CDP 起来
+    // 等 CDP 起来（Run#41 教训：按钮态先变、cdpAlive 的 /json/version 偶尔先通一瞬——
+    // 需「真连得上且能开页」才算就绪：puppeteer 实连+newPage 成功）
+    let browser2 = null;
     for (let i = 0; i < 30; i++) {
-      if (await cdpAlive()) break;
-      await sleep(2000);
+      try {
+        browser2 = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 30000 });
+        const p = await browser2.newPage();
+        await p.goto('about:blank', { timeout: 10000 }).catch(() => {});
+        await p.close();
+        break;
+      } catch (_) {
+        if (browser2) { try { browser2.disconnect(); } catch (_) {} browser2 = null; }
+        await sleep(3000);
+      }
     }
-    log('B2 验证代填');
+    if (!browser2) throw new Error('B1 后 CDP 60s 内不可用（分身内核未起）');
+    try { browser2.disconnect(); } catch (_) {}
+    log('B2 验证代填（CDP 已实测就绪）');
     await withPage(async (page) => {
       // 复用 A1 的登录页导航（首页找入口，不硬编码 /login）
       if (loginPageUrl) {
