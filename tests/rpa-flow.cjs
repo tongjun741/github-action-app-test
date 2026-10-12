@@ -231,7 +231,7 @@ async function main() {
           // Run#55 证据：必须排除「选择流程定义」弹窗（它也含"选择"字样）——真分身弹窗含 #keywords/依据名称检索/ant-list-item
           const pickerModalXpaths = [
             '//div[contains(@class,"ant-modal-root")][.//input[@id="keywords"]][not(.//div[contains(@class,"ant-modal-title")][contains(.,"流程")]])]',
-            '//div[contains(@class,"ant-modal-root")][.//input[contains(@placeholder,"名称检索")]][not(.//div[contains(@class,"ant-modal-title")][contains(.,"流程")])] [not(.//input[@id="keywords"])]',
+            '//div[contains(@class,"ant-modal-root")][.//div[contains(@class,"ant-modal-title")][contains(.,"选择分身")]]',
             '//div[contains(@class,"ant-modal-root")][.//div[contains(@class,"ant-modal-title")][contains(.,"分身")]][not(contains(.,"流程"))]',
           ];
           for (const px of pickerModalXpaths) {
@@ -323,20 +323,37 @@ async function main() {
         await sleep(1500);
       }
       if (step === 2 && !filledVar) {
-        // 填输入变量：input（placeholder/label 含 关键词 优先，否则 steps-form 内第一个可见 input）
-        for (const sel of [
-          '//input[@placeholder="关键词"]',
-          '//label[contains(.,"关键词")]//following-sibling::div//input',
-          '//div[contains(@class,"ant-pro-steps-form")]//input[contains(@placeholder,"关键词")]',
-          '//div[contains(@class,"ant-pro-steps-form")]//input[1]',
-          '//div[contains(@class,"ant-pro-steps-form")]//textarea[1]',
-        ]) {
-          try {
-            const inp = browser.$(sel);
-            await inp.waitForExist({ timeout: 3000 });
-            await inp.setValue(RPA_KEYWORD);
-            filledVar = true; log(`步骤2 已填变量=${RPA_KEYWORD}（${sel.slice(0, 40)}…）`); break;
-          } catch (_) {}
+        // 填输入变量（Run#56 分身选中后的 step2 DOM 实证）：
+        //   <label for="keyword">关键词</label>（必填）→ <input id="keyword">（placeholder 为空，靠 label 关联）
+        //   匹配内容 → <input id="matching">
+        //   旧选择器找 placeholder="关键词" 永远落空（Run#56 「请输入关键词」校验错误根因）。
+        try {
+          const kw = browser.$('//input[@id="keyword"]');
+          await kw.waitForExist({ timeout: 4000 });
+          await kw.setValue(RPA_KEYWORD);
+          log(`步骤2 已填关键词=${RPA_KEYWORD}（#keyword）`);
+          const mc = browser.$('//input[@id="matching"]');
+          if (await mc.isExisting()) {
+            await mc.setValue(MATCH);
+            log(`步骤2 已填匹配内容=${MATCH}（#matching）`);
+          }
+          filledVar = true;
+        } catch (_) {
+          // 兜底：placeholder/label 定位（结构变化时）
+          for (const sel of [
+            '//input[@placeholder="关键词"]',
+            '//label[contains(.,"关键词")]//following-sibling::div//input',
+            '//div[contains(@class,"ant-pro-steps-form")]//input[contains(@placeholder,"关键词")]',
+            '//div[contains(@class,"ant-pro-steps-form")]//input[1]',
+            '//div[contains(@class,"ant-pro-steps-form")]//textarea[1]',
+          ]) {
+            try {
+              const inp = browser.$(sel);
+              await inp.waitForExist({ timeout: 3000 });
+              await inp.setValue(RPA_KEYWORD);
+              filledVar = true; log(`步骤2 已填变量=${RPA_KEYWORD}（${sel.slice(0, 40)}…）`); break;
+            } catch (_) {}
+          }
         }
         if (!filledVar) {
           log('步骤2 未找到变量输入框——截图+DOM 取证（变量控件可能是 textarea/select）');
