@@ -32,7 +32,7 @@ const OUT = process.env.OUT || 'results-RPA_Flow.json';
 const FLOW_NAME = process.env.RPA_FLOW_NAME || '百度检索-教程示例';
 const RPA_KEYWORD = process.env.RPA_KEYWORD || 'ios';
 const MATCH = process.env.RPA_MATCH || 'Apple';
-const TIMEOUT_MS = Number(process.env.RPA_TIMEOUT_MS || 120000);
+const TIMEOUT_MS = Number(process.env.RPA_TIMEOUT_MS || 240000); // Run#57 实证：分身启动+百度加载+检索 >120s，翻倍
 
 const log = (...a) => console.log('[rpa-flow]', ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -410,11 +410,19 @@ async function main() {
     const puppeteer = require('puppeteer-core');
     const deadline = Date.now() + TIMEOUT_MS;
     let matched = null;
+    let lastDiag = 0;
     while (Date.now() < deadline) {
       let b = null;
       try {
         b = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 15000 });
         const pages = await b.pages();
+        // 每 20s 一条诊断：连接 OK + 当前全部页面 URL（定位 RPA 是否真的开了检索页）
+        if (Date.now() - lastDiag > 20000) {
+          const urls = [];
+          for (const p of pages) { try { urls.push(p.url().slice(0, 60)); } catch (_) {} }
+          log(`[cdp-diag] 连接OK，pages(${urls.length}): ${JSON.stringify(urls)}`);
+          lastDiag = Date.now();
+        }
         for (const p of pages) {
           try {
             const url = p.url();
@@ -424,7 +432,10 @@ async function main() {
           } catch (_) {}
         }
         await b.disconnect();
-      } catch (_) { if (b) try { await b.disconnect(); } catch (_) {} }
+      } catch (e) {
+        if (Date.now() - lastDiag > 20000) { log(`[cdp-diag] 连接失败: ${e.message.slice(0, 60)}`); lastDiag = Date.now(); }
+        if (b) try { await b.disconnect(); } catch (_) {}
+      }
       if (matched) break;
       await sleep(5000);
     }
