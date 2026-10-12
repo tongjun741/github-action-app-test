@@ -149,7 +149,7 @@ async function main() {
     for (let step = 1; step <= 3; step++) {
       log(`向导步骤 ${step}`);
       if (step === 1) {
-        // 分身选择（Run#48 DOM 实证：shop-picker 左侧空列表+右侧「添加分身」——「选 择」按钮无效果，真入口是「添加分身」）
+        // 分身选择（Run#48/49：shop-picker 左侧空+「添加分身」；「选 择」弹窗列表异步加载慢且会挡住其它按钮）
         let picked = false;
         for (const entrySel of [
           '//button[.//span[text()="选 择"]] | //span[text()="选 择"]/ancestor::button',
@@ -162,27 +162,29 @@ async function main() {
             await eb.click();
             log(`已点入口按钮（${entrySel.includes('添加') ? '添加分身' : '选 择'}）`);
             await sleep(2500);
-            // 选择弹窗/面板里选目标分身：先试搜索框（输 CLONE），再试点列表项
+            // 选择弹窗/面板：先搜索框输入 CLONE（触发过滤加载），再轮询列表项（最长 12s——列表异步加载慢）
             try {
               const search = browser.$('//div[contains(@class,"ant-modal")]//input[contains(@placeholder,"搜索")] | //div[contains(@class,"ant-modal")]//input[@type="search"] | //div[contains(@class,"shop-picker")]//input[1]');
               if (await search.isExisting()) {
                 await search.setValue(CLONE);
-                await sleep(1500);
                 log(`已搜索 ${CLONE}`);
               }
             } catch (_) {}
-            for (const sel of [
-              `//div[contains(@class,"ant-modal")]//td[contains(.,"${CLONE}")]`,
-              `//div[contains(@class,"ant-modal")]//tr[contains(.,"${CLONE}")]`,
-              `//div[contains(@class,"ant-modal")]//*[contains(text(),"${CLONE}")]`,
-              `//div[contains(@class,"shop-picker")]//*[contains(text(),"${CLONE}")]`,
-            ]) {
-              try {
-                const it = browser.$(sel);
-                await it.waitForExist({ timeout: 3500 });
-                await it.click();
-                picked = true; log(`已选中分身 ${CLONE}（${sel.slice(0, 44)}…）`); break;
-              } catch (_) {}
+            for (let w = 0; w < 4 && !picked; w++) {
+              for (const sel of [
+                `//div[contains(@class,"ant-modal")]//td[contains(.,"${CLONE}")]`,
+                `//div[contains(@class,"ant-modal")]//tr[contains(.,"${CLONE}")]`,
+                `//div[contains(@class,"ant-modal")]//*[contains(text(),"${CLONE}")]`,
+                `//div[contains(@class,"shop-picker")]//*[contains(text(),"${CLONE}")]`,
+              ]) {
+                try {
+                  const it = browser.$(sel);
+                  await it.waitForExist({ timeout: 3000 });
+                  await it.click();
+                  picked = true; log(`已选中分身 ${CLONE}（第 ${w + 1} 轮，${sel.slice(0, 40)}…）`); break;
+                } catch (_) {}
+              }
+              if (!picked) await sleep(3000); // 等列表异步加载
             }
             if (picked) {
               for (const sel of ['//div[contains(@class,"ant-modal")]//button[.//span[text()="确 定"]]', '.ant-modal .ant-btn-primary']) {
@@ -190,7 +192,15 @@ async function main() {
               }
               break;
             }
-            log('该入口未选中分身——试下一入口');
+            // Run#49 关键：未选中时弹窗开着挡住其它按钮——先关弹窗（取 消/X）再试下一入口
+            log('该入口未选中分身——关闭弹窗后试下一入口');
+            for (const c of [
+              '//div[contains(@class,"ant-modal")]//button[.//span[text()="取 消"]]',
+              '//div[contains(@class,"ant-modal")]//button[contains(@class,"ant-modal-close")]',
+              '//button[contains(@class,"ant-modal-close")]',
+            ]) {
+              try { const b = browser.$(c); await b.waitForExist({ timeout: 2000 }); await b.click(); log('已关闭选择弹窗'); await sleep(1200); break; } catch (_) {}
+            }
           } catch (e) { log(`入口异常: ${e.message.slice(0, 50)}`); }
         }
         if (!picked) { log('分身未能选中——截图取证'); await uploadShot(browser, 'clone-pick-miss'); }
