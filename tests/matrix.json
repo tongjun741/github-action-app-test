@@ -189,8 +189,14 @@
       "name": "执行RPA流程",
       "type": "client_rpa_flow",
       "url": "about:blank",
-      "expected": "manual",
-      "criteria": "执行RPA流程“百度检索-教程示例”，输入变量为“ssd”和“知乎”，应该能在百度上搜索ssd，并点开知乎的链接（源表 R21，2026-10-10 补录）",
+      "expected": "rpa_flow_result",
+      "rpa": {
+        "flowName": "百度检索-教程示例",
+        "params": { "关键词": "ios" },
+        "matchContent": "Apple",
+        "matchTimeoutMs": 120000
+      },
+      "criteria": "执行RPA流程“百度检索-教程示例”，参数关键词=ios，流程应完成百度检索并在结果中出现 Apple 相关内容（用户 2026-10-12 指定；源表 R21 原例 ssd/知乎）",
       "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
     },
     {
