@@ -163,7 +163,38 @@ async function main() {
             filledVar = true; log(`步骤2 已填变量=${RPA_KEYWORD}（${sel.slice(0, 40)}…）`); break;
           } catch (_) {}
         }
-        if (!filledVar) log('步骤2 未找到变量输入框（流程可能无输入变量）——截图取证');
+        if (!filledVar) {
+          log('步骤2 未找到变量输入框——截图+DOM 取证（变量控件可能是 textarea/select）');
+          await uploadShot(browser, 'step2-var');
+          try {
+            const html = await browser.getPageSource();
+            const p2 = path.join(process.cwd(), `rpa-dom-step2-${Date.now()}.txt`);
+            fs.writeFileSync(p2, html.slice(0, 2 * 1024 * 1024));
+            if (process.env.CLOUDINARY_URL) {
+              const mod2 = require('cloudinary');
+              const cl2 = (mod2.default && mod2.default.v2) || mod2.v2 || mod2.default;
+              cl2.config({ secure: true });
+              const now2 = new Date();
+              const mm2 = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, '0')}`;
+              const r2 = await cl2.uploader.upload(p2, { asset_folder: `e2eTest_${mm2}`, resource_type: 'raw' });
+              console.log(`[rpa-flow] 步骤2 DOM: ${r2.url}`);
+              console.log(`::notice title=RPA-DOM-STEP2::${Buffer.from(r2.url).toString('base64')}`);
+            }
+          } catch (e) { log(`步骤2 DOM dump 失败: ${e.message.slice(0, 60)}`); }
+          // 兜底：textarea/select 也试（变量控件类型未知）
+          for (const sel of [
+            '//div[contains(@class,"ant-pro-steps-form")]//textarea[1]',
+            '//textarea[@placeholder="关键词"]',
+            '//div[contains(@class,"ant-pro-steps-form")]//select[1]',
+          ]) {
+            try {
+              const inp = browser.$(sel);
+              await inp.waitForExist({ timeout: 2500 });
+              await inp.setValue(RPA_KEYWORD);
+              filledVar = true; log(`步骤2 兜底控件已填=${RPA_KEYWORD}（${sel.slice(0, 44)}…）`); break;
+            } catch (_) {}
+          }
+        }
       }
       let advanced = false;
       for (const sel of nextBtnSels) {
