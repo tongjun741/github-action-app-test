@@ -103,21 +103,35 @@ async function main() {
     log('已进入自动化页面');
 
     // 2) 找流程卡片/行「百度检索-教程示例」并点「执行/运行」
+    // Run#53 实证：流程列表异步加载有时序抖动（上轮 7s 出现、本轮 16s 仍未见）——
+    //    改为总窗 20s 的轮询重试，每轮尝试全部选择器。
     let execOk = false;
-    for (const sel of [
-      `//div[contains(.,"${FLOW_NAME}")][1]//span[text()="执行"]`,
-      `//div[contains(.,"${FLOW_NAME}")][1]//button[contains(.,"执行")]`,
-      `//tr[contains(.,"${FLOW_NAME}")]//span[text()="执行"]`,
-      `//div[contains(.,"${FLOW_NAME}")][1]//span[contains(text(),"运行")]`,
-    ]) {
-      try {
-        const el = browser.$(sel);
-        await el.waitForExist({ timeout: 4000 });
-        await el.click();
-        execOk = true; log(`已点击执行（${sel.slice(0, 50)}…）`); break;
-      } catch (_) {}
+    const execDeadline = Date.now() + 20000;
+    while (!execOk && Date.now() < execDeadline) {
+      for (const sel of [
+        `//div[contains(.,"${FLOW_NAME}")][1]//span[text()="执行"]`,
+        `//div[contains(.,"${FLOW_NAME}")][1]//button[contains(.,"执行")]`,
+        `//tr[contains(.,"${FLOW_NAME}")]//span[text()="执行"]`,
+        `//div[contains(.,"${FLOW_NAME}")][1]//span[contains(text(),"运行")]`,
+      ]) {
+        try {
+          const el = browser.$(sel);
+          await el.waitForExist({ timeout: 4000 });
+          await el.click();
+          execOk = true; log(`已点击执行（${sel.slice(0, 50)}…）`); break;
+        } catch (_) {}
+      }
+      if (!execOk) await sleep(2000); // 等列表渲染后重试
     }
-    if (!execOk) throw new Error(`自动化页面未找到流程「${FLOW_NAME}」的执行入口`);
+    if (!execOk) {
+      // 取证：自动化页面当前可见文本（定位是列表未渲染还是流程名变了）
+      try {
+        const bodyTxt = await browser.$('//div[contains(@class,"ant-layout-content")] | //main | //body').getText().catch(() => '');
+        log(`[diag] 自动化页面文本(前600): ${String(bodyTxt).replace(/\s+/g, ' ').slice(0, 600)}`);
+        await uploadShot(browser, 'flow-entry-miss');
+      } catch (_) {}
+      throw new Error(`自动化页面未找到流程「${FLOW_NAME}」的执行入口（20s 轮询）`);
+    }
 
     // 3) 执行方式弹窗（Run#45 DOM 实证）：标题「流程执行方式」，radio「执行流程任务」默认选中，
     //    按钮「确 定」——先点确定提交；之后再找参数表单（可能在确认后的下一层）

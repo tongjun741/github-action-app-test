@@ -74,22 +74,25 @@ async function kernel_version(page, c, opts) {
 }
 
 // 3) pixelscan —— 允许“使用了代理”，但不应有其它红色警告
-// Run#52 修（历史 15+ 轮全 manual 根因）：pixelscan 首页已改版为 landing（需点 "Scan My Browser"），
-//   首页正文永远不含 "very likely"——老逻辑在首页读一次性文本必然 manual。
-//   修法：① 直达 /fingerprint-check 扫描页（自动开始扫描）② 轮询等结果渲染 ③ dump 全文上传取证。
+// Run#52 修（历史 15+ 轮全 manual 根因①）：pixelscan 首页已改版为 landing（需点 "Scan My Browser"）。
+// Run#53 dump 实证（根因②）：/fingerprint-check 结果文案是「No masking detected」/「No automated behavior detected」，
+//   不是老词 "very likely"——判定词按真实文案匹配。
+//   关键通过信号 = 「No automated behavior detected」（分身浏览器未被识别为自动化）。
 async function fingerprint_pixelscan(page, c, opts) {
   const url = /pixelscan\.net\/?$/i.test(c.url) ? 'https://pixelscan.net/fingerprint-check' : c.url;
   await gotoSafe(page, url, 'networkidle', 45000, opts?.engine).catch(() => {});
   let text = '';
-  const deadline = Date.now() + 30000;
+  const deadline = Date.now() + 35000;
   for (;;) {
     text = await bodyText(page);
-    if (/very likely|not using (?:a )?proxy|consistent|inconsistent/i.test(text) || Date.now() > deadline) break;
+    const hasResult = /no (?:masking|automated behavior|proxy) detected|very likely|not using (?:a )?proxy|masking detected|automated behavior detected/i.test(text);
+    if (hasResult || Date.now() > deadline) break;
     await new Promise((r) => setTimeout(r, 2000));
   }
-  const proxy = /very likely you are using proxy/i.test(text);
-  const other = /very likely/i.test(text.replace(/very likely you are using proxy/i, ''));
-  // 全文 dump 取证（下一轮据真实文案收紧判定词）
+  const botClean = /no automated behavior detected/i.test(text);
+  const botFlagged = /automated behavior detected/i.test(text) && !botClean;
+  const proxyMasking = /masking detected/i.test(text) && !/no masking detected/i.test(text);
+  // 全文 dump 取证
   let dumpUrl = '';
   try {
     const p = path.join(process.cwd(), `pixelscan-${Date.now()}.txt`);
@@ -103,9 +106,11 @@ async function fingerprint_pixelscan(page, c, opts) {
       console.log(`::notice title=pixelscan-dump::${Buffer.from(r.url).toString('base64')}`);
     }
   } catch (_) {}
-  if (proxy) return { status: other ? 'fail' : 'pass', detail: `proxyHint=${proxy} otherWarn=${other}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
-  if (/consistent/i.test(text) && !/inconsistent/i.test(text)) return { status: 'pass', detail: `一致性提示 consistent（未见代理警告）${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
-  return { status: 'manual', detail: `未见代理/一致性判定词（30s 轮询超时），需人工确认; ${text.slice(0, 120).replace(/\n/g, ' ')}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
+  const suffix = dumpUrl ? ` [dump] ${dumpUrl}` : '';
+  if (botClean && !proxyMasking) return { status: 'pass', detail: `No automated behavior detected（分身未被识别为自动化），代理未检测到伪装${suffix}` };
+  if (botFlagged) return { status: 'fail', detail: `automated behavior detected（浏览器被识别为自动化）${suffix}` };
+  if (proxyMasking) return { status: 'manual', detail: `检测到代理伪装（CI 直连场景应无）${suffix}` };
+  return { status: 'manual', detail: `35s 轮询未见结果判定词，需人工确认; ${text.slice(0, 120).replace(/\n/g, ' ')}${suffix}` };
 }
 
 // 4) iphey —— 全绿（无 Unreliable / leak / mismatch）
@@ -215,6 +220,10 @@ async function fingerprint_whoer(page, c, opts) {
       console.log(`::notice title=whoer-dump::${Buffer.from(r.url).toString('base64')}`);
     }
   } catch (_) {}
+  // Run#53 dump 实证：whoer.net 对 CI（数据中心 IP）直接回 Cloudflare 拦截页——环境阻断，非浏览器问题
+  if (/sorry, you have been blocked|you are unable to access whoer/i.test(text)) {
+    return { status: 'manual', detail: `站点 Cloudflare 拦截 CI IP（环境阻断，非浏览器问题）——需本地人工访问验证${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
+  }
   if (!m) return { status: 'manual', detail: `30s 轮询未解析到得分，需人工确认; ${text.slice(0, 120).replace(/\n/g, ' ')}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
   const score = parseInt(m[1], 10);
   return { status: score >= 90 ? 'pass' : 'fail', detail: `score=${score}%${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
