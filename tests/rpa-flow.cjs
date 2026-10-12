@@ -119,25 +119,43 @@ async function main() {
     }
     if (!execOk) throw new Error(`自动化页面未找到流程「${FLOW_NAME}」的执行入口`);
 
-    // 3) 参数表单：关键词=ios
-    await sleep(3000);
+    // 3) 执行方式弹窗（Run#45 DOM 实证）：标题「流程执行方式」，radio「执行流程任务」默认选中，
+    //    按钮「确 定」——先点确定提交；之后再找参数表单（可能在确认后的下一层）
+    await sleep(2000);
+    let confirmed = false;
+    for (const sel of [
+      '//div[contains(@class,"ant-modal")]//button[.//span[text()="确 定"]]',
+      '//div[contains(@class,"ant-modal")]//span[text()="确 定"]/ancestor::button',
+      '.ant-modal .ant-btn-primary',
+    ]) {
+      try {
+        const b = browser.$(sel);
+        await b.waitForExist({ timeout: 3000 });
+        await b.click();
+        confirmed = true; log('已点「确 定」（流程执行方式弹窗）'); break;
+      } catch (_) {}
+    }
+    if (!confirmed) log('未见「流程执行方式」弹窗（可能已直接执行）');
+
+    // 3b) 参数表单（确认后可能出现）：关键词=ios
+    await sleep(2500);
     let paramOk = false;
-    for (const sel of ['//input[@placeholder="关键词"]', '//label[contains(.,"关键词")]//following-sibling::div//input', '//input[contains(@placeholder,"关键词")]']) {
+    for (const sel of ['//input[@placeholder="关键词"]', '//label[contains(.,"关键词")]//following-sibling::div//input', '//input[contains(@placeholder,"关键词")]', '//div[contains(@class,"ant-modal")]//input[1]', '//div[contains(@class,"ant-drawer")]//input[1]']) {
       try {
         const inp = browser.$(sel);
-        await inp.waitForExist({ timeout: 4000 });
+        await inp.waitForExist({ timeout: 3500 });
         await inp.setValue(RPA_KEYWORD);
-        paramOk = true; log(`已填参数 关键词=${RPA_KEYWORD}`); break;
+        paramOk = true; log(`已填参数 关键词=${RPA_KEYWORD}（${sel.slice(0, 46)}…）`); break;
       } catch (_) {}
     }
     if (paramOk) {
-      for (const sel of ['.ant-modal-confirm .ant-btn-primary', '//button[text()="确定"]', '//span[text()="确定"]/ancestor::button']) {
-        try { const b = browser.$(sel); await b.waitForExist({ timeout: 3000 }); await b.click(); log('已确认执行'); break; } catch (_) {}
+      for (const sel of ['.ant-modal-confirm .ant-btn-primary', '//div[contains(@class,"ant-modal")]//button[.//span[text()="确 定"]]', '.ant-modal .ant-btn-primary']) {
+        try { const b = browser.$(sel); await b.waitForExist({ timeout: 3000 }); await b.click(); log('已确认参数执行'); break; } catch (_) {}
       }
     } else {
       log('未找到参数表单（流程可能无参数直接执行或结构不同）——截图+DOM 取证');
       await uploadShot(browser, 'param-miss');
-      // Run#44 加：dump 执行点击后的页面 DOM（弹窗/表单真实结构上传，供下轮精修选择器）
+      // dump 执行点击后的页面 DOM（弹窗/表单真实结构上传，供下轮精修选择器）
       try {
         const html = await browser.getPageSource();
         const p = path.join(process.cwd(), `rpa-dom-afterexec-${Date.now()}.txt`);
