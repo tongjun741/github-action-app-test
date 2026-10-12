@@ -208,14 +208,19 @@ async function main() {
             } catch (_) {}
           }
           let entryOk = false;
+          // Run#55 决定性证据：「选 择」打开的是【选择流程定义】弹窗（placeholder=根据流程定义名称检索，
+          // 列头 流程名称/适用平台/版本…）——那是选流程的，不是选分身的！流程定义因从卡片「执行」进入
+          // 已预填，无需再选。真正的分身入口 = 「添加分身」按钮（Run#48/49 DOM 实证：其打开的 520px
+          // 弹窗含 #keywords/依据名称检索/ant-list-item）。
           for (const entrySel of [
-            '//button[.//span[text()="选 择"]] | //span[text()="选 择"]/ancestor::button',
+            '//button[.//span[contains(text(),"添加分身")]] | //span[contains(text(),"添加分身")]/ancestor::button',
+            '//*[contains(text(),"添加分身")]/ancestor::button',
           ]) {
             try {
               const eb = browser.$(entrySel);
               await eb.waitForExist({ timeout: 3500 });
               await eb.click();
-              entryOk = true; log(`[attempt ${attempt}] 已点入口按钮（选 择）`); break;
+              entryOk = true; log(`[attempt ${attempt}] 已点入口按钮（添加分身）`); break;
             } catch (_) {}
           }
           if (!entryOk) { log(`[attempt ${attempt}] 「选 择」按钮未找到`); break; }
@@ -223,10 +228,11 @@ async function main() {
 
           // 2) 严格作用域找分身选择弹窗：标题应为 分身 相关（非向导「流程」标题），内含搜索框
           let pickerModal = null; let pickerTitle = '';
+          // Run#55 证据：必须排除「选择流程定义」弹窗（它也含"选择"字样）——真分身弹窗含 #keywords/依据名称检索/ant-list-item
           const pickerModalXpaths = [
-            '//div[contains(@class,"ant-modal-root")][.//div[contains(@class,"ant-modal-title")][contains(.,"分身")]]',
-            '//div[contains(@class,"ant-modal-root")][.//input[@id="keywords"]]',
-            '//div[contains(@class,"ant-modal-root")][.//input[contains(@placeholder,"检索")]]',
+            '//div[contains(@class,"ant-modal-root")][.//input[@id="keywords"]][not(.//div[contains(@class,"ant-modal-title")][contains(.,"流程")]])]',
+            '//div[contains(@class,"ant-modal-root")][.//input[contains(@placeholder,"名称检索")]][not(.//div[contains(@class,"ant-modal-title")][contains(.,"流程")])] [not(.//input[@id="keywords"])]',
+            '//div[contains(@class,"ant-modal-root")][.//div[contains(@class,"ant-modal-title")][contains(.,"分身")]][not(contains(.,"流程"))]',
           ];
           for (const px of pickerModalXpaths) {
             try {
