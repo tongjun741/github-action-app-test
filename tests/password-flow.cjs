@@ -415,16 +415,37 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
   try {
     log('B1 重新打开分身浏览器');
     const openBtn = '//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]';
-    // 若分身仍处「正在访问」（A3 关闭失败未致命），跳过重开直接验证
-    let alreadyOpen = false;
+    // Run#42 实证：A3 已 CDP 关闭，但主壳按钮仍是「正在访问」残留态（点击态滞后）——
+    // 不能信按钮文字。正确策略：先探 CDP，活着=真开着（直接验证）；死了=一律走重开路径
+    //（点「正在访问」（残留态下点它=关闭/重开）或「打开浏览器」，然后处理「继续访问」）。
+    let cdpUp = false;
     try {
-      await wdioBrowser.$('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 3000 });
-      alreadyOpen = true;
-      log('分身仍处于「正在访问」状态（关闭未生效），直接进入代填验证');
+      const puppeteerProbe = require('puppeteer-core');
+      const pb = await puppeteerProbe.connect({ browserURL: CDP, protocolTimeout: 10000 });
+      await pb.disconnect();
+      cdpUp = true;
     } catch (_) { }
+    let alreadyOpen = false;
+    if (cdpUp) {
+      alreadyOpen = true;
+      log('CDP 实测在线——分身浏览器开着，直接进入代填验证');
+    }
     if (!alreadyOpen) {
-      await wdioBrowser.$(openBtn).waitForExist({ timeout: 30000 });
-      await wdioBrowser.$(openBtn).click();
+      // 优先点「打开浏览器」；若只见到「正在访问」残留态，也点它（触发状态流转）
+      let btn = null;
+      try {
+        await wdioBrowser.$(openBtn).waitForExist({ timeout: 8000 });
+        btn = openBtn;
+      } catch (_) {
+        try {
+          await wdioBrowser.$('//span[text()="正在访问"][contains(@class,"open-btn-text")]').waitForExist({ timeout: 4000 });
+          btn = '//span[text()="正在访问"][contains(@class,"open-btn-text")]';
+          log('按钮为「正在访问」残留态（CDP 已死）——点击触发状态流转');
+        } catch (_) { }
+      }
+      if (btn) {
+        try { await wdioBrowser.$(btn).click(); } catch (_) { }
+      }
     }
     // 处理「继续访问」+ 等「正在访问」
     for (let n = 0; n < 60; n++) {
