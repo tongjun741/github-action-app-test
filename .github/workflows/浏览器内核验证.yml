@@ -433,7 +433,9 @@ jobs:
         run: node tests/cookie-sync.cjs
 
       # 同步类 4 用例（源表 R17-R20）：历史记录/收藏夹/LocalStorage/IndexDB——同一第二台设备
+      # 2026-10-13 定案：无 if: always() 时前置 Cookie 步 failure 会跳过本步（历轮同步恒占位根因）
       - name: 同步类验证 (历史/收藏/LS/IDB)
+        if: always()
         timeout-minutes: 25
         continue-on-error: true   # 探测失败不杀 job（4 项各有独立判定）
         env:
