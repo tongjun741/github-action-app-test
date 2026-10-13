@@ -75,6 +75,11 @@ on:
         required: false
         default: 'win10'
         type: string
+      debug_sync:
+        description: '跨设备同步调试（专调 R16/R17-R20）：第一台写同步源(LS/IDB/Cookie+wdku历史)后不挂起，第二台 verify-cookie-sync job 读验证同步。与 debug_hold/debug_verify 互斥（同一轮只取一种调试形态）。'
+        required: false
+        default: false
+        type: boolean
       skip_win7:
         description: '跳过 Win7 Docker job（默认 true——Win7 搁置中；需验证 Win7 时手动填 false）。'
         required: false
@@ -338,10 +343,28 @@ jobs:
           OUT: results-GTranslate-${{ matrix.slug }}.json
         run: node tests/google-translate.cjs
 
+      # 2026-10-13 调试增强：debug_sync 模式下，第一台设备先写同步源（LS/IDB/Cookie+wdku 历史），
+      # 供 verify-cookie-sync job（第二台设备）读验证跨设备同步。仅 debug_sync 触发——
+      # 与 debug_verify 挂起争抢分身会话，故不叠加。脚本自身 spawn OPEN_CLONE_ONLY 开分身→写→关。
+      - name: 同步前置写入 (第一台写LS/IDB/Cookie+wdku历史)
+        if: always() && inputs.debug_sync == true
+        continue-on-error: true
+        timeout-minutes: 15
+        env:
+          DISPLAY: ${{ matrix.install == 'ubuntu' && ':99' || '' }}
+          E2E_PLATFORM: ${{ matrix.platform }}
+          TEAM_NAME: ${{ secrets.TEAM_NAME }}
+          WDIO_USERNAME: ${{ secrets.WDIO_USERNAME }}
+          PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
+          CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
+          OUT: results-Sync_Write-${{ matrix.slug }}.json
+        run: node tests/sync-flows.cjs --write
+
       # 调试挂起（保持隧道在线，Agent 从外网连 CDP 隧道自动探测）；
       # 每 5 分钟重发隧道 URL notice（Agent 轮询 annotations 即可拿到最新链接），到时自动结束。
       - name: 调试挂起 (保持隧道在线, Agent 自动探测)
-        if: inputs.debug_hold == true || inputs.debug_verify == true
+        # debug_sync 模式不挂起：让 verify-cookie-sync job 能紧接着跑跨设备读取（不被 300min 挂起阻塞）
+        if: (inputs.debug_hold == true || inputs.debug_verify == true) && inputs.debug_sync != true
         run: |
           MINS=${{ inputs.debug_hold_minutes || '30' }}
           [ "$MINS" -gt 300 ] 2>/dev/null && MINS=300
@@ -379,7 +402,9 @@ jobs:
   verify-cookie-sync:
     name: 验证 Cookie 同步 (第二台设备)
     needs: verify          # 必须等第一台机器登录完成，Cookie 才有同步源
-    if: ${{ !cancelled() && inputs.debug_hold != true && inputs.debug_verify != true }}
+    # 2026-10-13 调试增强：debug_verify/debug_sync 时也跑（覆盖 Group2 sync4+Cookie 调试）；
+    # 仅 debug_hold 纯挂起不跑验证时跳过。普通全量轮(input 全 false)照常跑。
+    if: ${{ !cancelled() && inputs.debug_hold != true }}
     runs-on: ubuntu-22.04  # 与 verify 的 Ubuntu job 物理不同机（GitHub 每次分配新 runner）
     env:
       CLIENT_BINARY: /opt/花漾客户端/huayoung
