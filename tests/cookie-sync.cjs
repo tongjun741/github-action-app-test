@@ -55,6 +55,7 @@ async function main() {
   // 2) 连 CDP 验证 wdku.net 登录态
   log('连接分身浏览器 CDP 验证登录态');
   const browser = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 60000 });
+  let browserRef = browser; // 重开分身后 CDP 实例会换，后续导航统一走 browserRef
   let status = 'fail';
   let detail = '';
   let proxyDiag = '';
@@ -107,8 +108,39 @@ async function main() {
       await sleep(15000);
     }
     if (!netOk) {
+      // 2026-10-13 #3 实证：分身带 PAC（data:base64 FindProxyForURL）启动，本地隧道端口未就绪/断开
+      // → 全部外网导航 ERR_PROXY_CONNECTION_FAILED。兜底：关掉分身重开一次（tunnelRouter 重建隧道）。
+      log('隧道不通——尝试重开分身重建隧道（一次）');
+      try {
+        const pages = await browser.pages().catch(() => []);
+        for (const p of pages) { try { await p.goto('about:blank', { timeout: 5000 }).catch(() => {}); } catch (_) {} }
+        await browser.disconnect().catch(() => {});
+      } catch (_) {}
+      const reopen = spawnSync(process.execPath, ['tests/e2e-verify.cjs'], {
+        stdio: 'inherit',
+        env: { ...process.env, OPEN_CLONE_ONLY: '1', OUT: `placeholder-reopen-${SLUG}.json` },
+      });
+      log(`重开分身退出码 ${reopen.status}`);
+      if (reopen.status === 0) {
+        const b2 = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 60000 }).catch(() => null);
+        if (b2) {
+          const p2 = await b2.newPage();
+          for (let i = 0; i < 6 && !netOk; i++) {
+            try {
+              await p2.goto('https://example.com/', { waitUntil: 'domcontentloaded', timeout: 15000 });
+              netOk = true;
+              log(`重开后隧道就绪（第 ${i + 1} 次）`);
+            } catch (e) { netErr = e.message.slice(0, 100); await sleep(10000); }
+          }
+          // 替换 browser 引用供后续导航用
+          await p2.close().catch(() => {});
+          browserRef = b2;
+        }
+      }
+    }
+    if (!netOk) {
       // 代理持续不可达 = 基础设施问题，判 error（区别于「到了页面但无登录态」的业务 fail）
-      throw new Error(`分身代理网络持续不可达（双站点 10 轮探测失败，末次错误: ${netErr}）`);
+      throw new Error(`分身代理网络持续不可达（含重开分身后仍失败，末次错误: ${netErr}）`);
     }
     // wdku.net 导航（有界重试）
     let lastErr = '';
@@ -169,7 +201,8 @@ async function main() {
     status = 'error';
     detail = `验证过程异常: ${e.message}`;
   } finally {
-    try { await browser.disconnect(); } catch (_) { }
+    try { await browserRef.disconnect(); } catch (_) { }
+    if (browserRef !== browser) { try { await browser.disconnect(); } catch (_) { } }
   }
 
   // 3) 写 results

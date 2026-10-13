@@ -85,6 +85,30 @@ async function main() {
     await login(config, password, browser);
     log('登录完成');
 
+    // 0) 提交 RPA 前先开分身并等隧道就绪（全量轮#2/#3 实证：引擎直接建任务导航百度时
+    //    tunnelRouter 隧道未就绪 → chrome-error 页；提前 openClone 拿到 9221 并验证外网可达，
+    //    引擎复用已开分身（main.js getChromium 同 shopId 直接复用），消除竞态）。
+    try {
+      const { openClone } = require('./e2e-verify.cjs');
+      await openClone(browser);
+      log('已提前打开分身（openClone）——等隧道就绪');
+      const puppeteer0 = require('puppeteer-core');
+      const CDP0 = process.env.CLIENT_CDP_ENDPOINT || `http://127.0.0.1:${process.env.REMOTE_DEBUG_PORT || 9221}`;
+      let tunnelOk = false;
+      for (let i = 0; i < 10; i++) {
+        let b0 = null;
+        try {
+          b0 = await puppeteer0.connect({ browserURL: CDP0, protocolTimeout: 20000 });
+          const p0 = await b0.newPage();
+          const resp = await p0.goto('https://example.com/', { waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => null);
+          await p0.close().catch(() => {});
+          if (resp && resp.status() < 400) { tunnelOk = true; await b0.disconnect(); log(`分身隧道已就绪（第 ${i + 1} 次探测）`); break; }
+        } catch (_) {} finally { if (b0) try { await b0.disconnect(); } catch (_) {} }
+        await sleep(6000);
+      }
+      if (!tunnelOk) log('隧道 60s 未就绪（继续提交 RPA——引擎可能自愈）');
+    } catch (e) { log(`openClone 预热失败(忽略，继续): ${e.message.slice(0, 80)}`); }
+
     // 1) 左侧「自动化」菜单
     await browser.$('.icon-shouye_24').waitForExist({ timeout: 60000 });
     await browser.$('.icon-shouye_24').click();
