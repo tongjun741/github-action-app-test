@@ -61,22 +61,29 @@ async function main() {
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(45000);
-    // 先探网络/代理就绪：ipapi.co 轻量页，重试最多 60s（Run#25 实测分身代理需要就绪时间）
+    // 先探网络/代理就绪：ipapi.co 轻量页（Run#25 实测分身代理需要就绪时间）。
+    // 2026-10-13 夜间全量轮实证：前序 4 平台 job 刚结束时第二台设备分身代理可能仍未就绪
+    // （ipapi 6 次全挂）——窗口拉宽到 ~5 分钟，ipapi/example.com 双探（区分站点抽风 vs 代理未通）。
     let netOk = false;
-    for (let i = 0; i < 6; i++) {
-      try {
-        await page.goto('https://ipapi.co/', { waitUntil: 'domcontentloaded', timeout: 15000 });
-        netOk = true;
-        log(`代理网络就绪（第 ${i + 1} 次探测）`);
-        break;
-      } catch (e) {
-        log(`网络探测失败(第 ${i + 1} 次): ${e.message.slice(0, 100)}`);
-        await sleep(10000);
+    let netErr = '';
+    for (let i = 0; i < 10; i++) {
+      for (const probeUrl of ['https://ipapi.co/', 'https://example.com/']) {
+        try {
+          await page.goto(probeUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
+          netOk = true;
+          log(`代理网络就绪（第 ${i + 1} 次探测 ${probeUrl}）`);
+          break;
+        } catch (e) {
+          netErr = e.message.slice(0, 100);
+          log(`网络探测失败(第 ${i + 1} 次 ${probeUrl}): ${netErr}`);
+        }
       }
+      if (netOk) break;
+      await sleep(15000);
     }
     if (!netOk) {
       // 代理持续不可达 = 基础设施问题，判 error（区别于「到了页面但无登录态」的业务 fail）
-      throw new Error('分身代理网络持续不可达（ipapi 探测 6 次失败，疑似代理未就绪/多设备争抢）');
+      throw new Error(`分身代理网络持续不可达（双站点 10 轮探测失败，末次错误: ${netErr}）`);
     }
     // wdku.net 导航（有界重试）
     let lastErr = '';

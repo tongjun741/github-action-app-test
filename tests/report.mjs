@@ -68,7 +68,14 @@ async function buildReport(platformFiles, outPath) {
     for (const r of pf.results) {
       if (!index[r.caseId]) index[r.caseId] = { name: r.name, criteria: r.criteria, type: r.type };
       if (!grid[r.caseId]) grid[r.caseId] = {};
-      grid[r.caseId][pf.platform] = { status: r.status, detail: r.detail };
+      // 2026-10-13：同一 caseId 可能来自多个文件（如 RPA/翻译 独立步骤产物 vs 平台主结果占位）。
+      // 占位（detail 含「占位」或 status=skipped 且无实质信息）不覆盖已有真结果；真结果覆盖占位。
+      const prev = grid[r.caseId][pf.platform];
+      const isNewPlaceholder = /占位/.test(String(r.detail || '')) || (r.status === 'skipped' && !String(r.detail || '').trim());
+      const isPrevPlaceholder = prev && (/占位/.test(String(prev.detail || '')) || (prev.status === 'skipped' && !String(prev.detail || '').trim()));
+      if (!prev || isPrevPlaceholder || (!isNewPlaceholder && prev.status !== 'pass' && prev.status !== 'fail')) {
+        grid[r.caseId][pf.platform] = { status: r.status, detail: r.detail };
+      }
       if (!cases.includes(r.caseId)) cases.push(r.caseId);
     }
   }

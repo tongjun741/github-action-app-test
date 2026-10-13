@@ -362,6 +362,8 @@ jobs:
           name: results-${{ matrix.slug }}
           path: |
             results-${{ matrix.slug }}.json
+            results-RPA_Flow.json
+            results-GTranslate.json
             screenshot-${{ matrix.slug }}.png
             iphey-*.png
           if-no-files-found: warn
