@@ -121,7 +121,19 @@ async function main() {
       await sleep(1500);
     } catch (e) { log(`openClone 预热失败(忽略，继续): ${e.message.slice(0, 80)}`); }
 
-    // 1) 左侧「自动化」菜单
+    // 1) 左侧「自动化」菜单（全量轮#6 实证：openClone 后主壳可能残留 ant-modal-centered 弹窗
+    //    ——「继续访问」类确认框在 openClone 返回后才弹出，点菜单前必须清场）
+    const clearModals = async (where) => {
+      for (let mc = 0; mc < 4; mc++) {
+        const xBtns = await browser.$$('//button[contains(@class,"ant-modal-close")]').catch(() => []);
+        const vis = [];
+        for (const x of xBtns) { if (await x.isDisplayed().catch(() => false)) vis.push(x); }
+        if (!vis.length) return mc;
+        try { await vis[vis.length - 1].click(); log(`[${where}] 已关闭遮挡弹窗（第 ${mc + 1} 个 X）`); await sleep(900); } catch (_) { return mc; }
+      }
+      return 4;
+    };
+    await clearModals('菜单前');
     await browser.$('.icon-shouye_24').waitForExist({ timeout: 60000 });
     await browser.$('.icon-shouye_24').click();
     // 自动化菜单（图标 class 参考「支持」按钮旁的菜单结构；兜底 XPath 文本）
@@ -153,7 +165,7 @@ async function main() {
         try {
           const el = browser.$(sel);
           await el.waitForExist({ timeout: 4000 });
-          await el.click();
+          await el.click({ force: true }); // force：被弹窗/浮层遮挡时强制点击（intercept 高发点）
           execOk = true; log(`已点击执行（${sel.slice(0, 50)}…）`); break;
         } catch (_) {}
       }
