@@ -13,6 +13,7 @@
  * 注：LS/IDB 为 per-origin，写入与读取均须在同一 origin（qq.com）执行；花漾将其随分身云端同步。
  */
 const fs = require('node:fs');
+const path = require('node:path');
 const process = require('node:process');
 const puppeteer = require('puppeteer-core');
 
@@ -22,6 +23,15 @@ const CDP_PORT = Number(process.env.REMOTE_DEBUG_PORT || 9221);
 const CDP = process.env.CLIENT_CDP_ENDPOINT || `http://127.0.0.1:${CDP_PORT}`;
 const OUT = process.env.OUT || 'results-Sync_Flows.json';
 const MODE = process.argv.includes('--write') ? 'write' : 'read';
+
+// G4 (2026-10-13)：使用用户指定的官方验证脚本（E:\workspace\docker\浏览器内核测试脚本\）写/读 LS/Cookie/IDB。
+// 官方脚本已 vendored 进仓库 tests/official/，CI 直接加载（不再依赖用户本机 E:\ 路径）。
+const OFFICIAL_DIR = path.join(__dirname, 'official');
+let WRITE_SRC = '';
+let READ_SRC = '';
+try { WRITE_SRC = fs.readFileSync(path.join(OFFICIAL_DIR, '写入存储.js'), 'utf8'); } catch (_) {}
+try { READ_SRC = fs.readFileSync(path.join(OFFICIAL_DIR, '读取存储.js'), 'utf8'); } catch (_) {}
+if (!WRITE_SRC) log('警告: tests/official/写入存储.js 缺失，write 模式将退化为内联写入');
 
 const log = (...a) => console.log('[sync-flows]', ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -74,43 +84,61 @@ async function writeMode() {
     } catch (e) {
       push(out, 'history_write', '历史记录写入(访问wdku)', 'client_history_sync_write', 'error', `wdku 访问异常: ${e.message.slice(0, 90)}`);
     }
-    // 2) qq.com 按官方写入存储.js：LS + Cookie + IDB
+    // 1.5) G5：收藏夹同步源 —— 第一台设备真实收藏 wdku（地址栏星标，真鼠标点击）
+    try {
+      const star = await page.evaluate(() => ({ x: Math.round(window.innerWidth * 0.93), y: 42 }));
+      const client = await page.target().createCDPSession();
+      await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: star.x, y: star.y });
+      await sleep(150);
+      await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: star.x, y: star.y, button: 'left', clickCount: 1 });
+      await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: star.x, y: star.y, button: 'left', clickCount: 1 });
+      await sleep(1500);
+      try { await client.detach(); } catch (_) {}
+      push(out, 'bookmark_write', '收藏夹写入(wdku收藏)', 'client_bookmark_sync_write', 'pass', '已点地址栏星标收藏 wdku（待第二台 chrome://bookmarks 验证同步）');
+    } catch (e) {
+      push(out, 'bookmark_write', '收藏夹写入(wdku收藏)', 'client_bookmark_sync_write', 'error', `收藏点击异常: ${e.message.slice(0, 90)}`);
+    }
+    // 2) qq.com 按官方 写入存储.js 写 LS + Cookie + IDB（G4：使用用户指定脚本）
     try {
       await gotoRetry(page, 'https://www.qq.com/', 45000);
       await sleep(3000);
+      if (WRITE_SRC) {
+        try { await page.evaluate(WRITE_SRC); log('已注入官方 写入存储.js'); }
+        catch (e) { log(`注入官方写入脚本异常: ${e.message.slice(0, 60)}`); }
+      } else {
+        // 兜底内联（与官方脚本等价键名）
+        await page.evaluate(() => {
+          localStorage.setItem('szdamai_localStorage_key', 'szdamai_localStorage_value');
+          document.cookie = 'szdamai_Cookie_key=szdamai_Cookie_value; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/';
+          const r = indexedDB.open('szdamai_dbName', 2);
+          r.onupgradeneeded = (ev) => { const db = ev.target.result; if (!db.objectStoreNames.contains('szdamai_customers')) db.createObjectStore('szdamai_customers', { keyPath: 'name' }); };
+          r.onsuccess = (ev) => { const db = ev.target.result; db.transaction('szdamai_customers', 'readwrite').objectStore('szdamai_customers').add({ name: 'new_customre_name', extInfo: 'xdfd' }); };
+        });
+      }
+      await sleep(4000); // 等 IDB 事务落库
+      // 验证写入落地
       const rw = await page.evaluate(() => {
         const res = {};
-        try {
-          localStorage.setItem('szdamai_localStorage_key', 'szdamai_localStorage_value');
-          res.ls = localStorage.getItem('szdamai_localStorage_key') === 'szdamai_localStorage_value';
-        } catch (e) { res.lsErr = e.message; }
-        try {
-          document.cookie = 'szdamai_Cookie_key=szdamai_Cookie_value; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/';
-          res.cookie = document.cookie.includes('szdamai_Cookie_key');
-        } catch (e) { res.cookieErr = e.message; }
+        try { res.ls = localStorage.getItem('szdamai_localStorage_key') === 'szdamai_localStorage_value'; } catch (e) { res.lsErr = e.message; }
+        try { res.cookie = document.cookie.includes('szdamai_Cookie_key'); } catch (e) { res.cookieErr = e.message; }
         res.idb = new Promise((resolve) => {
           try {
             const request = indexedDB.open('szdamai_dbName', 2);
             request.onerror = () => resolve({ ok: false, err: 'open 失败' });
-            request.onupgradeneeded = (event) => {
-              const db = event.target.result;
-              if (!db.objectStoreNames.contains('szdamai_customers')) db.createObjectStore('szdamai_customers', { keyPath: 'name' });
-            };
             request.onsuccess = (event) => {
               const db = event.target.result;
-              const tx = db.transaction('szdamai_customers', 'readwrite');
-              tx.objectStore('szdamai_customers').add({ name: 'new_customre_name', extInfo: 'xdfd' });
-              tx.oncomplete = () => resolve({ ok: true });
-              tx.onerror = () => resolve({ ok: false, err: 'tx 失败' });
+              try {
+                db.transaction('szdamai_customers').objectStore('szdamai_customers').get('new_customre_name').onsuccess = (e2) => resolve({ ok: !!(e2.target.result && e2.target.result.extInfo === 'xdfd'), back: e2.target.result ? String(e2.target.result.extInfo) : '(空)' });
+              } catch (e) { resolve({ ok: false, err: e.message }); }
             };
           } catch (e) { resolve({ ok: false, err: e.message }); }
         });
         return res;
       });
       const idb = await Promise.resolve(rw.idb);
-      push(out, 'localstorage_write', 'LocalStorage写入(qq.com)', 'client_localstorage_sync_write', rw.ls ? 'pass' : 'fail', rw.ls ? 'szdamai_localStorage_key 写入成功（待第二台验证同步）' : `LS 写入失败: ${rw.lsErr || '?'}`);
-      push(out, 'cookie_write', 'Cookie写入(qq.com)', 'client_cookie_sync_write', rw.cookie ? 'pass' : 'fail', rw.cookie ? 'szdamai_Cookie_key 写入成功（待第二台验证同步）' : `Cookie 写入失败: ${rw.cookieErr || '?'}`);
-      push(out, 'indexdb_write', 'IndexDB写入(qq.com)', 'client_indexdb_sync_write', idb && idb.ok ? 'pass' : 'fail', idb && idb.ok ? 'szdamai_dbName/szdamai_customers 写入成功（待第二台验证同步）' : `IDB 写入失败: ${idb && idb.err || '?'}`);
+      push(out, 'localstorage_write', 'LocalStorage写入(qq.com)', 'client_localstorage_sync_write', rw.ls ? 'pass' : 'fail', rw.ls ? 'szdamai_localStorage_key 写入成功（官方脚本，待第二台验证同步）' : `LS 写入失败: ${rw.lsErr || '?'}`);
+      push(out, 'cookie_write', 'Cookie写入(qq.com)', 'client_cookie_sync_write', rw.cookie ? 'pass' : 'fail', rw.cookie ? 'szdamai_Cookie_key 写入成功（官方脚本，待第二台验证同步）' : `Cookie 写入失败: ${rw.cookieErr || '?'}`);
+      push(out, 'indexdb_write', 'IndexDB写入(qq.com)', 'client_indexdb_sync_write', idb && idb.ok ? 'pass' : 'fail', idb && idb.ok ? 'szdamai_dbName/szdamai_customers 写入成功（官方脚本，待第二台验证同步）' : `IDB 写入失败: ${idb && idb.err || '?'}`);
     } catch (e) {
       push(out, 'localstorage_write', 'LocalStorage写入(qq.com)', 'client_localstorage_sync_write', 'error', `qq.com 异常: ${e.message.slice(0, 90)}`);
       push(out, 'cookie_write', 'Cookie写入(qq.com)', 'client_cookie_sync_write', 'error', `qq.com 异常: ${e.message.slice(0, 90)}`);
@@ -178,6 +206,16 @@ async function readMode() {
     // 3. LS (qq.com, 重试等云端同步)
     try {
       await gotoRetry(page, 'https://www.qq.com/', 45000);
+      // G4：使用官方 读取存储.js 读取（console 取证）
+      if (READ_SRC) {
+        try {
+          const logs = [];
+          page.on('console', (m) => logs.push(m.text()));
+          await page.evaluate(READ_SRC);
+          await sleep(2000);
+          log(`已注入官方 读取存储.js（console: ${logs.slice(0, 3).join(' | ')}）`);
+        } catch (e) { log(`注入官方读取脚本异常: ${e.message.slice(0, 60)}`); }
+      }
       let lsOk = false, lsVal = '';
       for (let i = 0; i < 5; i++) {
         const v = await page.evaluate(() => { try { return localStorage.getItem('szdamai_localStorage_key'); } catch (e) { return null; } }).catch(() => null);

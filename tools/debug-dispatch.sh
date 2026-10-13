@@ -6,8 +6,10 @@
 #       并自动轮询 run 状态、抓取 CDP 隧道 URL（调试挂起时从外网连分身现场看）。
 #
 # 用法：
-#   bash tools/debug-dispatch.sh kernel_password   # Group1: win10 全项验证(内核版本+密码流程)，跑完挂起保活
-#   bash tools/debug-dispatch.sh sync_cookie       # Group2/3: 跨设备同步(第一台写LS/IDB/Cookie+第二台读验证)
+#   bash tools/debug-dispatch.sh kernel_password   # Group1: win10 全项验证(内核版本+密码流程+右键翻译+IP绑定指纹)，跑完挂起保活
+#   bash tools/debug-dispatch.sh sync_write        # 第一台(win10)写同步源(LS/IDB/Cookie+wdku历史+收藏)，不挂起
+#   bash tools/debug-dispatch.sh sync_read         # 第二台(ubuntu)读验证跨设备同步（须先跑完 sync_write 等云端同步）
+#   bash tools/debug-dispatch.sh sync_cookie       # 一个action两job：第一台写+第二台读（顺序跑，调试快速验证用）
 #   bash tools/debug-dispatch.sh ui_probe [平台]   # 主壳 UI 探测(详情页DOM)，挂起保活
 #   bash tools/debug-dispatch.sh hold [平台]       # 纯挂起(开分身不验证)，挂起保活
 #   bash tools/debug-dispatch.sh poll <run_id>     # 轮询 run 状态 + 打印 CDP 隧道 URL / 结果 notice
@@ -17,8 +19,8 @@
 #   GH_TOKEN   GitHub PAT（需 actions:read + workflow 权限）
 #   GH_REPO    仓库（默认 tongjun741/github-action-app-test）
 #
-# 注意：kernel_password 走 debug_verify（含 verify + verify-cookie-sync 两 job，但无 first-write 源，
-#       故 sync 读侧可能 fail，属正常）；sync_cookie 走 debug_sync（第一台写+第二台读，跨设备完整链路）。
+# 注意：kernel_password 走 debug_verify（验证+IP绑定预检；verify-cookie-sync 第二台无 first-write 源，sync 读侧可能 fail 属正常）。
+#       sync_write/sync_read 是两 action 拆分（用户要求「两个action验证多台设备」），sync_write 先跑、等云端同步后再 sync_read。
 
 set -uo pipefail
 
@@ -78,8 +80,16 @@ case "${1:-}" in
     # Group1: win10 全项验证（内核版本 help 页 + 密码保存/代填鼠标流程），跑完挂起保活 60min
     dispatch_and_poll "--field debug_verify=true --field debug_platform=win10 --field debug_hold_minutes=60"
     ;;
+  sync_write)
+    # 第一台(win10)写同步源：LS/IDB/Cookie(qq.com官方脚本) + wdku历史 + wdku收藏；不挂起
+    dispatch_and_poll "--field debug_sync=true --field debug_sync_mode=write --field debug_platform=win10"
+    ;;
+  sync_read)
+    # 第二台(ubuntu)读验证跨设备同步：须先跑完 sync_write 并等云端同步生效
+    dispatch_and_poll "--field debug_sync=true --field debug_sync_mode=read --field debug_platform=win10"
+    ;;
   sync_cookie)
-    # Group2/3: 跨设备同步 —— 第一台(win10)写 LS/IDB/Cookie+wdku 历史，第二台读验证
+    # Group2/3: 跨设备同步 —— 第一台(win10)写 LS/IDB/Cookie+wdku 历史，第二台读验证（一个action两job）
     dispatch_and_poll "--field debug_sync=true --field debug_platform=win10"
     ;;
   ui_probe)

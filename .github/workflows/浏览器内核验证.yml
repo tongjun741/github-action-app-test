@@ -80,6 +80,11 @@ on:
         required: false
         default: false
         type: boolean
+      debug_sync_mode:
+        description: '跨设备同步调试形态：空=both(一个action两job顺序跑)；write=仅第一台写源(配合第二个 read action 验证)；read=仅第二台读验证(配合前一个 write action 已写源)。与 debug_sync 同用。'
+        required: false
+        default: ''
+        type: string
       skip_win7:
         description: '跳过 Win7 Docker job（默认 true——Win7 搁置中；需验证 Win7 时手动填 false）。'
         required: false
@@ -347,7 +352,7 @@ jobs:
       # 供 verify-cookie-sync job（第二台设备）读验证跨设备同步。仅 debug_sync 触发——
       # 与 debug_verify 挂起争抢分身会话，故不叠加。脚本自身 spawn OPEN_CLONE_ONLY 开分身→写→关。
       - name: 同步前置写入 (第一台写LS/IDB/Cookie+wdku历史)
-        if: always() && inputs.debug_sync == true
+        if: always() && inputs.debug_sync == true && inputs.debug_sync_mode != 'read'
         continue-on-error: true
         timeout-minutes: 15
         env:
@@ -404,7 +409,7 @@ jobs:
     needs: verify          # 必须等第一台机器登录完成，Cookie 才有同步源
     # 2026-10-13 调试增强：debug_verify/debug_sync 时也跑（覆盖 Group2 sync4+Cookie 调试）；
     # 仅 debug_hold 纯挂起不跑验证时跳过。普通全量轮(input 全 false)照常跑。
-    if: ${{ !cancelled() && inputs.debug_hold != true }}
+    if: ${{ !cancelled() && inputs.debug_hold != true && inputs.debug_sync_mode != 'write' }}
     runs-on: ubuntu-22.04  # 与 verify 的 Ubuntu job 物理不同机（GitHub 每次分配新 runner）
     env:
       CLIENT_BINARY: /opt/花漾客户端/huayoung

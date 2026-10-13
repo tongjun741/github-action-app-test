@@ -32,6 +32,31 @@ async function uploadShotToCloudinary(filePath, tag) {
   }
 }
 
+// G1 (2026-10-13)：分身出口IP绑定预检 —— 用户已绑定IP，访问指纹站前先确认分身走了绑定IP。
+// 判定口径（用户确认）：分身能否访问 https://ipapi.co/（拿到出口IP即绑定生效；不可达=绑定不生效/代理未起）。
+// 不比对具体IP值，只判可达性；命中则把出口IP打到日志供人工核对是否为绑定IP。
+async function assertCloneIpBound(page) {
+  let tab = null;
+  try {
+    const b = page.browser();
+    tab = (b && typeof b.newPage === 'function') ? await b.newPage().catch(() => null) : null;
+  } catch (_) { tab = null; }
+  const usePage = tab || page;
+  try {
+    await usePage.goto('https://ipapi.co/json/', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 1500));
+    const txt = await usePage.evaluate(() => (document.body ? document.body.innerText : '') || '').catch(() => '');
+    const m = String(txt).match(/"ip"\s*:\s*"([\d.:a-fA-F]+)"/);
+    const ip = m ? m[1] : null;
+    if (!ip) return { ok: false, err: `ipapi.co 未返回IP（响应: ${String(txt).slice(0, 80)}）` };
+    return { ok: true, ip };
+  } catch (e) {
+    return { ok: false, err: e.message.slice(0, 80) };
+  } finally {
+    if (tab) { try { await tab.close(); } catch (_) {} }
+  }
+}
+
 
 function isPublicIp(ip) {
   if (!ip) return false;
@@ -95,6 +120,10 @@ async function kernel_version(page, c, opts) {
 //   不是老词 "very likely"——判定词按真实文案匹配。
 //   关键通过信号 = 「No automated behavior detected」（分身浏览器未被识别为自动化）。
 async function fingerprint_pixelscan(page, c, opts) {
+  // G1 预检：分身必须绑定IP后才访问验证站（用户已绑定IP）
+  const ipb = await assertCloneIpBound(page).catch((e) => ({ ok: false, err: e.message }));
+  if (!ipb.ok) return { status: 'fail', detail: `分身未绑定IP（ipapi.co 不可达：${ipb.err}）——绑定不生效，无法验证 pixelscan` };
+  console.log(`[ip-binding] pixelscan 分身出口IP=${ipb.ip}（绑定生效）`);
   const url = /pixelscan\.net\/?$/i.test(c.url) ? 'https://pixelscan.net/fingerprint-check' : c.url;
   await gotoSafe(page, url, 'networkidle', 45000, opts?.engine).catch(() => {});
   let text = '';
@@ -141,6 +170,10 @@ const IPHEY_VERDICT_RE = /looks\s+(un)?reliable/i;
 //       ③ 轮询只等 Looks+判定词整体出现，超时 manual（附截图人工复核）。
 const IPHEY_FAIL_RE = /looks\s+unreliable/i;
 async function fingerprint_iphey(page, c, opts) {
+  // G1 预检：分身必须绑定IP后才访问验证站
+  const ipb = await assertCloneIpBound(page).catch((e) => ({ ok: false, err: e.message }));
+  if (!ipb.ok) return { status: 'fail', detail: `分身未绑定IP（ipapi.co 不可达：${ipb.err}）——绑定不生效，无法验证 iphey` };
+  console.log(`[ip-binding] iphey 分身出口IP=${ipb.ip}（绑定生效）`);
   await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
   let text = '';
   const deadline = Date.now() + 25000;
@@ -213,6 +246,10 @@ async function fingerprint_webrtc(page, c, opts) {
 // Run#52 修（历史 15+ 轮全 manual 根因）：得分由 JS 异步渲染，一次性读文本必然读不到数字。
 //   修法：① 轮询等 "XX%" 数字出现 ② 命中多个数字时取「anonymity/匿名」上下文优先 ③ dump 取证。
 async function fingerprint_whoer(page, c, opts) {
+  // G1 预检：分身必须绑定IP后才访问验证站
+  const ipb = await assertCloneIpBound(page).catch((e) => ({ ok: false, err: e.message }));
+  if (!ipb.ok) return { status: 'fail', detail: `分身未绑定IP（ipapi.co 不可达：${ipb.err}）——绑定不生效，无法验证 whoer` };
+  console.log(`[ip-binding] whoer 分身出口IP=${ipb.ip}（绑定生效）`);
   await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
   let text = '';
   let m = null;
@@ -419,6 +456,10 @@ async function checkCase(page, caseDef, opts) {
   // 不执行任何导航，也不计入 CI 红/绿（runner.mjs 仅 fail/error 置红）。
   if (caseDef.ignored) {
     return { status: 'ignored', detail: '按用户要求忽略该用例（不执行、不计入红/绿）' };
+  }
+  // G3 (2026-10-13)：nopecha 验证码 —— 用户要求「每次都忽略」，不执行、不计入红/绿。
+  if (caseDef.type === 'manual_captcha') {
+    return { status: 'ignored', detail: '按用户要求忽略该用例（每次都忽略，不计入红/绿）' };
   }
   const fn = CHECKERS[caseDef.type];
   try {

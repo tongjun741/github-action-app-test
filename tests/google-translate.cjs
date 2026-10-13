@@ -32,6 +32,57 @@ const URL_TARGET = 'https://www.tiktok.com/support?lang=en';
 const log = (...a) => console.log('[gtranslate]', ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// G2 (2026-10-13)：用户要求「改成真鼠标点」右键翻译 —— 真鼠标右键页面文本 → 原生上下文菜单 → 点「翻译」项。
+// 原生上下文菜单不在 DOM（无法 page.click），故 CDP 真鼠标右键唤起菜单后，按经验坐标网格扫描菜单项左键点击，
+// 每次点击后检测页面 CJK 占比是否上升（翻译生效信号）。命中即成功。
+async function tryRightClickTranslate(page) {
+  const target = await page.evaluate(() => {
+    const cands = ['article p', 'main p', 'p', 'h1', 'h2', 'section', 'div'];
+    for (const s of cands) {
+      const els = document.querySelectorAll(s);
+      for (const el of els) {
+        if (el.offsetParent !== null && (el.textContent || '').trim().length > 25) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 50 && r.height > 10) return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+        }
+      }
+    }
+    return null;
+  }).catch(() => null);
+  if (!target) return { ok: false, err: '未找到可右键的文本块' };
+  let client;
+  try { client = await page.target().createCDPSession(); } catch (e) { return { ok: false, err: 'CDP会话失败:' + e.message.slice(0, 40) }; }
+  const ratioNow = () => page.evaluate(() => {
+    const t = (document.body ? document.body.innerText : '');
+    const cjk = (t.match(/[一-鿿]/g) || []).length;
+    return cjk / Math.max(t.length, 1);
+  }).catch(() => 0);
+  const rightClick = async (x, y) => {
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    await sleep(120);
+    await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'right', clickCount: 1 });
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'right', clickCount: 1 });
+  };
+  await rightClick(target.x, target.y);
+  await sleep(900);
+  let triggered = false, ratio = 0;
+  // 原生菜单首项正确项约在点击点下方 +30px 起，逐项间隔 ~26px；扫描命中「翻译」项
+  for (const dy of [30, 56, 82, 108, 134, 160, 186, 212, 238]) {
+    await rightClick(target.x, target.y); // 重新唤起菜单（每次左键点击会关闭上一次）
+    await sleep(650);
+    const mx = target.x + 6, my = target.y + dy;
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: mx, y: my });
+    await sleep(120);
+    await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: mx, y: my, button: 'left', clickCount: 1 });
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: mx, y: my, button: 'left', clickCount: 1 });
+    await sleep(1500);
+    ratio = await ratioNow();
+    if (ratio > 0.1) { triggered = true; break; }
+  }
+  try { await client.detach(); } catch (_) {}
+  return { ok: triggered, ratio };
+}
+
 async function main() {
   const out = { platform: PLATFORM, ts: new Date().toISOString(), results: [] };
   const push = (status, detail) => {
@@ -111,6 +162,18 @@ async function main() {
       };
       const baseText = await page.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 6000)).catch(() => '');
       log(`基线页面 CJK 占比 ${(cjkRatio(baseText) * 100).toFixed(1)}%（英文页应接近 0）`);
+
+      // G2 (2026-10-13)：用户要求「改成真鼠标点」——先尝试右键上下文菜单「翻译」项（真鼠标）。
+      let rc = null;
+      try { rc = await tryRightClickTranslate(page); } catch (e) { rc = { ok: false, err: e.message.slice(0, 60) }; }
+      if (rc && rc.ok) {
+        push('pass', `右键菜单触发翻译生效（CJK 占比 ${(rc.ratio * 100).toFixed(1)}%，真鼠标右键→翻译项）`);
+        fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
+        log(`已写出 ${OUT}`);
+        try { await pptr.disconnect(); } catch (_) {}
+        process.exit(0);
+      }
+      log(`右键翻译未触发（${rc && rc.err || '菜单未命中翻译项'}）——回退 API 探测/bubble 路径`);
 
       // 触发翻译（Run#51 复盘：widget 曾在元素不存在时也置 triggered='widget'，把 API 探测短路——假触发）。
       // 正确顺序：API 探测无条件先跑（「翻译加速可达」最硬证据，不依赖页面组件）；
