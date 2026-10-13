@@ -28,10 +28,10 @@ const SLUG = PLATFORM.replace(/\s+/g, '_');
 const CDP_PORT = Number(process.env.REMOTE_DEBUG_PORT || 9221);
 const CDP = process.env.CLIENT_CDP_ENDPOINT || `http://127.0.0.1:${CDP_PORT}`;
 const OUT = process.env.OUT || 'results-Sync_Flows.json';
-const LS_KEY = 'huayoung_sync_probe';
-const LS_VAL = `ls_${Date.now()}`;
-const IDB_DB = 'huayoung_sync_probe';
-const IDB_VAL = `idb_${Date.now()}`;
+// 2026-10-13 用户指定：改用 E:\workspace\docker\浏览器内核测试脚本（写入存储.js/读取存储.js）的键名体系
+//   localStorage: szdamai_localStorage_key / szdamai_localStorage_value
+//   IndexedDB:   szdamai_dbName(v2) > szdamai_customers(keyPath=name) > {name:"new_customre_name", extInfo:"xdfd"}
+//   （旧 huayoung_sync_probe 键已废弃）
 
 const log = (...a) => console.log('[sync-flows]', ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -114,50 +114,63 @@ async function main() {
     push(out, 'bookmark_sync', '收藏夹同步', 'client_bookmark_sync', 'error', `bookmarks 页异常: ${e.message.slice(0, 90)}`);
   }
 
-  // ===== 3. LocalStorage 同步：qq.com 写入+读回（本轮自洽；跨设备下轮） =====
+  // ===== 3. LocalStorage 同步：qq.com 写入+读回 =====
+  // 2026-10-13 用户指定：使用 E:\workspace\docker\浏览器内核测试脚本 目录下的验证脚本
+  //   （写入存储.js / 读取存储.js）的键名体系：
+  //   localStorage: szdamai_localStorage_key = szdamai_localStorage_value
   try {
     await page.goto('https://www.qq.com/', { waitUntil: 'domcontentloaded', timeout: 45000 });
     await sleep(3000);
-    const rw = await page.evaluate(([k, v]) => {
+    // === 等价执行「写入存储.js」 ===
+    const rw = await page.evaluate(() => {
       try {
-        localStorage.setItem(k, v);
-        const back = localStorage.getItem(k);
-        return { ok: back === v, back };
+        localStorage.setItem('szdamai_localStorage_key', 'szdamai_localStorage_value');
+        const back = localStorage.getItem('szdamai_localStorage_key');
+        return { ok: back === 'szdamai_localStorage_value', back };
       } catch (e) { return { ok: false, err: e.message }; }
-    }, [LS_KEY, LS_VAL]);
+    });
     push(out, 'localstorage_sync', 'LocalStorage同步', 'client_localstorage_sync',
       rw.ok ? 'manual' : 'fail',
-      rw.ok ? `qq.com 写入+读回自洽成功（${LS_KEY}=${LS_VAL}）；跨设备读取待下轮验证` : `LocalStorage 写入失败: ${rw.err || rw.back}`);
+      rw.ok ? 'qq.com 按官方脚本写入+读回自洽成功（szdamai_localStorage_key=szdamai_localStorage_value）；跨设备读取待下轮验证' : `LocalStorage 写入失败(官方脚本键): ${rw.err || rw.back}`);
   } catch (e) {
     push(out, 'localstorage_sync', 'LocalStorage同步', 'client_localstorage_sync', 'error', `qq.com 异常: ${e.message.slice(0, 90)}`);
   }
 
   // ===== 4. IndexDB 同步：qq.com 写入+读回 =====
+  // 用户官方脚本体系：db=szdamai_dbName(v2) store=szdamai_customers(keyPath=name)
+  //   写入 {name:"new_customre_name", extInfo:"xdfd"}，读回 get("new_customre_name").extInfo
   try {
-    const rw = await page.evaluate(([db, val]) => new Promise((resolve) => {
+    const rw = await page.evaluate(() => new Promise((resolve) => {
       try {
-        const req = indexedDB.open(db, 1);
-        req.onupgradeneeded = () => { req.result.createObjectStore('kv'); };
-        req.onsuccess = () => {
-          const d = req.result;
+        const request = indexedDB.open('szdamai_dbName', 2);
+        request.onerror = () => resolve({ ok: false, err: 'indexedDB.open 失败' });
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains('szdamai_customers')) {
+            db.createObjectStore('szdamai_customers', { keyPath: 'name' });
+          }
+        };
+        request.onsuccess = (event) => {
+          const db = event.target.result;
           try {
-            const tx = d.transaction('kv', 'readwrite');
-            tx.objectStore('kv').put(val, 'probe');
-            tx.oncomplete = () => {
-              const tx2 = d.transaction('kv', 'readonly');
-              const get = tx2.objectStore('kv').get('probe');
-              get.onsuccess = () => resolve({ ok: get.result === val, back: String(get.result) });
-              get.onerror = () => resolve({ ok: false, err: 'get error' });
+            const transaction = db.transaction('szdamai_customers', 'readwrite');
+            const objectStore = transaction.objectStore('szdamai_customers');
+            objectStore.add({ name: 'new_customre_name', extInfo: 'xdfd' });
+            transaction.oncomplete = () => {
+              // === 等价执行「读取存储.js」 ===
+              const tx2 = db.transaction('szdamai_customers').objectStore('szdamai_customers');
+              const g = tx2.get('new_customre_name');
+              g.onsuccess = () => resolve({ ok: !!(g.result && g.result.extInfo === 'xdfd'), back: g.result ? String(g.result.extInfo) : '(空)' });
+              g.onerror = () => resolve({ ok: false, err: 'get error' });
             };
-            tx.onerror = () => resolve({ ok: false, err: 'tx error' });
+            transaction.onerror = () => resolve({ ok: false, err: 'tx error' });
           } catch (e) { resolve({ ok: false, err: e.message }); }
         };
-        req.onerror = () => resolve({ ok: false, err: 'open error' });
       } catch (e) { resolve({ ok: false, err: e.message }); }
-    }), [IDB_DB, IDB_VAL]);
+    }));
     push(out, 'indexdb_sync', 'IndexDB同步', 'client_indexdb_sync',
       rw.ok ? 'manual' : 'fail',
-      rw.ok ? `qq.com IndexDB 写入+读回自洽成功（${IDB_DB}=${IDB_VAL}）；跨设备读取待下轮验证` : `IndexDB 写入失败: ${rw.err || rw.back}`);
+      rw.ok ? 'qq.com 按官方脚本 IndexDB 写入+读回自洽成功（szdamai_dbName/szdamai_customers/new_customre_name.extInfo=xdfd）；跨设备读取待下轮验证' : `IndexDB 写入失败(官方脚本库表): ${rw.err || rw.back}`);
   } catch (e) {
     push(out, 'indexdb_sync', 'IndexDB同步', 'client_indexdb_sync', 'error', `IndexDB 异常: ${e.message.slice(0, 90)}`);
   }

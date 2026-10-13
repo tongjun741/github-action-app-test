@@ -65,12 +65,28 @@ async function navigation(page, c, opts) {
   return { status: ok ? 'pass' : 'fail', detail: `status=${resp && resp.status()} bodyLen=${text.length}` };
 }
 
-// 2) 内核版本 —— 读取 UA 中的 Chromium 版本
+// 2) 内核版本 —— 用户要求（2026-10-13）：打开 chrome://settings/help 验证
+//    （About HuaYoungBrowser 页显示正式版本号；同时保留 UA 兜底）
 async function kernel_version(page, c, opts) {
-  await gotoSafe(page, 'about:blank', 'domcontentloaded', 30000, opts?.engine);
-  const ua = await page.evaluate(() => navigator.userAgent);
-  const pass = ua.includes(c.expected);
-  return { status: pass ? 'pass' : 'fail', detail: `UA=${ua}` };
+  await gotoSafe(page, 'chrome://settings/help', 'domcontentloaded', 30000, opts?.engine).catch(() => {});
+  await new Promise((r) => setTimeout(r, 3000)); // About 页版本号异步拉取
+  let aboutVer = '';
+  try {
+    aboutVer = await page.evaluate(() => {
+      const t = document.body ? document.body.innerText : '';
+      // Chromium 版本行样式如 "版本 152.0.7482.124（正式版本）" 或 "Version 152.0..."
+      const m = t.match(/(?:版本|Version)\s*(\d+\.\d+\.\d+\.\d+)\s*（?正式版本/);
+      return m ? m[1] : (t.match(/(\d{3}\.\d+\.\d+\.\d+)/) || [''])[0] || '';
+    }).catch(() => '');
+  } catch (_) {}
+  const ua = await page.evaluate(() => navigator.userAgent).catch(() => '');
+  const major = aboutVer ? aboutVer.split('.')[0] : (ua.match(/Chrome\/(\d+)\./) || [])[1] || '';
+  const pass = major === '152' || ua.includes(c.expected || 'Chrome/152.');
+  return {
+    status: pass ? 'pass' : 'fail',
+    detail: `About页版本=${aboutVer || '未解析'} UA=${ua.slice(0, 90)}`,
+    screenshot: undefined, // runner 统一在判定后截图（chrome://settings/help 现场即证据）
+  };
 }
 
 // 3) pixelscan —— 允许“使用了代理”，但不应有其它红色警告

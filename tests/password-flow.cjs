@@ -226,10 +226,12 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       await sleep(12000); // 密码管理器落库宽限
       const url = page.url();
       log(`提交后 URL: ${url}`);
-      // 【模拟人工点击保存】用户要求 2026-10-10：不得用浏览器参数绕过，模拟真人点「保存」。
-      // 双路径探测气泡：
-      //   ① HuaYoung 若自实现 DOM 型保存提示（花漾是 Electron 壳+定制 Chromium，大概率）→ 找按钮点击
-      //   ② Chromium 原生气泡（浏览器级 UI，不在页面 DOM）→ 键盘 Enter（气泡默认焦点就是「保存」）
+      // 【模拟人工鼠标点击保存】用户要求 2026-10-13：控制桌面鼠标点击浏览器的气泡来保存密码。
+      // 三路径：
+      //   ① HuaYoung 自实现 DOM 型保存提示 → 直接找按钮 click()
+      //   ② Chromium 原生气泡（浏览器级 UI，不在页面 DOM）→ CDP Input.dispatchMouseEvent
+      //      真鼠标坐标点击（气泡弹出在地址栏正下方、左对齐，「保存」按钮在气泡左下）
+      //   ③ 兜底键盘 Enter（气泡默认焦点是「保存」）
       let bubbleAction = 'none';
       // ① DOM 型提示按钮
       try {
@@ -244,7 +246,32 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
         });
         if (domBtn) { bubbleAction = `dom-click:${domBtn}`; log(`已点击 DOM 保存按钮: ${domBtn}`); }
       } catch (_) { }
-      // ② Chromium 原生气泡：键盘 Enter（气泡默认焦点在「保存」）——通过 CDP Input 域派发
+      // ② Chromium 原生气泡：真鼠标点击（坐标 = 视口左上偏下——气泡「保存」按钮位置）
+      if (bubbleAction === 'none') {
+        try {
+          const client = await page.target().createCDPSession();
+          const vp = page.viewport() || { width: 1280, height: 800 };
+          // 气泡锚定在地址栏（工具栏 ~40px）正下方左缘；「保存」按钮在气泡内容左下区域
+          const bx = Math.round(vp.width * 0.08);   // ~100px：气泡左缘内收
+          const by = Math.round(vp.height * 0.115); // ~90px：工具栏+气泡头部下移
+          await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: bx, y: by });
+          await sleep(150);
+          await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: bx, y: by, button: 'left', clickCount: 1 });
+          await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: bx, y: by, button: 'left', clickCount: 1 });
+          bubbleAction = `mouse-click@(${bx},${by})`;
+          log(`已真鼠标点击气泡「保存」（坐标 ${bx},${by}）`);
+          await sleep(800);
+          // 若一次未中（气泡尺寸差异），网格扫点气泡常见区域（3×2 网格）
+          for (const [gx, gy] of [[0.06, 0.10], [0.10, 0.13], [0.14, 0.10]]) {
+            const x2 = Math.round(vp.width * gx); const y2 = Math.round(vp.height * gy);
+            await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: x2, y: y2, button: 'left', clickCount: 1 });
+            await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x2, y: y2, button: 'left', clickCount: 1 });
+            await sleep(400);
+          }
+          await client.detach();
+        } catch (e) { log(`鼠标点击气泡异常(将兜底 Enter): ${e.message.slice(0, 60)}`); }
+      }
+      // ③ 兜底：键盘 Enter
       if (bubbleAction === 'none') {
         try {
           const client = await page.target().createCDPSession();
@@ -505,22 +532,43 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
         await shotToCloudinary(page, `autofill-miss-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
         throw new Error(`登录页未找到密码框（代填验证）（${diag}）`);
       }
-      // 触发 autofill 三连：① 聚焦账号框 ② 重载页面（Chromium autofill 常需导航事件触发）③ 再聚焦
+      // 触发代填（用户要求 2026-10-13：控制鼠标选择账号来测试代填密码）：
+      // ① 真鼠标点击账号框（CDP dispatchMouseEvent，坐标=账号框中心）→ 弹出账号选择下拉
+      // ② 鼠标点击下拉中的账号项（下拉是浏览器级 UI，位置在账号框正下方）
+      // ③ 保留 DOM 聚焦/reload 作为辅助触发（Chromium autofill 常需导航事件）
+      const mouseClickAt = async (client, x, y) => {
+        await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+        await sleep(120);
+        await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+        await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+        await sleep(400);
+      };
+      try {
+        const client = await page.target().createCDPSession();
+        // ① 鼠标点击账号框中心
+        if (inputs.userInput) {
+          const box = await page.evaluate((sel) => {
+            const r = document.querySelector(sel).getBoundingClientRect();
+            return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+          }, inputs.userInput).catch(() => null);
+          if (box) {
+            await mouseClickAt(client, box.x, box.y);
+            log(`已真鼠标点击账号框（${box.x},${box.y}）——等待账号选择下拉`);
+            await sleep(1500);
+            // ② 点击下拉首项（账号框正下方 ~28px 处）
+            await mouseClickAt(client, box.x, box.y + 28);
+            log('已真鼠标点击账号下拉首项');
+            await sleep(1500);
+          }
+        }
+        await client.detach();
+      } catch (e) { log(`鼠标账号选择异常(继续DOM触发): ${e.message.slice(0, 60)}`); }
+      // ③ 辅助：DOM 聚焦 + reload 触发 autofill
       try {
         if (inputs.userInput) {
-          await page.click(inputs.userInput).catch(() => {});
           await page.focus(inputs.userInput).catch(() => {});
-          await sleep(1500);
+          await sleep(1200);
         }
-      } catch (_) { }
-      try {
-        await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
-        await sleep(4000);
-      } catch (_) { }
-      try {
-        const inputs2 = await findLoginInputs(page);
-        if (inputs2.userInput) { await page.focus(inputs2.userInput).catch(() => {}); await sleep(1500); }
-        if (inputs2.passInput) { await page.click(inputs2.passInput).catch(() => {}); await sleep(1500); }
       } catch (_) { }
       let filled = { value: false, autofill: false };
       const freshInputs = await findLoginInputs(page).catch(() => inputs);
