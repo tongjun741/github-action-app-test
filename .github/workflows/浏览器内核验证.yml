@@ -365,7 +365,13 @@ jobs:
             results-RPA_Flow-*.json
             results-GTranslate-*.json
             screenshot-${{ matrix.slug }}.png
+            shot-*.png
+            rpa-*.png
+            gtranslate-*.png
             iphey-*.png
+            plugins-*.png
+            password-*.png
+            save-bubble-*.png
           if-no-files-found: warn
 
   # ===== Cookie 同步：在另一台电脑（独立 job = 不同 runner 机器）验证登录态同步 =====
@@ -456,6 +462,10 @@ jobs:
             results-Cookie_Sync.json
             results-Sync_Flows.json
             cookie-sync-*.png
+            shot-*.png
+            rpa-*.png
+            gtranslate-*.png
+            password-*.png
           if-no-files-found: warn
 
   verify-win7:
@@ -717,7 +727,30 @@ jobs:
       - name: 生成 Excel 报告
         run: node tests/report.mjs --dir artifacts --out report.xlsx
 
+      # 2026-10-13 用户要求：所有测试结果截图打包成 zip（文件名与 Excel 明细「截图文件」列对应）
+      - name: 打包测试截图 zip
+        shell: bash
+        run: |
+          mkdir -p shots
+          # artifacts 经 merge-multiple 解到同目录：results json 与各脚本 png 混在一起——挑 png
+          found=0
+          for f in artifacts/*.png; do
+            [ -f "$f" ] || continue
+            cp "$f" shots/ && found=$((found+1))
+          done
+          echo "截图数: $found"
+          if [ "$found" -gt 0 ]; then
+            cd shots && zip -q "../screenshots.zip" *.png && cd ..
+            ls -la screenshots.zip
+          else
+            echo "::warning::未收集到任何截图 png"
+            touch screenshots.zip
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: verification-report
-          path: report.xlsx
+          path: |
+            report.xlsx
+            screenshots.zip
+          if-no-files-found: error

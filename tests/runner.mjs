@@ -161,10 +161,19 @@ async function run() {
               if (page && page.setDefaultTimeout) page.setDefaultTimeout(45000);
             } catch (_) { /* 保持原 page，让本用例如实报错 */ }
           }
-          res = await Promise.race([
-            checkCase(page, c, { proxyIp, engine }),
-            new Promise((_, rej) => setTimeout(() => rej(new Error('用例判定超时(120s)')), 120000)),
-          ]);
+        res = await Promise.race([
+          checkCase(page, c, { proxyIp, engine }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('用例判定超时(120s)')), 120000)),
+        ]);
+        // 2026-10-13 用户要求：所有测试结果统一截图（每用例判定后），文件名进 results 供报告标注
+        try {
+          const shotName = `shot-${platform.replace(/\s+/g, '_')}-${c.id}.png`;
+          await page.screenshot({ path: shotName, fullPage: false }).catch(() => {});
+          if (existsSync(shotName)) {
+            res.screenshot = shotName;
+            console.log(`  [shot] ${shotName}`);
+          }
+        } catch (_) { /* 截图失败不影响判定 */ }
         } catch (e) {
           res = { status: 'error', detail: `判定过程异常: ${e.message}` };
           console.error(`  [错误] ${c.name}: ${e.message}`);
@@ -179,6 +188,7 @@ async function run() {
       platformResults.push({
         caseId: c.id, name: c.name, type: c.type,
         status: res.status, detail: res.detail, criteria: c.criteria,
+        ...(res.screenshot ? { screenshot: res.screenshot } : {}),
       });
       const tag = { pass: '✓', fail: '✗', manual: '人工', error: '错误', skipped: '跳过', na: '-' }[res.status] || res.status;
       console.log(`  [${tag}] ${c.name} — ${res.detail}`);

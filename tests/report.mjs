@@ -18,7 +18,8 @@ import ExcelJS from 'exceljs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const STATUS_LABEL = {
-  pass: '通过', fail: '失败', manual: '人工', error: '错误', skipped: '跳过', na: '不适用', ignored: '忽略',
+  // 2026-10-13 用户要求对齐原表用词：成功 / 不通过 / 人工确认 / 测试网站不可用 / 忽略
+  pass: '成功', fail: '不通过', manual: '人工确认', error: '异常', skipped: '跳过', na: '不适用', ignored: '忽略（按用户要求）',
 };
 const STATUS_FILL = {
   pass: 'C6EFCE', fail: 'FFC7CE', manual: 'FFEB9C', error: 'F4B0B0',
@@ -88,7 +89,9 @@ async function buildReport(platformFiles, outPath) {
       const isNewPlaceholder = /占位/.test(String(r.detail || '')) || (r.status === 'skipped' && !String(r.detail || '').trim());
       const isPrevPlaceholder = prev && (/占位/.test(String(prev.detail || '')) || (prev.status === 'skipped' && !String(prev.detail || '').trim()));
       if (!prev || isPrevPlaceholder || (!isNewPlaceholder && prev.status !== 'pass' && prev.status !== 'fail')) {
-        grid[r.caseId][pf.platform] = { status: r.status, detail: r.detail };
+        grid[r.caseId][pf.platform] = { status: r.status, detail: r.detail, screenshot: r.screenshot || (prev && prev.screenshot) };
+      } else if (prev && r.screenshot && !prev.screenshot) {
+        prev.screenshot = r.screenshot; // 真结果已保留但缺截图——补
       }
       if (!cases.includes(r.caseId)) cases.push(r.caseId);
     }
@@ -103,33 +106,54 @@ async function buildReport(platformFiles, outPath) {
   wb.creator = 'HuaYoung E2E Verifier';
   wb.title = `验证报告 ${kernel || ''} ${teamId ? `[team ${teamId} / ${cloneName} 分身]` : ''}`.trim();
 
-  // ---- Sheet 1: 验证结果 ----
+  // ---- Sheet 1: 验证结果（用户原表格式：平台列在前 + 验证标准 + 示例；2026-10-13 用户要求）----
+  // 原表结构：R1 = 空|Win10|mac arm64|mac x64|Ubuntu22|Win7|验证标准|示例；R2 = 测试版本行
   const ws = wb.addWorksheet('验证结果');
+  const S1_PLATFORMS = platforms.filter((p) => p !== 'Windows 10 (第二台设备)');
+  const ws1Header = ['验证项', ...S1_PLATFORMS.map((p) => (p === 'Windows 7' ? 'Windows 7（仅关注是否能打开会话）' : p)), '验证标准', '示例'];
   ws.columns = [
-    { header: '验证项', key: 'name', width: 34 },
-    { header: '验证标准', key: 'criteria', width: 60 },
-    ...platforms.map((p) => ({ header: p, key: p, width: 16 })),
+    { header: ws1Header[0], key: 'name', width: 34 },
+    ...S1_PLATFORMS.map((p) => ({ header: p === 'Windows 7' ? 'Windows 7（仅关注是否能打开会话）' : p, key: p, width: 22 })),
+    { header: '验证标准', key: 'criteria', width: 42 },
+    { header: '示例', key: 'demo', width: 10 },
   ];
   const headerRow = ws.getRow(1);
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF305496' } };
+  headerRow.font = { bold: true };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDEBF7' } };
   headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  headerRow.height = 30;
+
+  // 测试版本行（原表 R2）：从 meta.testVersion 取；缺省给固定生产版本号
+  const FIXED_VER = { 'Windows 10': '12.9.1042', 'macOS arm64': '12.9.949', 'macOS x64': '12.9.949', 'Ubuntu 22': '12.9.911', 'Windows 7': '12.9.905' };
+  const verRow = ws.addRow({ name: '测试版本' });
+  verRow.getCell('name').font = { bold: true };
+  for (const p of S1_PLATFORMS) {
+    const v = (testVer && testVer[p]) || FIXED_VER[p] || '';
+    verRow.getCell(p).value = v ? `版本：${v}` : '';
+  }
+  verRow.commit();
 
   for (const cid of cases) {
     const meta = index[cid];
-    const row = ws.addRow({ name: meta.name, criteria: meta.criteria });
-    row.getCell('criteria').alignment = { wrapText: true, vertical: 'top' };
-    for (const p of platforms) {
+    const row = ws.addRow({ name: meta.name, criteria: meta.criteria || '' });
+    row.getCell('name').font = { bold: true };
+    row.getCell('name').alignment = { wrapText: true, vertical: 'center' };
+    row.getCell('criteria').alignment = { wrapText: true, vertical: 'center' };
+    row.getCell('criteria').font = { size: 9 };
+    for (const p of S1_PLATFORMS) {
       const cell = row.getCell(p);
       const v = grid[cid]?.[p];
       const status = v ? v.status : 'na';
-      cell.value = STATUS_LABEL[status] || status;
+      const label = STATUS_LABEL[status] || status;
+      // 状态文案（原表风格：成功/不通过/测试网站不可用/人工确认…），附截图文件名
+      const shot = v && v.screenshot ? `\n[截图] ${v.screenshot}` : '';
+      cell.value = label + shot;
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (STATUS_FILL[status] || 'FFFFFF') } };
-      cell.font = { color: { argb: 'FF' + (STATUS_FONT[status] || '000000') }, bold: true };
-      cell.alignment = { horizontal: 'center', vertical: 'center' };
+      cell.font = { bold: !shot, size: shot ? 9 : 11 };
+      cell.alignment = { horizontal: 'center', vertical: 'center', wrapText: true };
     }
   }
-  ws.views = [{ state: 'frozen', ySplit: 1 }];
+  ws.views = [{ state: 'frozen', ySplit: 2 }];
 
   // ---- Sheet 2: 汇总 ----
   const ws2 = wb.addWorksheet('汇总');
@@ -167,7 +191,7 @@ async function buildReport(platformFiles, outPath) {
   tRow.font = { bold: true };
   tRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
 
-  // ---- Sheet 3: 明细 ----
+  // ---- Sheet 3: 明细（含截图文件名列）----
   const ws3 = wb.addWorksheet('明细');
   ws3.columns = [
     { header: '平台', key: 'platform', width: 18 },
@@ -175,6 +199,7 @@ async function buildReport(platformFiles, outPath) {
     { header: '类型', key: 'type', width: 22 },
     { header: '状态', key: 'status', width: 12 },
     { header: '说明', key: 'detail', width: 70 },
+    { header: '截图文件', key: 'screenshot', width: 30 },
     { header: '验证标准', key: 'criteria', width: 60 },
   ];
   const h3 = ws3.getRow(1);
@@ -186,7 +211,8 @@ async function buildReport(platformFiles, outPath) {
       const v = grid[cid]?.[p] || { status: 'na', detail: '' };
       const row = ws3.addRow({
         platform: p, name: meta.name, type: meta.type,
-        status: STATUS_LABEL[v.status] || v.status, detail: v.detail || '', criteria: meta.criteria || '',
+        status: STATUS_LABEL[v.status] || v.status, detail: v.detail || '',
+        screenshot: v.screenshot || '', criteria: meta.criteria || '',
       });
       const sc = row.getCell('status');
       sc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (STATUS_FILL[v.status] || 'FFFFFF') } };
