@@ -57,6 +57,23 @@ async function main() {
   const browser = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 60000 });
   let status = 'fail';
   let detail = '';
+  let proxyDiag = '';
+  // 2026-10-13 诊断：先读 chrome://version（不走代理）拿分身启动命令行——
+  // 若带 --proxy-server 则 ERR_PROXY_CONNECTION_FAILED 是分身代理通道问题（非脚本/网络问题）
+  try {
+    const diagPage = await browser.newPage();
+    await diagPage.goto('chrome://version', { waitUntil: 'domcontentloaded', timeout: 15000 });
+    const cmdLine = await diagPage.evaluate(() => {
+      const rows = [...document.querySelectorAll('#command_line, .version-table tr')];
+      const cmd = rows.map((r) => r.innerText).find((t) => /--/.test(t)) || document.body.innerText;
+      return cmd.slice(0, 800);
+    }).catch(() => '');
+    await diagPage.close().catch(() => {});
+    const m = String(cmdLine).match(/--proxy-server[=\s]+([^\s]+)/);
+    proxyDiag = m ? `分身代理参数: ${m[1]}` : '未见 --proxy-server 参数（直连模式）';
+    log(`[diag] ${proxyDiag}`);
+    if (!m) log(`[diag] 命令行(前400): ${String(cmdLine).slice(0, 400)}`);
+  } catch (e) { log(`[diag] chrome://version 读取失败: ${e.message.slice(0, 80)}`); }
   let shotPath = '';
   try {
     const page = await browser.newPage();
