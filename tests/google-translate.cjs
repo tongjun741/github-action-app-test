@@ -11,8 +11,9 @@
  *   4) 触发翻译：① Chrome 原生 translate 气泡 ② #google_translate_element widget ③ translate.googleapis API 探测
  *   5) 判定：页面出现中文（CJK 占比 > 10%）= 翻译成功；API 探测返回中文 = 加速可达
  *
- * 注：右键菜单是浏览器原生 UI，CDP 无法点——用「页面级翻译触发」等价验证翻译能力
- *     （translate.googleapis 经客户端加速代理可达 + 渲染成功）。
+ * 注：右键菜单是浏览器原生 UI（page.screenshot 截不到），故用 OCR 方案：screenshot-desktop 截全屏
+ *     （含原生菜单）→ tesseract.js 识别「翻译」项 → 屏幕坐标经窗口位置+DPR 映射回视口坐标 → CDP 真鼠标点击。
+ *     页面级翻译触发（API 探测/bubble/widget）仍保留为兜底证据。
  * 输出：results-GTranslate.json
  */
 const fs = require('node:fs');
@@ -22,6 +23,8 @@ const { remote } = require('webdriverio');
 const puppeteer = require('puppeteer-core');
 const { openClone, login, resolveBinary, resolveChromedriver, buildCaps } = require('./e2e-verify.cjs');
 const { productConfig } = require('./config');
+const screenshotDesktop = require('screenshot-desktop'); // OS 级全屏截图（含浏览器原生右键菜单，page.screenshot 截不到）
+const tesseract = require('tesseract.js');               // OCR 词级识别，定位菜单项屏幕坐标
 
 const PLATFORM = process.env.E2E_PLATFORM || 'Windows 10';
 const CDP_PORT = Number(process.env.REMOTE_DEBUG_PORT || 9221);
@@ -32,9 +35,28 @@ const URL_TARGET = 'https://www.tiktok.com/support?lang=en';
 const log = (...a) => console.log('[gtranslate]', ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// G2 (2026-10-13)：用户要求「改成真鼠标点」右键翻译 —— 真鼠标右键页面文本 → 原生上下文菜单 → 点「翻译」项。
-// 原生上下文菜单不在 DOM（无法 page.click），故 CDP 真鼠标右键唤起菜单后，按经验坐标网格扫描菜单项左键点击，
-// 每次点击后检测页面 CJK 占比是否上升（翻译生效信号）。命中即成功。
+// G2 (2026-10-13)：用户先要求「真鼠标点」→ 现升级为 **OCR 方案**：
+//   screenshot-desktop 截全屏（含原生右键菜单）→ tesseract.js 识别「翻译」项屏幕坐标
+//   → 经窗口屏幕位置(window.screenX/Y)+DPR 映射回视口坐标 → CDP 真鼠标点击。
+//   原生菜单 page.screenshot 截不到，故必须 OS 级截图。OCR 未命中/异常 → 降级原网格扫描 → 再降级 API 探测。
+let _gocrWorker = null;
+async function ocrFindTranslateItem(fullPngBuf, screenCssW) {
+  // 全屏 PNG buffer → OCR 词级识别 → 返回「翻译」项屏幕设备像素中心 + dpr
+  const tmp = path.join(process.cwd(), `rc-menu-${Date.now()}.png`);
+  fs.writeFileSync(tmp, fullPngBuf);
+  const imgW = fullPngBuf.readUInt32BE(16); // PNG IHDR 宽（设备像素）
+  const dpr = imgW / screenCssW;            // 截图宽 / 主屏 CSS 宽 = DPR
+  if (!_gocrWorker) _gocrWorker = await tesseract.createWorker('chi_sim+eng');
+  const { data } = await _gocrWorker.recognize(tmp);
+  const words = (data.words || []).filter((w) => w.confidence >= 40 && w.bbox);
+  const hit = words.find((w) => /(翻译|translate)/i.test(w.text));
+  if (!hit) return null;
+  return {
+    sx: Math.round((hit.bbox.x0 + hit.bbox.x1) / 2),
+    sy: Math.round((hit.bbox.y0 + hit.bbox.y1) / 2),
+    dpr, text: hit.text,
+  };
+}
 async function tryRightClickTranslate(page) {
   const target = await page.evaluate(() => {
     const cands = ['article p', 'main p', 'p', 'h1', 'h2', 'section', 'div'];
@@ -52,6 +74,11 @@ async function tryRightClickTranslate(page) {
   if (!target) return { ok: false, err: '未找到可右键的文本块' };
   let client;
   try { client = await page.target().createCDPSession(); } catch (e) { return { ok: false, err: 'CDP会话失败:' + e.message.slice(0, 40) }; }
+  // 窗口屏幕位置（CSS px）+ 主屏 CSS 宽（用于 DPR 与坐标映射）
+  const winfo = await page.evaluate(() => ({ screenX: window.screenX, screenY: window.screenY, screenCssW: window.screen.width }))
+    .catch(() => ({ screenX: 0, screenY: 0, screenCssW: 1920 }));
+  // 标题栏+工具栏偏移（HuaYoung 分身浏览器若为嵌入式 webview 则≈0；若点击偏，用 RC_MENU_TOOLBAR_PX 校准）
+  const TB = Number(process.env.RC_MENU_TOOLBAR_PX || 0);
   const ratioNow = () => page.evaluate(() => {
     const t = (document.body ? document.body.innerText : '');
     const cjk = (t.match(/[一-鿿]/g) || []).length;
@@ -63,21 +90,44 @@ async function tryRightClickTranslate(page) {
     await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'right', clickCount: 1 });
     await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'right', clickCount: 1 });
   };
+  const leftClickVp = async (vx, vy) => {
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: vx, y: vy });
+    await sleep(120);
+    await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: vx, y: vy, button: 'left', clickCount: 1 });
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: vx, y: vy, button: 'left', clickCount: 1 });
+  };
   await rightClick(target.x, target.y);
   await sleep(900);
   let triggered = false, ratio = 0;
-  // 原生菜单首项正确项约在点击点下方 +30px 起，逐项间隔 ~26px；扫描命中「翻译」项
-  for (const dy of [30, 56, 82, 108, 134, 160, 186, 212, 238]) {
-    await rightClick(target.x, target.y); // 重新唤起菜单（每次左键点击会关闭上一次）
-    await sleep(650);
-    const mx = target.x + 6, my = target.y + dy;
-    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: mx, y: my });
-    await sleep(120);
-    await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: mx, y: my, button: 'left', clickCount: 1 });
-    await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: mx, y: my, button: 'left', clickCount: 1 });
-    await sleep(1500);
-    ratio = await ratioNow();
-    if (ratio > 0.1) { triggered = true; break; }
+
+  // —— OCR 主路径：OS 全屏截图 → 识别「翻译」→ 屏幕坐标映射回视口 → CDP 点击 ——
+  try {
+    const fullBuf = await screenshotDesktop({ format: 'png' });
+    const ocr = await ocrFindTranslateItem(fullBuf, winfo.screenCssW);
+    if (ocr) {
+      const vx = Math.round(ocr.sx / ocr.dpr - winfo.screenX);
+      const vy = Math.round(ocr.sy / ocr.dpr - winfo.screenY - TB);
+      log(`OCR 命中右键菜单「${ocr.text}」屏幕(${ocr.sx},${ocr.sy}) dpr=${ocr.dpr.toFixed(2)} → 视口(${vx},${vy}) [win=(${winfo.screenX},${winfo.screenY}) TB=${TB}]`);
+      await leftClickVp(vx, vy);
+      await sleep(1500);
+      ratio = await ratioNow();
+      if (ratio > 0.1) triggered = true;
+    } else {
+      log('OCR 未识别到「翻译」项（原生菜单未截到 / OCR 误判）——降级网格扫描');
+    }
+  } catch (e) { log(`OCR 右键菜单异常(降级网格): ${e.message.slice(0, 80)}`); }
+
+  // —— 兜底：原网格扫描（视口坐标直接 CDP 点击，菜单项约 +30px 起、间隔 ~26px）——
+  if (!triggered) {
+    for (const dy of [30, 56, 82, 108, 134, 160, 186, 212, 238]) {
+      await rightClick(target.x, target.y); // 重新唤起菜单（左键点击会关闭上一次）
+      await sleep(650);
+      const mx = target.x + 6, my = target.y + dy;
+      await leftClickVp(mx, my);
+      await sleep(1500);
+      ratio = await ratioNow();
+      if (ratio > 0.1) { triggered = true; break; }
+    }
   }
   try { await client.detach(); } catch (_) {}
   return { ok: triggered, ratio };

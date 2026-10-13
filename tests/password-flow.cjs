@@ -226,60 +226,90 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       await sleep(12000); // 密码管理器落库宽限
       const url = page.url();
       log(`提交后 URL: ${url}`);
-      // 【模拟人工鼠标点击保存】用户要求 2026-10-13：控制桌面鼠标点击浏览器的气泡来保存密码。
-      // 三路径：
-      //   ① HuaYoung 自实现 DOM 型保存提示 → 直接找按钮 click()
-      //   ② Chromium 原生气泡（浏览器级 UI，不在页面 DOM）→ CDP Input.dispatchMouseEvent
-      //      真鼠标坐标点击（气泡弹出在地址栏正下方、左对齐，「保存」按钮在气泡左下）
-      //   ③ 兜底键盘 Enter（气泡默认焦点是「保存」）
+      // 【OCR 识别保存密码按钮并真鼠标点击】用户要求 2026-10-13 切换为 OCR 方案。
+      // 思路：page 视口截图 → tesseract.js 词级识别（bbox=图片像素）→ 关键词命中按钮 → CDP 真鼠标点击。
+      // 坐标系统 = CDP 视口坐标；截图是客户端 web 内容（含 HuaYoung 自实现 DOM 气泡），OCR 直接可见。
+      // 图片像素→视口 CSS 像素：DPR>1 时 page.screenshot 会放大，按 innerWidth/innerHeight 映射回 CDP 坐标。
+      // 兜底顺序：OCR 未命中/异常 → DOM boundingBox 方案 → 键盘 Enter（原生气泡默认焦点=保存）。
       let bubbleAction = 'none';
-      // ① DOM 型提示按钮
+      const OCR_KW_PWD = /密码/;                          // 优先：含「密码」词（最专一，避开误命中「保存」其他文字）
+      const OCR_KW_SAVE = /(保存|记住|save|remember)/i;   // 次选：保存/记住
       try {
-        const domBtn = await page.evaluate(() => {
-          const cands = Array.from(document.querySelectorAll('button, div[role=button], a, span'))
-            .filter((e) => {
-              const t = (e.textContent || '').trim();
-              return /^(保存|保存密码|是|确定|Save.*password|Save)$/i.test(t) && e.offsetParent !== null;
-            });
-          if (cands.length) { cands[0].click(); return (cands[0].textContent || '').trim(); }
-          return null;
-        });
-        if (domBtn) { bubbleAction = `dom-click:${domBtn}`; log(`已点击 DOM 保存按钮: ${domBtn}`); }
-      } catch (_) { }
-      // ② Chromium 原生气泡：真鼠标点击（坐标 = 视口左上偏下——气泡「保存」按钮位置）
+        const fs = require('fs');
+        const tesseract = require('tesseract.js');
+        const shotBuf = Buffer.from(await page.screenshot({ encoding: 'base64', type: 'png' }), 'base64');
+        const shotPath = `/tmp/save-bubble-ocr-${Date.now()}.png`;
+        fs.writeFileSync(shotPath, shotBuf);
+        const readPngSize = (b) => ({ w: b.readUInt32BE(16), h: b.readUInt32BE(20) }); // PNG IHDR：宽/高在 offset16/20
+        const img = readPngSize(shotBuf);
+        const vp = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
+        const sx = vp.width / img.w, sy = vp.height / img.h; // 图片→视口映射（DPR 因子）
+        if (!global.__ocrWorker) global.__ocrWorker = await tesseract.createWorker('chi_sim+eng');
+        const { data } = await global.__ocrWorker.recognize(shotPath);
+        const words = (data.words || []).filter((w) => w.confidence >= 40 && w.bbox);
+        const wp = words.find((w) => OCR_KW_PWD.test(w.text));
+        const ws = words.find((w) => OCR_KW_SAVE.test(w.text));
+        const w = wp || ws;
+        if (w) {
+          const cx = Math.round(((w.bbox.x0 + w.bbox.x1) / 2) * sx);
+          const cy = Math.round(((w.bbox.y0 + w.bbox.y1) / 2) * sy);
+          log(`OCR 命中保存按钮词「${w.text}」(conf=${Math.round(w.confidence)}), 视口坐标(${cx},${cy}) [scale=${sx.toFixed(2)}]`);
+          const client = await page.target().createCDPSession();
+          await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy });
+          await sleep(150);
+          await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'left', clickCount: 1 });
+          await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, button: 'left', clickCount: 1 });
+          await client.detach();
+          bubbleAction = `ocr:${w.text}@(${cx},${cy})`;
+          await sleep(1000);
+        } else {
+          log(`OCR 未命中保存关键词（识别词数=${words.length}），转 DOM 兜底`);
+        }
+      } catch (e) { log(`OCR 识别异常(转 DOM 兜底): ${e.message.slice(0, 80)}`); }
+      // 兜底①：DOM boundingBox 精确定位 + CDP 真鼠标点击（与账号下拉一致）
       if (bubbleAction === 'none') {
         try {
-          const client = await page.target().createCDPSession();
-          const vp = page.viewport() || { width: 1280, height: 800 };
-          // 气泡锚定在地址栏（工具栏 ~40px）正下方左缘；「保存」按钮在气泡内容左下区域
-          const bx = Math.round(vp.width * 0.08);   // ~100px：气泡左缘内收
-          const by = Math.round(vp.height * 0.115); // ~90px：工具栏+气泡头部下移
-          await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: bx, y: by });
-          await sleep(150);
-          await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: bx, y: by, button: 'left', clickCount: 1 });
-          await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: bx, y: by, button: 'left', clickCount: 1 });
-          bubbleAction = `mouse-click@(${bx},${by})`;
-          log(`已真鼠标点击气泡「保存」（坐标 ${bx},${by}）`);
-          await sleep(800);
-          // 若一次未中（气泡尺寸差异），网格扫点气泡常见区域（3×2 网格）
-          for (const [gx, gy] of [[0.06, 0.10], [0.10, 0.13], [0.14, 0.10]]) {
-            const x2 = Math.round(vp.width * gx); const y2 = Math.round(vp.height * gy);
-            await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: x2, y: y2, button: 'left', clickCount: 1 });
-            await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x2, y: y2, button: 'left', clickCount: 1 });
-            await sleep(400);
+          const hit = await page.evaluate(() => {
+            const TXT = /(保存\s*密码|记住\s*密码|保存|记住|save\s*password|save)/i;
+            const cands = Array.from(document.querySelectorAll('button, [role=button], a, span, div'))
+              .filter((e) => {
+                if (e.offsetParent === null && getComputedStyle(e).position !== 'fixed') return false;
+                const t = (e.textContent || '').replace(/\s+/g, '').trim();
+                return t && TXT.test(t) && e.children.length <= 2; // 叶子级、文本短，像按钮
+              })
+              .sort((a, b) => {
+                const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+                return (ra.width * ra.height) - (rb.width * rb.height); // 取面积最小且可见者
+              });
+            if (!cands.length) return null;
+            const el = cands[0];
+            const r = el.getBoundingClientRect();
+            return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2), text: (el.textContent || '').replace(/\s+/g, '').trim().slice(0, 16) };
+          });
+          if (hit) {
+            log(`DOM 保存按钮定位: ${JSON.stringify(hit)}`);
+            const client = await page.target().createCDPSession();
+            await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: hit.x, y: hit.y });
+            await sleep(150);
+            await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: hit.x, y: hit.y, button: 'left', clickCount: 1 });
+            await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: hit.x, y: hit.y, button: 'left', clickCount: 1 });
+            await client.detach();
+            bubbleAction = `dom-mouse:${hit.text}@(${hit.x},${hit.y})`;
+            log(`已真鼠标点击 DOM 保存按钮「${hit.text}」中心(${hit.x},${hit.y})`);
+            await sleep(1000);
           }
-          await client.detach();
-        } catch (e) { log(`鼠标点击气泡异常(将兜底 Enter): ${e.message.slice(0, 60)}`); }
+        } catch (e) { log(`DOM 定位点击异常: ${e.message.slice(0, 60)}`); }
       }
-      // ③ 兜底：键盘 Enter
+      // 兜底②：键盘 Enter（针对 Chromium 原生保存气泡默认焦点=保存，功能等价于点「保存」）
       if (bubbleAction === 'none') {
         try {
           const client = await page.target().createCDPSession();
           await client.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
           await client.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
-          bubbleAction = 'keyboard-enter';
-          log('已发送键盘 Enter（针对 Chromium 原生保存气泡默认焦点）');
           await client.detach();
+          bubbleAction = 'keyboard-enter';
+          log('已发送键盘 Enter（Chromium 原生气泡默认焦点=保存）');
+          await sleep(1500);
         } catch (_) { }
       }
       await sleep(5000); // 等保存动作生效
