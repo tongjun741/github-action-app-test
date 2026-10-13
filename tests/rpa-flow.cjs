@@ -56,7 +56,7 @@ async function uploadShot(browser, tag) {
 async function main() {
   const out = { platform: PLATFORM, ts: new Date().toISOString(), results: [] };
   const push = (status, detail) => {
-    out.results.push({ id: 'rpa_flow', name: '执行RPA流程', type: 'client_rpa_flow', platform: PLATFORM, status, detail, ts: new Date().toISOString() });
+    out.results.push({ caseId: 'rpa_flow', id: 'rpa_flow', name: '执行RPA流程', type: 'client_rpa_flow', platform: PLATFORM, status, detail, criteria: '执行RPA流程“百度检索-教程示例”，参数关键词=ios，流程应完成百度检索并在结果中出现 Apple 相关内容', ts: new Date().toISOString() });
     console.log(`  [${status === 'pass' ? '✓' : '✗'}] 执行RPA流程 — ${detail.slice(0, 120)}`);
   };
 

@@ -54,7 +54,21 @@ function loadResults(args) {
     if (Array.isArray(j)) { for (const x of j) all.push(x); }
     else if (j.platform && j.results) { all.push(j); }
   }
-  return all;
+  // 2026-10-13：同名 platform 的多个文件（如 results-RPA_Flow.json 与 results-Windows_10.json 同为
+  // platform="Windows 10"）合并为一个平台条目——否则矩阵会生成重复列。
+  const byPlatform = [];
+  const idx = new Map();
+  for (const pf of all) {
+    if (idx.has(pf.platform)) {
+      const t = byPlatform[idx.get(pf.platform)];
+      t.results.push(...pf.results);
+      if (!t.meta || !t.meta.kernel) t.meta = pf.meta || t.meta;
+    } else {
+      idx.set(pf.platform, byPlatform.length);
+      byPlatform.push({ platform: pf.platform, results: [...pf.results], meta: pf.meta });
+    }
+  }
+  return byPlatform;
 }
 
 async function buildReport(platformFiles, outPath) {

@@ -35,7 +35,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function main() {
   const out = { platform: PLATFORM, ts: new Date().toISOString(), results: [] };
   const push = (status, detail) => {
-    out.results.push({ id: 'google_translate', name: '右键Google翻译', type: 'client_google_translate', platform: PLATFORM, status, detail, ts: new Date().toISOString() });
+    out.results.push({ caseId: 'google_translate', id: 'google_translate', name: '右键Google翻译', type: 'client_google_translate', platform: PLATFORM, status, detail, criteria: '分身开启谷歌翻译加速，使用Webshare的IP访问https://www.tiktok.com/support?lang=en，右键选择翻译后应该能正常翻译页面', ts: new Date().toISOString() });
     console.log(`  [${status === 'pass' ? '✓' : '✗'}] 右键Google翻译 — ${detail.slice(0, 120)}`);
   };
 

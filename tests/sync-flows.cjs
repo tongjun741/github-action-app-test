@@ -37,7 +37,7 @@ const log = (...a) => console.log('[sync-flows]', ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function push(out, id, name, type, status, detail) {
-  out.results.push({ id, name, type, platform: PLATFORM, status, detail, ts: new Date().toISOString() });
+  out.results.push({ caseId: id, id, name, type, platform: PLATFORM, status, detail, criteria: '（源表 R17-R20 同步类用例）', ts: new Date().toISOString() });
   const icon = { pass: '✓', fail: '✗', error: '✗', manual: '人工', skip: '跳过' }[status] || '-';
   console.log(`  [${icon}] ${name} — ${detail.slice(0, 110)}`);
 }
