@@ -190,7 +190,7 @@ async function run() {
         status: res.status, detail: res.detail, criteria: c.criteria,
         ...(res.screenshot ? { screenshot: res.screenshot } : {}),
       });
-      const tag = { pass: '✓', fail: '✗', manual: '人工', error: '错误', skipped: '跳过', na: '-' }[res.status] || res.status;
+      const tag = { pass: '✓', fail: '✗', manual: '人工', error: '错误', skipped: '跳过', na: '-', site_unavailable: '站点不可用', ignored: '忽略' }[res.status] || res.status;
       console.log(`  [${tag}] ${c.name} — ${res.detail}`);
     }
     if (context) await context.close().catch(() => {});

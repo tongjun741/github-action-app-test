@@ -19,15 +19,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const STATUS_LABEL = {
   // 2026-10-13 用户要求对齐原表用词：成功 / 不通过 / 人工确认 / 测试网站不可用 / 忽略
-  pass: '成功', fail: '不通过', manual: '人工确认', error: '异常', skipped: '跳过', na: '不适用', ignored: '忽略（按用户要求）',
+  pass: '成功', fail: '不通过', manual: '人工确认', error: '异常', skipped: '跳过', na: '不适用', ignored: '忽略（按用户要求）', site_unavailable: '网站不可用，忽略',
 };
 const STATUS_FILL = {
   pass: 'C6EFCE', fail: 'FFC7CE', manual: 'FFEB9C', error: 'F4B0B0',
-  skipped: 'D9D9D9', na: 'F2F2F2', ignored: 'E7E6E6',
+  skipped: 'D9D9D9', na: 'F2F2F2', ignored: 'E7E6E6', site_unavailable: 'E7E6E6',
 };
 const STATUS_FONT = {
   pass: '006100', fail: '9C0006', manual: '9C6500', error: '9C0006',
-  skipped: '595959', na: '808080', ignored: '808080',
+  skipped: '595959', na: '808080', ignored: '808080', site_unavailable: '808080',
 };
 
 function parseArgs(argv) {
@@ -177,7 +177,8 @@ async function buildReport(platformFiles, outPath) {
   for (const p of platforms) {
     const cnt = { pass: 0, fail: 0, manual: 0, skipped: 0, error: 0, na: 0, ignored: 0 };
     for (const cid of cases) {
-      const s = (grid[cid]?.[p]?.status) || 'na';
+      const raw = (grid[cid]?.[p]?.status) || 'na';
+      const s = raw === 'site_unavailable' ? 'ignored' : raw; // 站点不可用并入「忽略」列
       cnt[s] = (cnt[s] || 0) + 1;
     }
     const decided = cnt.pass + cnt.fail;

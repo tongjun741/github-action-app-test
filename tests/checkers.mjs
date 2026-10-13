@@ -283,13 +283,11 @@ async function fingerprint_whoer(page, c, opts) {
 }
 
 // 7) ipbinding —— WebRTC blocked
-// 判定口径变更（用户确认 2026-10-10）：CI 无代理、分身 SOCKS 不可达，导航必抛错；
-//   按用户要求【忽略】该用例（matrix.json 中 ipbinding 标 ignored:true，checkCase 直接返回 忽略，不再导航）。
-//   下方逻辑保留作离线/有代理环境的参考实现。
+// 原Excel（生产环境-12.9-148内核.xlsx）该测试站 ipbinding.online 自身标注「测试网站不可用」；
+// 用户确认（2026-10-13）：ipbind 标记为「网站不可用，忽略」——不导航、不计入红/绿。
+// status=site_unavailable（report.mjs 标签「网站不可用，忽略」，汇总计入「忽略」列）。
 async function fingerprint_ipbinding(page, c, opts) {
-  await gotoSafe(page, c.url, 'domcontentloaded', 30000, opts?.engine);
-  const text = await bodyText(page);
-  return { status: /webrtc blocked/i.test(text) ? 'pass' : 'fail', detail: text.slice(0, 140).replace(/\n/g, ' ') };
+  return { status: 'site_unavailable', detail: 'ipbinding.online 测试站不可用，原Excel标注为「测试网站不可用」' };
 }
 
 // 8) nopecha —— 验证码可加载性检测（脚本化，2026-10-10 用户要求去人工）
