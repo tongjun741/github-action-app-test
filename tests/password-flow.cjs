@@ -230,8 +230,8 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       // 思路：page 视口截图 → tesseract.js 词级识别（bbox=图片像素）→ 关键词命中按钮 → CDP 真鼠标点击。
       // 坐标系统 = CDP 视口坐标；截图是客户端 web 内容（含 HuaYoung 自实现 DOM 气泡），OCR 直接可见。
       // 图片像素→视口 CSS 像素：DPR>1 时 page.screenshot 会放大，按 innerWidth/innerHeight 映射回 CDP 坐标。
-      // 兜底顺序：OCR 未命中/异常 → DOM boundingBox 方案 → 键盘 Enter（原生气泡默认焦点=保存）。
-      let bubbleAction = 'none';
+      // 仅 OCR：OCR 命中即 CDP 真鼠标点击；未命中/异常记 ocr-none，不回退 DOM/Enter/网格（用户要求不降级）。
+      let bubbleAction = 'ocr-none';
       const OCR_KW_PWD = /密码/;                          // 优先：含「密码」词（最专一，避开误命中「保存」其他文字）
       const OCR_KW_SAVE = /(保存|记住|save|remember)/i;   // 次选：保存/记住
       try {
@@ -263,55 +263,10 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
           bubbleAction = `ocr:${w.text}@(${cx},${cy})`;
           await sleep(1000);
         } else {
-          log(`OCR 未命中保存关键词（识别词数=${words.length}），转 DOM 兜底`);
+          log(`OCR 未命中保存关键词（识别词数=${words.length}），按用户要求不降级（仅 OCR）`);
         }
-      } catch (e) { log(`OCR 识别异常(转 DOM 兜底): ${e.message.slice(0, 80)}`); }
-      // 兜底①：DOM boundingBox 精确定位 + CDP 真鼠标点击（与账号下拉一致）
-      if (bubbleAction === 'none') {
-        try {
-          const hit = await page.evaluate(() => {
-            const TXT = /(保存\s*密码|记住\s*密码|保存|记住|save\s*password|save)/i;
-            const cands = Array.from(document.querySelectorAll('button, [role=button], a, span, div'))
-              .filter((e) => {
-                if (e.offsetParent === null && getComputedStyle(e).position !== 'fixed') return false;
-                const t = (e.textContent || '').replace(/\s+/g, '').trim();
-                return t && TXT.test(t) && e.children.length <= 2; // 叶子级、文本短，像按钮
-              })
-              .sort((a, b) => {
-                const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
-                return (ra.width * ra.height) - (rb.width * rb.height); // 取面积最小且可见者
-              });
-            if (!cands.length) return null;
-            const el = cands[0];
-            const r = el.getBoundingClientRect();
-            return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2), text: (el.textContent || '').replace(/\s+/g, '').trim().slice(0, 16) };
-          });
-          if (hit) {
-            log(`DOM 保存按钮定位: ${JSON.stringify(hit)}`);
-            const client = await page.target().createCDPSession();
-            await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: hit.x, y: hit.y });
-            await sleep(150);
-            await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: hit.x, y: hit.y, button: 'left', clickCount: 1 });
-            await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: hit.x, y: hit.y, button: 'left', clickCount: 1 });
-            await client.detach();
-            bubbleAction = `dom-mouse:${hit.text}@(${hit.x},${hit.y})`;
-            log(`已真鼠标点击 DOM 保存按钮「${hit.text}」中心(${hit.x},${hit.y})`);
-            await sleep(1000);
-          }
-        } catch (e) { log(`DOM 定位点击异常: ${e.message.slice(0, 60)}`); }
-      }
-      // 兜底②：键盘 Enter（针对 Chromium 原生保存气泡默认焦点=保存，功能等价于点「保存」）
-      if (bubbleAction === 'none') {
-        try {
-          const client = await page.target().createCDPSession();
-          await client.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
-          await client.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
-          await client.detach();
-          bubbleAction = 'keyboard-enter';
-          log('已发送键盘 Enter（Chromium 原生气泡默认焦点=保存）');
-          await sleep(1500);
-        } catch (_) { }
-      }
+      } catch (e) { log(`OCR 识别异常(不降级): ${e.message.slice(0, 80)}`); }
+      // （已移除 DOM boundingBox / 键盘 Enter 降级兜底：本用例仅用 OCR 识别，命中即点，未命中记 ocr-none）
       await sleep(5000); // 等保存动作生效
       // 气泡现场取证（截图）
       await shotToCloudinary(page, `save-bubble-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`).catch(() => { });

@@ -13,7 +13,7 @@
  *
  * 注：右键菜单是浏览器原生 UI（page.screenshot 截不到），故用 OCR 方案：screenshot-desktop 截全屏
  *     （含原生菜单）→ tesseract.js 识别「翻译」项 → 屏幕坐标经窗口位置+DPR 映射回视口坐标 → CDP 真鼠标点击。
- *     页面级翻译触发（API 探测/bubble/widget）仍保留为兜底证据。
+ *     页面级翻译触发仅以 OCR 命中右键菜单「翻译」项为准，不再以 API 探测/bubble/widget 兜底。
  * 输出：results-GTranslate.json
  */
 const fs = require('node:fs');
@@ -38,7 +38,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // G2 (2026-10-13)：用户先要求「真鼠标点」→ 现升级为 **OCR 方案**：
 //   screenshot-desktop 截全屏（含原生右键菜单）→ tesseract.js 识别「翻译」项屏幕坐标
 //   → 经窗口屏幕位置(window.screenX/Y)+DPR 映射回视口坐标 → CDP 真鼠标点击。
-//   原生菜单 page.screenshot 截不到，故必须 OS 级截图。OCR 未命中/异常 → 降级原网格扫描 → 再降级 API 探测。
+//   原生菜单 page.screenshot 截不到，故必须 OS 级截图。OCR 未命中/异常即判定失败，不降级网格扫描/API 探测。
 let _gocrWorker = null;
 async function ocrFindTranslateItem(fullPngBuf, screenCssW) {
   // 全屏 PNG buffer → OCR 词级识别 → 返回「翻译」项屏幕设备像素中心 + dpr
@@ -113,22 +113,11 @@ async function tryRightClickTranslate(page) {
       ratio = await ratioNow();
       if (ratio > 0.1) triggered = true;
     } else {
-      log('OCR 未识别到「翻译」项（原生菜单未截到 / OCR 误判）——降级网格扫描');
+      log('OCR 未识别到「翻译」项（原生菜单未截到 / OCR 误判）——按用户要求不降级');
     }
-  } catch (e) { log(`OCR 右键菜单异常(降级网格): ${e.message.slice(0, 80)}`); }
+  } catch (e) { log(`OCR 右键菜单异常(不降级): ${e.message.slice(0, 80)}`); }
 
-  // —— 兜底：原网格扫描（视口坐标直接 CDP 点击，菜单项约 +30px 起、间隔 ~26px）——
-  if (!triggered) {
-    for (const dy of [30, 56, 82, 108, 134, 160, 186, 212, 238]) {
-      await rightClick(target.x, target.y); // 重新唤起菜单（左键点击会关闭上一次）
-      await sleep(650);
-      const mx = target.x + 6, my = target.y + dy;
-      await leftClickVp(mx, my);
-      await sleep(1500);
-      ratio = await ratioNow();
-      if (ratio > 0.1) { triggered = true; break; }
-    }
-  }
+  // （已移除原网格扫描降级：本用例仅用 OCR，命中即点；未命中记 ok=false 不降级）
   try { await client.detach(); } catch (_) {}
   return { ok: triggered, ratio };
 }
@@ -139,6 +128,17 @@ async function main() {
     out.results.push({ caseId: 'google_translate', id: 'google_translate', name: '右键Google翻译', type: 'client_google_translate', platform: PLATFORM, status, detail, criteria: '分身开启谷歌翻译加速，使用Webshare的IP访问https://www.tiktok.com/support?lang=en，右键选择翻译后应该能正常翻译页面', ts: new Date().toISOString() });
     console.log(`  [${status === 'pass' ? '✓' : '✗'}] 右键Google翻译 — ${detail.slice(0, 120)}`);
   };
+  // 尊重大矩阵 ignored：用户要求忽略「右键Google翻译」时，直接记 ignored 不执行、不计入红/绿
+  try {
+    const m = JSON.parse(require('fs').readFileSync(path.join(__dirname, 'matrix.json'), 'utf8'));
+    const c = (m.cases || []).find((x) => x.id === 'google_translate');
+    if (c && c.ignored) {
+      push('ignored', '按用户要求忽略该用例（不执行、不计入红/绿）');
+      fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
+      log('右键Google翻译 按矩阵 ignored 跳过');
+      process.exit(0);
+    }
+  } catch (_) {}
 
   // 1) 先杀残留客户端（Windows），避免 RPA 步遗留进程占 9221
   if (process.platform === 'win32') {
@@ -213,17 +213,23 @@ async function main() {
       const baseText = await page.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 6000)).catch(() => '');
       log(`基线页面 CJK 占比 ${(cjkRatio(baseText) * 100).toFixed(1)}%（英文页应接近 0）`);
 
-      // G2 (2026-10-13)：用户要求「改成真鼠标点」——先尝试右键上下文菜单「翻译」项（真鼠标）。
+      // G2 (2026-10-13)：用户要求「右键翻译只使用 OCR，不要降级」。
+      // 仅真鼠标右键 → OCR 识别「翻译」项 → CDP 点击；命中即 pass，未命中即 fail（不回退 API/bubble/widget）。
       let rc = null;
       try { rc = await tryRightClickTranslate(page); } catch (e) { rc = { ok: false, err: e.message.slice(0, 60) }; }
       if (rc && rc.ok) {
-        push('pass', `右键菜单触发翻译生效（CJK 占比 ${(rc.ratio * 100).toFixed(1)}%，真鼠标右键→翻译项）`);
+        push('pass', `右键菜单 OCR 命中「翻译」项并触发翻译生效（CJK 占比 ${(rc.ratio * 100).toFixed(1)}%，真鼠标右键→翻译项）`);
         fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
         log(`已写出 ${OUT}`);
         try { await pptr.disconnect(); } catch (_) {}
         process.exit(0);
       }
-      log(`右键翻译未触发（${rc && rc.err || '菜单未命中翻译项'}）——回退 API 探测/bubble 路径`);
+      // 仅 OCR：未命中即 fail，不回退 API 探测 / bubble / widget（那些是翻译加速代理证据，不等于右键翻译本身）
+      push('fail', `OCR 未命中/未触发右键翻译菜单「翻译」项（${rc && rc.err || '菜单未命中'}），按用户要求仅用 OCR 不降级`);
+      fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
+      log(`已写出 ${OUT}`);
+      try { await pptr.disconnect(); } catch (_) {}
+      process.exit(1);
 
       // 触发翻译（Run#51 复盘：widget 曾在元素不存在时也置 triggered='widget'，把 API 探测短路——假触发）。
       // 正确顺序：API 探测无条件先跑（「翻译加速可达」最硬证据，不依赖页面组件）；

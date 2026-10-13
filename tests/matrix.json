@@ -41,6 +41,7 @@
     },
     {
       "id": "pixelscan",
+      "ignored": true,
       "name": "http://pixelscan.net/",
       "type": "fingerprint_pixelscan",
       "url": "http://pixelscan.net/",
@@ -50,6 +51,7 @@
     },
     {
       "id": "iphey",
+      "ignored": true,
       "name": "https://iphey.com/",
       "type": "fingerprint_iphey",
       "url": "https://iphey.com/",
@@ -59,6 +61,7 @@
     },
     {
       "id": "browserleaks_ip",
+      "ignored": true,
       "name": "https://browserleaks.com/ip",
       "type": "fingerprint_webrtc",
       "url": "https://browserleaks.com/ip",
@@ -68,6 +71,7 @@
     },
     {
       "id": "whoer",
+      "ignored": true,
       "name": "https://whoer.net/",
       "type": "fingerprint_whoer",
       "url": "https://whoer.net/",
@@ -86,6 +90,7 @@
     },
     {
       "id": "nopecha",
+      "ignored": true,
       "name": "https://nopecha.com/demo",
       "type": "manual_captcha",
       "url": "https://nopecha.com/demo",
@@ -122,6 +127,7 @@
     },
     {
       "id": "password_save",
+      "ignored": true,
       "name": "普通会话能否保存密码",
       "type": "client_password_save",
       "url": "https://www.wdku.net/",
@@ -131,6 +137,7 @@
     },
     {
       "id": "password_autofill",
+      "ignored": true,
       "name": "普通会话能否代填密码",
       "type": "client_password_autofill",
       "url": "https://www.wdku.net/",
@@ -200,6 +207,7 @@
     },
     {
       "id": "google_translate",
+      "ignored": true,
       "name": "右键Google翻译",
       "type": "client_google_translate",
       "url": "https://www.tiktok.com/support?lang=en",
