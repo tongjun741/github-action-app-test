@@ -48,13 +48,27 @@ async function assertCloneIpBound(page) {
     const txt = await usePage.evaluate(() => (document.body ? document.body.innerText : '') || '').catch(() => '');
     const m = String(txt).match(/"ip"\s*:\s*"([\d.:a-fA-F]+)"/);
     const ip = m ? m[1] : null;
-    if (!ip) return { ok: false, err: `ipapi.co 未返回IP（响应: ${String(txt).slice(0, 80)}）` };
-    return { ok: true, ip };
+    const cm = String(txt).match(/"country_code"\s*:\s*"([A-Z]{2})"/);
+    const country = cm ? cm[1] : null;
+    if (!ip) return { ok: false, err: `ipapi.co 未返回IP（响应: ${String(txt).slice(0, 80)}）`, country: null };
+    return { ok: true, ip, country };
   } catch (e) {
     return { ok: false, err: e.message.slice(0, 80) };
   } finally {
     if (tab) { try { await tab.close(); } catch (_) {} }
   }
+}
+
+// 取指定 IP 的归属国家（GeoIP），用于 WebRTC 国家一致性比对（ipapi.co 限速/异常时返回 null）
+async function getIpCountry(page, ip) {
+  try {
+    return await page.evaluate(async (targetIp) => {
+      const r = await fetch(`https://ipapi.co/${targetIp}/json/`, { cache: 'no-store' });
+      const j = await r.json().catch(() => ({}));
+      if (j && j.error) return null;
+      return j && j.country_code ? j.country_code : null;
+    }, ip);
+  } catch (_) { return null; }
 }
 
 
@@ -208,7 +222,10 @@ async function fingerprint_iphey(page, c, opts) {
   return { status: 'manual', detail: `轮询超时未见「Looks Reliable/Unreliable」判定词，需人工确认; ${text.slice(0, 160).replace(/\n/g, ' ')}${shotSuffix}` };
 }
 
-// 5) browserleaks/ip —— 自采集 WebRTC IP，与代理 IP 比对
+// 5) browserleaks/ip —— 自采集 WebRTC IP，与分身出口（绑定）IP 比对「国家一致性」
+//    用户要求（2026-10-13）：WebRTC 暴露的 IP 国家必须与分身出口（绑定）IP 国家一致。
+//    不要求 IP 值完全相同（住宅/绑定代理下出口可能有多个实例 IP，国家相同即可）；
+//    仅当某 WebRTC 公网 IP 的国家 ≠ 出口国家时才判泄漏(fail)。
 async function fingerprint_webrtc(page, c, opts) {
   await gotoSafe(page, c.url, 'domcontentloaded', 30000, opts?.engine);
   const rtcIps = await page.evaluate(async () => {
@@ -229,17 +246,26 @@ async function fingerprint_webrtc(page, c, opts) {
       setTimeout(() => resolve([...ips]), 3500);
     });
   });
-  let publicIp = opts.proxyIp || null;
-  if (!publicIp) {
-    try {
-      publicIp = await page.evaluate(async () => {
-        const r = await fetch('https://api.ipify.org?format=json');
-        return (await r.json()).ip;
-      });
-    } catch (_) {}
+  // 取分身出口 IP + 国家（基准），复用 G1 绑定预检（分身必须绑定 IP 后才验证）
+  const base = await assertCloneIpBound(page).catch((e) => ({ ok: false, err: e.message }));
+  if (!base.ok || !base.country) {
+    return { status: 'fail', detail: `无法取得分身出口国家（ipapi.co 不可达：${base.err || '无country'}）——绑定不生效，无法验证 WebRTC 国家一致性` };
   }
-  const leak = rtcIps.some((ip) => isPublicIp(ip) && ip !== publicIp);
-  return { status: leak ? 'fail' : 'pass', detail: `rtcIps=${[...rtcIps].join(',')} publicIp=${publicIp || 'n/a'}` };
+  console.log(`[webrtc] 分身出口(${base.ip}, ${base.country}) rtcIps=${[...rtcIps].join(',')}`);
+  // 比对每个 WebRTC 公网 IP 的国家
+  const mism = [];
+  for (const ip of rtcIps) {
+    if (!isPublicIp(ip)) continue;
+    if (ip === base.ip) continue;            // 与出口 IP 相同 → 同国家，免查
+    const cc = await getIpCountry(page, ip);
+    if (cc == null) mism.push(`${ip}:国家未知`);
+    else if (cc !== base.country) mism.push(`${ip}:${cc}`);
+  }
+  const ok = mism.length === 0;
+  return {
+    status: ok ? 'pass' : 'fail',
+    detail: `WebRTC 国家一致性=${ok ? '通过' : '不通过'}(基准国=${base.country}) 国家不一致=[${mism.join('; ')}]`,
+  };
 }
 
 // 6) whoer —— 解析匿名得分 >= 90

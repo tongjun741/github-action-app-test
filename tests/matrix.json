@@ -62,8 +62,8 @@
       "name": "https://browserleaks.com/ip",
       "type": "fingerprint_webrtc",
       "url": "https://browserleaks.com/ip",
-      "expected": "webrtc_matches_proxy",
-      "criteria": "使用 Webshare 的 IP 访问时，页面上显示的所有 IP 都应该与代理 IP 一致，尤其要注意 WebRTC 这一项",
+      "expected": "webrtc_country_consistent",
+      "criteria": "WebRTC 暴露的 IP 国家必须与分身出口（绑定）IP 国家一致（不要求 IP 值完全相同，国家相同即可）",
       "appliesTo": ["Windows 10", "macOS arm64", "macOS x64", "Ubuntu 22"]
     },
     {
