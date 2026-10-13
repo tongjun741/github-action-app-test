@@ -85,44 +85,11 @@ async function main() {
     await login(config, password, browser);
     log('登录完成');
 
-    // 0) 提交 RPA 前先开分身并等隧道就绪（全量轮#2/#3 实证：引擎直接建任务导航百度时
-    //    tunnelRouter 隧道未就绪 → chrome-error 页；提前 openClone 拿到 9221 并验证外网可达，
-    //    引擎复用已开分身（main.js getChromium 同 shopId 直接复用），消除竞态）。
-    //    Run#4 教训：openClone 后主壳可能停留在分身视图/被浮层遮挡——预热完必须回「首页」
-    //    再进自动化（Ubuntu 实证 click intercepted 在 icon-shouye_24 上）。
-    try {
-      const { openClone } = require('./e2e-verify.cjs');
-      await openClone(browser);
-      log('已提前打开分身（openClone）——等隧道就绪');
-      const puppeteer0 = require('puppeteer-core');
-      const CDP0 = process.env.CLIENT_CDP_ENDPOINT || `http://127.0.0.1:${process.env.REMOTE_DEBUG_PORT || 9221}`;
-      let tunnelOk = false;
-      for (let i = 0; i < 10; i++) {
-        let b0 = null;
-        try {
-          b0 = await puppeteer0.connect({ browserURL: CDP0, protocolTimeout: 20000 });
-          const p0 = await b0.newPage();
-          const resp = await p0.goto('https://example.com/', { waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => null);
-          await p0.close().catch(() => {});
-          if (resp && resp.status() < 400) { tunnelOk = true; await b0.disconnect(); log(`分身隧道已就绪（第 ${i + 1} 次探测）`); break; }
-        } catch (_) {} finally { if (b0) try { await b0.disconnect(); } catch (_) {} }
-        await sleep(6000);
-      }
-      if (!tunnelOk) log('隧道 60s 未就绪（继续提交 RPA——引擎可能自愈）');
-      // 回主壳首页（洗掉分身视图/浮层），给「自动化」菜单一个干净的点击面
-      for (const sel of ['.icon-shouye_24', '//span[text()="首页"]/ancestor::a', '//span[text()="首页"]']) {
-        try {
-          const hb = browser.$(sel);
-          await hb.waitForExist({ timeout: 8000 }).then(() => hb.click({ force: true })).catch(() => {});
-          log(`预热后已回首页（${sel.slice(0, 24)}）`);
-          break;
-        } catch (_) {}
-      }
-      await sleep(1500);
-    } catch (e) { log(`openClone 预热失败(忽略，继续): ${e.message.slice(0, 80)}`); }
+    // 0) （已回退）openClone 预热——全量轮#7 实证：引擎复用脚本打开的分身时只开百度首页、
+    //    不执行检索步骤（0/4）；而 #1/夜间轮无预热时引擎自己开分身 4/4 pass。
+    //    隧道竞态（#3 的 chrome-error）改由 CDP 轮询中的 reload 自愈处理。
 
-    // 1) 左侧「自动化」菜单（全量轮#6 实证：openClone 后主壳可能残留 ant-modal-centered 弹窗
-    //    ——「继续访问」类确认框在 openClone 返回后才弹出，点菜单前必须清场）
+    // 1) 左侧「自动化」菜单（全量轮#6 实证：主壳可能残留 ant-modal-centered 弹窗——清场后再点）
     const clearModals = async (where) => {
       for (let mc = 0; mc < 4; mc++) {
         const xBtns = await browser.$$('//button[contains(@class,"ant-modal-close")]').catch(() => []);
@@ -511,7 +478,17 @@ async function main() {
             const url = p.url();
             // Run#60 实证：RPA 结果页不一定以 baidu 域名呈现（分身新 tab/内嵌页）；放宽为：
             // baidu/bing/google 域名页直接查正文；其它非 chrome-error 页也查正文（兜底捕获任何含 Apple 的检索结果）
-            if (/chrome-error:|devtools:|szdamai\.local\/?$|about:blank/i.test(url)) continue;
+            if (/chrome-error:|devtools:|szdamai\.local\/?$|about:blank/i.test(url)) {
+              // 全量轮#3/#7 隧道竞态自愈：错误页（title 是目标站但页面是 chrome-error）自动 reload
+              // ——隧道通常几秒~几十秒内就绪，reload 后引擎/页面可恢复加载（不碰引擎执行）
+              if (/chrome-error:/i.test(url)) {
+                const ti = await p.title().catch(() => '');
+                if (/baidu|bing|google/i.test(ti) || /baidu|bing|google/i.test(url)) {
+                  try { await p.reload({ waitUntil: 'domcontentloaded', timeout: 20000 }); log(`[heal] 已 reload 隧道错误页（${ti.slice(0, 20)}）`); } catch (_) {}
+                }
+              }
+              continue;
+            }
             const text = await p.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 8000)).catch(() => '');
             if (text.includes(MATCH)) { matched = url; break; }
           } catch (_) {}
