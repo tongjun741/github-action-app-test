@@ -88,6 +88,8 @@ async function main() {
     // 0) 提交 RPA 前先开分身并等隧道就绪（全量轮#2/#3 实证：引擎直接建任务导航百度时
     //    tunnelRouter 隧道未就绪 → chrome-error 页；提前 openClone 拿到 9221 并验证外网可达，
     //    引擎复用已开分身（main.js getChromium 同 shopId 直接复用），消除竞态）。
+    //    Run#4 教训：openClone 后主壳可能停留在分身视图/被浮层遮挡——预热完必须回「首页」
+    //    再进自动化（Ubuntu 实证 click intercepted 在 icon-shouye_24 上）。
     try {
       const { openClone } = require('./e2e-verify.cjs');
       await openClone(browser);
@@ -107,6 +109,16 @@ async function main() {
         await sleep(6000);
       }
       if (!tunnelOk) log('隧道 60s 未就绪（继续提交 RPA——引擎可能自愈）');
+      // 回主壳首页（洗掉分身视图/浮层），给「自动化」菜单一个干净的点击面
+      for (const sel of ['.icon-shouye_24', '//span[text()="首页"]/ancestor::a', '//span[text()="首页"]']) {
+        try {
+          const hb = browser.$(sel);
+          await hb.waitForExist({ timeout: 8000 }).then(() => hb.click({ force: true })).catch(() => {});
+          log(`预热后已回首页（${sel.slice(0, 24)}）`);
+          break;
+        } catch (_) {}
+      }
+      await sleep(1500);
     } catch (e) { log(`openClone 预热失败(忽略，继续): ${e.message.slice(0, 80)}`); }
 
     // 1) 左侧「自动化」菜单

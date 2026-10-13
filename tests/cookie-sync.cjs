@@ -122,7 +122,7 @@ async function main() {
       });
       log(`重开分身退出码 ${reopen.status}`);
       if (reopen.status === 0) {
-        const b2 = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 60000 }).catch(() => null);
+        const b2 = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 60000 }).catch((e) => { log(`重开后 CDP 连接失败: ${e.message.slice(0, 80)}`); return null; });
         if (b2) {
           const p2 = await b2.newPage();
           for (let i = 0; i < 6 && !netOk; i++) {
@@ -130,8 +130,13 @@ async function main() {
               await p2.goto('https://example.com/', { waitUntil: 'domcontentloaded', timeout: 15000 });
               netOk = true;
               log(`重开后隧道就绪（第 ${i + 1} 次）`);
-            } catch (e) { netErr = e.message.slice(0, 100); await sleep(10000); }
+            } catch (e) {
+              netErr = e.message.slice(0, 100);
+              log(`重开后探测失败(第 ${i + 1} 次): ${netErr}`);
+              await sleep(10000);
+            }
           }
+          if (!netOk) log('重开分身未能恢复隧道——PAC 指向的本地隧道端口持续不可达（客户端侧隧道问题，非脚本）');
           // 替换 browser 引用供后续导航用
           await p2.close().catch(() => {});
           browserRef = b2;
@@ -142,12 +147,14 @@ async function main() {
       // 代理持续不可达 = 基础设施问题，判 error（区别于「到了页面但无登录态」的业务 fail）
       throw new Error(`分身代理网络持续不可达（含重开分身后仍失败，末次错误: ${netErr}）`);
     }
-    // wdku.net 导航（有界重试）
+    // wdku.net 导航（有界重试）——用 browserRef（重开后是新实例）新建 page，不用可能已断开的旧 page
     let lastErr = '';
     let navOk = false;
+    let page2 = null;
     for (let i = 0; i < 4; i++) {
       try {
-        await page.goto('https://www.wdku.net/', { waitUntil: 'domcontentloaded', timeout: 45000 });
+        if (!page2) page2 = await browserRef.newPage();
+        await page2.goto('https://www.wdku.net/', { waitUntil: 'domcontentloaded', timeout: 45000 });
         navOk = true;
         break;
       } catch (e) {
@@ -158,7 +165,7 @@ async function main() {
     }
     if (!navOk) throw new Error(`wdku.net 导航重试 4 次仍失败: ${lastErr.slice(0, 160)}`);
     await sleep(5000);
-    const probe = await page.evaluate(() => {
+    const probe = await page2.evaluate(() => {
       // 页面可能未真正到达 wdku.net（about:blank / 错误页 / opaque origin）——全部信息带上
       const text = document.body ? document.body.innerText : '';
       const firstLine = text.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 5).join(' / ');
@@ -184,7 +191,7 @@ async function main() {
     });
     log(`探测结果: ${JSON.stringify(probe)}`);
     shotPath = path.join(process.cwd(), `cookie-sync-${Date.now()}.png`);
-    await page.screenshot({ path: shotPath }).catch(() => { });
+    await page2.screenshot({ path: shotPath }).catch(() => { });
     // 判定：URL 确实在 wdku.net 域 +（storage token 或页面元素）且没有「登录/注册」主导航 → pass
     const onWdku = /wdku\.net/i.test(probe.url);
     if (onWdku && (probe.storageToken || (probe.loggedHints && !probe.loggedOut))) {
