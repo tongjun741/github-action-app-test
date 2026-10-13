@@ -64,15 +64,23 @@ async function main() {
     const diagPage = await browser.newPage();
     await diagPage.goto('chrome://version', { waitUntil: 'domcontentloaded', timeout: 15000 });
     const cmdLine = await diagPage.evaluate(() => {
-      const rows = [...document.querySelectorAll('#command_line, .version-table tr')];
-      const cmd = rows.map((r) => r.innerText).find((t) => /--/.test(t)) || document.body.innerText;
-      return cmd.slice(0, 800);
+      // chrome://version 的 command_line 是完整命令行节点；兜底全文
+      const el = document.querySelector('#command_line') || document.getElementById('command_line');
+      if (el && el.innerText && el.innerText.length > 20) return el.innerText;
+      const rows = [...document.querySelectorAll('table tr, .version-table tr')];
+      const cmd = rows.map((r) => r.innerText).find((t) => /--/.test(t));
+      return cmd || document.body.innerText;
     }).catch(() => '');
     await diagPage.close().catch(() => {});
-    const m = String(cmdLine).match(/--proxy-server[=\s]+([^\s]+)/);
-    proxyDiag = m ? `分身代理参数: ${m[1]}` : '未见 --proxy-server 参数（直连模式）';
-    log(`[diag] ${proxyDiag}`);
-    if (!m) log(`[diag] 命令行(前400): ${String(cmdLine).slice(0, 400)}`);
+    const full = String(cmdLine || '');
+    const m = full.match(/--proxy-server[=\s]+([^\s]+)/);
+    proxyDiag = m ? `分身代理参数: ${m[1]}` : '未见 --proxy-server 参数';
+    log(`[diag] ${proxyDiag}（命令行总长 ${full.length}）`);
+    // 打印含 proxy/tunnel/socks 的全部片段（不受 800 截断影响）
+    const fragRe = /.{0,40}(proxy|tunnel|socks)[^\s]*[^\0]{0,40}/gi;
+    const frags = full.match(fragRe) || [];
+    if (frags.length) log(`[diag] 命令行相关片段: ${JSON.stringify(frags.slice(0, 6))}`);
+    else log(`[diag] 命令行尾段(后300): ${full.slice(-300)}`);
   } catch (e) { log(`[diag] chrome://version 读取失败: ${e.message.slice(0, 80)}`); }
   let shotPath = '';
   try {

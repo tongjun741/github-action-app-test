@@ -320,7 +320,7 @@ jobs:
           RPA_FLOW_NAME: '百度检索-教程示例'
           RPA_KEYWORD: 'ios'
           RPA_MATCH: 'Apple'
-          OUT: results-RPA_Flow.json
+          OUT: results-RPA_Flow-${{ matrix.slug }}.json
         run: node tests/rpa-flow.cjs
 
       # R22 右键Google翻译（翻译加速探活+CJK 判定）
@@ -335,7 +335,7 @@ jobs:
           WDIO_USERNAME: ${{ secrets.WDIO_USERNAME }}
           PRODUCT_WDIO_PASSWORD: ${{ secrets.PRODUCT_WDIO_PASSWORD }}
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
-          OUT: results-GTranslate.json
+          OUT: results-GTranslate-${{ matrix.slug }}.json
         run: node tests/google-translate.cjs
 
       # 调试挂起（保持隧道在线，Agent 从外网连 CDP 隧道自动探测）；
@@ -362,8 +362,8 @@ jobs:
           name: results-${{ matrix.slug }}
           path: |
             results-${{ matrix.slug }}.json
-            results-RPA_Flow.json
-            results-GTranslate.json
+            results-RPA_Flow-*.json
+            results-GTranslate-*.json
             screenshot-${{ matrix.slug }}.png
             iphey-*.png
           if-no-files-found: warn
