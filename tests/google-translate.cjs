@@ -98,7 +98,7 @@ async function main() {
     }
     if (!pptr) throw new Error('分身 CDP 180s 内不可用（翻译用例前置失败）');
 
-    const page = await pptr.newPage();
+    let page = await pptr.newPage();
     page.setDefaultTimeout(60000);
     try {
       // 英文页基线
@@ -116,16 +116,54 @@ async function main() {
       // 正确顺序：API 探测无条件先跑（「翻译加速可达」最硬证据，不依赖页面组件）；
       // bubble/widget 仅在目标元素真实存在且操作成功时才计入。
       let apiProbe = null;
-      try {
-        apiProbe = await page.evaluate(async () => {
+      // 全量轮#5 实证：R19 步后分身隧道可能已死（CDP 活着但导航/ fetch 全挂）——
+      // API 探测失败且属代理类错误时，重开分身重建隧道后再试一轮。
+      const doApiProbe = async () => page.evaluate(async () => {
+        try {
+          const r = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=hello', { method: 'GET' });
+          const j = await r.json();
+          return { ok: r.ok, translated: j && j[0] && j[0][0] ? String(j[0][0][0]) : '' };
+        } catch (e) { return { ok: false, err: e.message.slice(0, 80) }; }
+      }).catch(() => ({ ok: false, err: 'eval fail' }));
+      apiProbe = await doApiProbe();
+      log(`translate API 探测: ${JSON.stringify(apiProbe)}`);
+      if (!apiProbe.ok && /fetch|proxy|network|timeout/i.test(String(apiProbe.err || '')) && alreadyOpen) {
+        log('API 探测代理类失败——隧道疑死，重开分身重建（一次）');
+        try { await pptr.disconnect(); } catch (_) {}
+        try { require('node:child_process').execSync('taskkill /F /IM HuaYoungApp.exe /T 2>nul || true'); } catch (_) {}
+        if (process.platform !== 'win32') { try { require('node:child_process').execSync('pkill -f 花漾客户端 || pkill -f HuaYoungApp || true'); } catch (_) {} }
+        await sleep(3000);
+        browser = await remote({ capabilities: buildCaps(binary, resolveChromedriver()), logLevel: 'warn' });
+        log('客户端已重启');
+        const config2 = {
+          ...productConfig,
+          teamName: process.env.TEAM_NAME || productConfig.teamName,
+          username: process.env.WDIO_USERNAME || productConfig.username,
+        };
+        await login(config2, process.env.PRODUCT_WDIO_PASSWORD || 'password', browser);
+        log('重新登录完成');
+        await openClone(browser);
+        log('分身已重开');
+        for (let i = 0; i < 60; i++) {
           try {
-            const r = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=hello', { method: 'GET' });
-            const j = await r.json();
-            return { ok: r.ok, translated: j && j[0] && j[0][0] ? String(j[0][0][0]) : '' };
-          } catch (e) { return { ok: false, err: e.message.slice(0, 80) }; }
-        }).catch(() => ({ ok: false, err: 'eval fail' }));
-        log(`translate API 探测: ${JSON.stringify(apiProbe)}`);
-      } catch (_) { apiProbe = { ok: false, err: 'outer fail' }; }
+            pptr = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 30000 });
+            const p = await pptr.newPage();
+            await p.goto('about:blank', { timeout: 10000 }).catch(() => {});
+            await p.close();
+            log('CDP 重连就绪');
+            break;
+          } catch (_) {
+            if (pptr) { try { await pptr.disconnect(); } catch (_) {} pptr = null; }
+            await sleep(3000);
+          }
+        }
+        page = await pptr.newPage();
+        page.setDefaultTimeout(60000);
+        await page.goto(URL_TARGET, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch((e) => log(`重开导航: ${e.message.slice(0, 60)}`));
+        await sleep(5000);
+        apiProbe = await doApiProbe();
+        log(`重开后 API 探测: ${JSON.stringify(apiProbe)}`);
+      }
       if (apiProbe && apiProbe.ok && /你好|您好/.test(apiProbe.translated || '')) {
         push('pass', `翻译加速可用：translate.googleapis.com 经客户端代理可达且返回中文（${apiProbe.translated}）`);
         fs.writeFileSync(OUT, JSON.stringify(out, null, 2));

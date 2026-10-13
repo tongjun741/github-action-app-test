@@ -370,6 +370,15 @@ async function openClone(browser) {
   log('进入分身详情页，等待「打开浏览器」');
   const openBtn = '//span[contains(@class,"open-btn-tex")][text()="打开浏览器"]';
   await browser.$(openBtn).waitForExist({ timeout: DETAIL_LOAD_TIMEOUT });
+  // 全量轮#5 实证：分身详情页可能弹出公告/提示 modal（ant-modal-centered）挡住「打开浏览器」——
+  // 点开前先清场：逐个点最内层 modal 的 X（放弃用「取 消」文字键——会误中向导）。
+  for (let mc = 0; mc < 4; mc++) {
+    const xBtns = await browser.$$('//div[contains(@class,"ant-modal-wrap")][contains(@style,"")]//button[contains(@class,"ant-modal-close")] | //button[contains(@class,"ant-modal-close")]').catch(() => []);
+    const vis = [];
+    for (const x of xBtns) { if (await x.isDisplayed().catch(() => false)) vis.push(x); }
+    if (!vis.length) break;
+    try { await vis[vis.length - 1].click(); log(`已关闭遮挡弹窗（第 ${mc + 1} 个 X）`); await sleep(800); } catch (_) { break; }
+  }
   await browser.$(openBtn).click();
 
   log('处理「继续访问」并等待「正在访问」');
