@@ -74,7 +74,21 @@ async function fullShot(baseName, opts = {}) {
     const dir = shotDirFor();
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, `${baseName}-${Date.now()}.png`);
-    const buf = await screenshotDesktop({ format: 'png' });
+    // macOS：screenshot-desktop 依赖 TCC 屏幕录制权限（runner 无 → No displays detected）。
+    // 改用系统 screencapture -x（静默全屏）；仍失败（如完全无 GUI 会话）由外层兜底。
+    let buf = null;
+    if (process.platform === 'darwin') {
+      try {
+        const { execSync } = require('node:child_process');
+        const tmpCap = path.join(require('node:os').tmpdir(), `scap-${Date.now()}.png`);
+        execSync(`screencapture -x ${JSON.stringify(tmpCap)}`, { timeout: 15000 });
+        buf = fs.readFileSync(tmpCap);
+        try { fs.unlinkSync(tmpCap); } catch (_) {}
+      } catch (e) {
+        console.log(`[shot] screencapture 失败: ${e.message.slice(0, 60)}`);
+      }
+    }
+    if (!buf) buf = await screenshotDesktop({ format: 'png' });
     // 顶部水印条：高 ~56px（按图高自适应 4%），半透明深色底 + 白字，左上角
     // jimp v1（本地实测）：loadFont 顶层函数；print({font,text,x,y})；measureText 顶层。
     try {
@@ -102,7 +116,8 @@ async function fullShot(baseName, opts = {}) {
       try { const url = await opts.upload(file); if (url) console.log(`[shot] 已上传: ${url}`); } catch (_) {}
     }
     console.log(`[shot] 全屏截图: ${file}`);
-    return file;
+    // 统一正斜杠（Windows path.join 产生 \，Excel 引用与 zip 内路径需一致）
+    return file.replace(/\\/g, '/');
   } catch (e) {
     console.log(`[shot] 全屏截图失败: ${e.message.slice(0, 80)}`);
     return null;
