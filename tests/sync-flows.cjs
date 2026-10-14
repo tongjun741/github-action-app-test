@@ -84,17 +84,19 @@ async function writeMode() {
     } catch (e) {
       push(out, 'history_write', '历史记录写入(访问wdku)', 'client_history_sync_write', 'error', `wdku 访问异常: ${e.message.slice(0, 90)}`);
     }
-    // 1.5) G5：收藏夹同步源 —— 第一台设备真实收藏 wdku（地址栏星标，真鼠标点击）
+    // 1.5) G5：收藏夹同步源 —— 第一台设备真实收藏 wdku（地址栏星标，OS 真鼠标点击）
+    // 2026-10-14 用户铁律：永远不用 CDP 合成事件；工具缺失则跳过点击、记 error。
     try {
-      const star = await page.evaluate(() => ({ x: Math.round(window.innerWidth * 0.93), y: 42 }));
-      const client = await page.target().createCDPSession();
-      await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: star.x, y: star.y });
-      await sleep(150);
-      await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: star.x, y: star.y, button: 'left', clickCount: 1 });
-      await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: star.x, y: star.y, button: 'left', clickCount: 1 });
+      const { osLeftClick, osMouseSupported } = require('./include/osmouse');
+      if (!osMouseSupported()) {
+        throw new Error('OS 鼠标工具缺失（win=ps1 / mac=cliclick / linux=xdotool）——按用户要求不降级 CDP 合成事件');
+      }
+      const star = await page.evaluate(() => ({ x: Math.round(window.innerWidth * 0.93), y: 42, sx: window.screenX, sy: window.screenY, dpr: window.devicePixelRatio }));
+      const scrX = Math.round((star.sx + star.x) * star.dpr);
+      const scrY = Math.round((star.sy + star.y) * star.dpr);
+      await osLeftClick(scrX, scrY);
       await sleep(1500);
-      try { await client.detach(); } catch (_) {}
-      push(out, 'bookmark_write', '收藏夹写入(wdku收藏)', 'client_bookmark_sync_write', 'pass', '已点地址栏星标收藏 wdku（待第二台 chrome://bookmarks 验证同步）');
+      push(out, 'bookmark_write', '收藏夹写入(wdku收藏)', 'client_bookmark_sync_write', 'pass', `已 OS 真鼠标点地址栏星标收藏 wdku（屏幕${scrX},${scrY}，待第二台 chrome://bookmarks 验证同步）`);
     } catch (e) {
       push(out, 'bookmark_write', '收藏夹写入(wdku收藏)', 'client_bookmark_sync_write', 'error', `收藏点击异常: ${e.message.slice(0, 90)}`);
     }

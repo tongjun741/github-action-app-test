@@ -236,33 +236,30 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       const OCR_KW_SAVE = /(保存|记住|save|remember)/i;   // 次选：保存/记住
       try {
         const tesseract = require('tesseract.js');
-        const shotBuf = Buffer.from(await page.screenshot({ encoding: 'base64', type: 'png' }), 'base64');
-        // Windows 无 /tmp——用 os.tmpdir()（跨平台）；文件名拼时间戳防冲突
+        // 2026-10-14 用户铁律：永远不用 CDP 合成事件；点击一律 OS 真鼠标（工具缺失则本用例不点击）。
+        // 截图改 OS 全屏（screenshot-desktop）——OCR bbox 即屏幕设备像素，直接喂 OS 鼠标，无需 DPR 换算。
+        const { osLeftClick, osMouseSupported } = require('./include/osmouse');
+        const shotDesktop = require('screenshot-desktop');
         const os = require('node:os');
         const shotPath = path.join(os.tmpdir(), `save-bubble-ocr-${Date.now()}.png`);
-        fs.writeFileSync(shotPath, shotBuf);
-        const readPngSize = (b) => ({ w: b.readUInt32BE(16), h: b.readUInt32BE(20) }); // PNG IHDR：宽/高在 offset16/20
-        const img = readPngSize(shotBuf);
-        const vp = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
-        const sx = vp.width / img.w, sy = vp.height / img.h; // 图片→视口映射（DPR 因子）
+        const fullBuf = await shotDesktop({ format: 'png' });
+        fs.writeFileSync(shotPath, fullBuf);
         if (!global.__ocrWorker) global.__ocrWorker = await tesseract.createWorker('chi_sim+eng');
         const { data } = await global.__ocrWorker.recognize(shotPath);
         const words = (data.words || []).filter((w) => w.confidence >= 40 && w.bbox);
         const wp = words.find((w) => OCR_KW_PWD.test(w.text));
         const ws = words.find((w) => OCR_KW_SAVE.test(w.text));
         const w = wp || ws;
-        if (w) {
-          const cx = Math.round(((w.bbox.x0 + w.bbox.x1) / 2) * sx);
-          const cy = Math.round(((w.bbox.y0 + w.bbox.y1) / 2) * sy);
-          log(`OCR 命中保存按钮词「${w.text}」(conf=${Math.round(w.confidence)}), 视口坐标(${cx},${cy}) [scale=${sx.toFixed(2)}]`);
-          const client = await page.target().createCDPSession();
-          await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: cx, y: cy });
-          await sleep(150);
-          await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: cx, y: cy, button: 'left', clickCount: 1 });
-          await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: cx, y: cy, button: 'left', clickCount: 1 });
-          await client.detach();
+        if (w && osMouseSupported()) {
+          const cx = Math.round((w.bbox.x0 + w.bbox.x1) / 2);
+          const cy = Math.round((w.bbox.y0 + w.bbox.y1) / 2);
+          log(`OCR 命中保存按钮词「${w.text}」(conf=${Math.round(w.confidence)}), 屏幕坐标(${cx},${cy})——OS 真鼠标点击`);
+          await osLeftClick(cx, cy);
           bubbleAction = `ocr:${w.text}@(${cx},${cy})`;
           await sleep(1000);
+        } else if (w && !osMouseSupported()) {
+          log(`OCR 命中「${w.text}」但 OS 鼠标工具缺失——按用户要求不降级 CDP 合成事件，不点击`);
+          bubbleAction = 'ocr-hit-noclick(tool-missing)';
         } else {
           log(`OCR 未命中保存关键词（识别词数=${words.length}），按用户要求不降级（仅 OCR）`);
         }
@@ -524,31 +521,34 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
         throw new Error(`登录页未找到密码框（代填验证）（${diag}）`);
       }
       // 触发代填（用户要求 2026-10-13：控制鼠标选择账号来测试代填密码）：
-      // ① 真鼠标点击账号框（CDP dispatchMouseEvent，坐标=账号框中心）→ 弹出账号选择下拉
-      // ② 鼠标点击下拉中的账号项（下拉是浏览器级 UI，位置在账号框正下方）
+      // 2026-10-14 用户铁律：永远不用 CDP 合成事件——点击一律 OS 真鼠标（工具缺失则跳过点击、只做判定）。
+      // ① OS 真鼠标点击账号框（视口坐标→屏幕坐标 (screenX+x)*dpr）→ 弹出账号选择下拉
+      // ② OS 真鼠标点击下拉中的账号项（下拉在账号框正下方）
       // ③ 保留 DOM 聚焦/reload 作为辅助触发（Chromium autofill 常需导航事件）
-      const mouseClickAt = async (client, x, y) => {
-        await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
-        await sleep(120);
-        await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
-        await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
-        await sleep(400);
-      };
       try {
-        const client = await page.target().createCDPSession();
-        // ① 鼠标点击账号框中心
+        const { osLeftClick, osMouseSupported } = require('./include/osmouse');
+        const osReady = osMouseSupported();
+        if (!osReady) log('[osmouse] OS 鼠标工具缺失——代填不执行鼠标点击（按用户要求不降级 CDP 合成事件）');
+        const winfo = osReady ? await page.evaluate(() => ({ sx: window.screenX, sy: window.screenY, dpr: window.devicePixelRatio })).catch(() => ({ sx: 0, sy: 0, dpr: 1 })) : null;
+        const vpToScreen = (x, y) => ({ sx: Math.round((winfo.sx + x) * winfo.dpr), sy: Math.round((winfo.sy + y) * winfo.dpr) });
+        const osClickVp = async (x, y) => {
+          if (!osReady) return;
+          const s = vpToScreen(x, y);
+          await osLeftClick(s.sx, s.sy);
+        };
+        // ① OS 鼠标点击账号框中心
         if (inputs.userInput) {
           const box = await page.evaluate((sel) => {
             const r = document.querySelector(sel).getBoundingClientRect();
             return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
           }, inputs.userInput).catch(() => null);
-          if (box) {
-            await mouseClickAt(client, box.x, box.y);
-            log(`已真鼠标点击账号框（${box.x},${box.y}）——等待账号选择下拉`);
+          if (box && osReady) {
+            await osClickVp(box.x, box.y);
+            log(`已 OS 真鼠标点击账号框（视口${box.x},${box.y}）——等待账号选择下拉`);
             await sleep(1500);
             // ② 点击下拉首项（账号框正下方 ~28px 处）
-            await mouseClickAt(client, box.x, box.y + 28);
-            log('已真鼠标点击账号下拉首项');
+            await osClickVp(box.x, box.y + 28);
+            log('已 OS 真鼠标点击账号下拉首项');
             await sleep(1500);
           }
         }
