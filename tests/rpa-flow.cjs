@@ -500,15 +500,18 @@ async function main() {
                 const homeDiag = await p.evaluate(() => {
                   const kw = document.querySelector('#kw, input[name=wd]');
                   const btn = document.querySelector('#su, input[type=submit]');
+                  const ae = document.activeElement;
                   return {
                     kwValue: kw ? String(kw.value || '') : null,
                     kwExists: !!kw,
                     btnExists: !!btn,
                     readyState: document.readyState,
+                    visibility: document.visibilityState,
+                    activeEl: ae ? (ae.id || ae.tagName || 'unknown') : 'none',
                     bodySnippet: (document.body ? document.body.innerText : '').replace(/\s+/g, ' ').slice(0, 120),
                   };
                 });
-                log(`[home-diag] 百度首页停留>60s——kw=${homeDiag.kwValue} kwExists=${homeDiag.kwExists} btn=${homeDiag.btnExists} ready=${homeDiag.readyState} body=${homeDiag.bodySnippet}`);
+                log(`[home-diag] 百度首页停留>60s——kw="${homeDiag.kwValue}" kwExists=${homeDiag.kwExists} btn=${homeDiag.btnExists} ready=${homeDiag.readyState} vis=${homeDiag.visibility} activeEl=${homeDiag.activeEl} body=${homeDiag.bodySnippet}`);
               } catch (e) { log(`[home-diag] 读取失败: ${e.message.slice(0, 50)}`); }
             }
             const text = await p.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 8000)).catch(() => '');

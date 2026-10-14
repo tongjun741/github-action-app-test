@@ -117,9 +117,18 @@ async function tryRightClickTranslate(page) {
   let triggered = false, ratio = 0;
 
   // —— OCR 主路径：OS 全屏截图 → 识别「翻译」→ 屏幕坐标映射回视口 → CDP 点击 ——
+  // 2026-10-14 聚焦轮#2 实证：右键发生在后台 tab（可见页是 RPA 残留百度页），菜单不可见——
+  //   ① rightClick 前必须 page.bringToFront()；② screenshot-desktop 首次调用要拉起 PowerShell
+  //   （秒级延迟），先预热一次；③ 菜单渲染有时序——连拍 4 张逐张 OCR，命中即点。
+  try { await page.bringToFront(); } catch (_) {}
+  try { await screenshotDesktop({ format: 'png' }); } catch (_) { /* 预热失败不阻塞 */ }
   try {
-    const fullBuf = await screenshotDesktop({ format: 'png' });
-    const ocr = await ocrFindTranslateItem(fullBuf, winfo.screenCssW);
+    let ocr = null; let fullBuf = null;
+    for (let attempt = 1; attempt <= 4 && !ocr; attempt++) {
+      fullBuf = await screenshotDesktop({ format: 'png' });
+      ocr = await ocrFindTranslateItem(fullBuf, winfo.screenCssW);
+      if (!ocr) { log(`[ocr-retry ${attempt}] 未见「翻译」项，${attempt < 4 ? '300ms 后连拍' : '放弃'}`); await sleep(300); }
+    }
     if (ocr) {
       const vx = Math.round(ocr.sx / ocr.dpr - winfo.screenX);
       const vy = Math.round(ocr.sy / ocr.dpr - winfo.screenY - TB);
