@@ -30,8 +30,9 @@ function winClick(x, y, button) {
 }
 
 function macClick(x, y, button) {
-  // cliclick: r:x,y = 右键点击;  c:x,y = 左键点击
-  const sub = button === 'right' ? `r:${x},${y}` : `c:${x},${y}`;
+  // cliclick 语法（38508986590 实锤：r: 报 Unrecognized action shortcut "r"）：
+  // c:x,y=左键点击；rc:x,y=右键点击
+  const sub = button === 'right' ? `rc:${x},${y}` : `c:${x},${y}`;
   const r = run('cliclick', [sub]);
   if (r.code !== 0) throw new Error(`cliclick exit=${r.code} ${r.err.slice(0, 80)}`);
   return true;

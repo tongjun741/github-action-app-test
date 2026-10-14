@@ -115,6 +115,7 @@ async function tryRightClickTranslate(page) {
   log('[osmouse] OS 真鼠标可用');
   const doRightClick = async (vx, vy) => {
     const s = vpToScreen(vx, vy);
+    log(`[osmouse] OS 右键：视口(${vx},${vy}) → 屏幕(${s.sx},${s.sy}) [win=(${winfo.screenX},${winfo.screenY}) dpr=${winfo.dpr} TB=${TB}]`);
     await osRightClick(s.sx, s.sy);
   };
   try { await page.bringToFront(); } catch (_) {}
