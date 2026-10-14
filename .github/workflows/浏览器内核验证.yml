@@ -187,7 +187,7 @@ jobs:
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils scrot imagemagick
+          sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils scrot imagemagick xdotool
           if [ -z "${{ github.event.inputs.software_download_url }}" ]; then
             # 2026-10-12 用户指定：固定客户端版本（ubuntu 12.9.911，不再动态读 static.config.json）
             dl="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_12.9.911_zh_setup.deb"
@@ -229,6 +229,10 @@ jobs:
           echo "下载客户端: $dl"
           # 2026-10-14 用户要求：安装包文件名进截图水印 + Excel
           echo "E2E_INSTALLER_NAME=$(basename "$dl")" >> "$GITHUB_ENV"
+          # 2026-10-14 OS 级真鼠标（右键翻译）：mac 用 cliclick（brew 装一次，已有则跳过；失败仅告警）
+          if ! command -v cliclick >/dev/null 2>&1; then
+            brew install cliclick 2>/dev/null || echo "::warning::cliclick 安装失败，右键翻译 OS 鼠标将降级 CDP"
+          fi
           # 2026-10-14 用户要求：分辨率 ≥1440×1080——mac runner 默认 1920×1080 已达标；
           # 仅校验，工具缺失/失败只告警不阻塞。⚠️ shell 是 bash -e -o pipefail：
           # grep|head 管道会让 grep 收 SIGPIPE(141)、grep 无匹配返回 1——pipefail 均判败 → set -e 杀脚本。
@@ -453,7 +457,7 @@ jobs:
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils scrot imagemagick
+          sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils scrot imagemagick xdotool
           if [ -z "${{ github.event.inputs.software_download_url }}" ]; then
             # 2026-10-12 用户指定：固定客户端版本（ubuntu 12.9.911，第二台设备与首台一致）
             dl="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_12.9.911_zh_setup.deb"

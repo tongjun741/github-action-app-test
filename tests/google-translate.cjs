@@ -91,8 +91,8 @@ async function tryRightClickTranslate(page) {
   let client;
   try { client = await page.target().createCDPSession(); } catch (e) { return { ok: false, err: 'CDP会话失败:' + e.message.slice(0, 40) }; }
   // 窗口屏幕位置（CSS px）+ 主屏 CSS 宽（用于 DPR 与坐标映射）
-  const winfo = await page.evaluate(() => ({ screenX: window.screenX, screenY: window.screenY, screenCssW: window.screen.width }))
-    .catch(() => ({ screenX: 0, screenY: 0, screenCssW: 1920 }));
+  const winfo = await page.evaluate(() => ({ screenX: window.screenX, screenY: window.screenY, screenCssW: window.screen.width, dpr: window.devicePixelRatio }))
+    .catch(() => ({ screenX: 0, screenY: 0, screenCssW: 1920, dpr: 1 }));
   // 标题栏+工具栏偏移（HuaYoung 分身浏览器若为嵌入式 webview 则≈0；若点击偏，用 RC_MENU_TOOLBAR_PX 校准）
   const TB = Number(process.env.RC_MENU_TOOLBAR_PX || 0);
   const ratioNow = () => page.evaluate(() => {
@@ -100,27 +100,37 @@ async function tryRightClickTranslate(page) {
     const cjk = (t.match(/[一-鿿]/g) || []).length;
     return cjk / Math.max(t.length, 1);
   }).catch(() => 0);
-  const rightClick = async (x, y) => {
-    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
-    await sleep(120);
-    await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'right', clickCount: 1 });
-    await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'right', clickCount: 1 });
+  // 2026-10-14 OS 级真鼠标（用户指令）：CDP 合成事件不触发 Chromium 原生右键菜单
+  // （38501855187 实锤：bringToFront+连拍4张全无菜单）。改 OS 真鼠标：
+  // 视口坐标(x,y) → 屏幕设备像素 = (screenX + x) * dpr, (screenY + y + TB) * dpr
+  const { osRightClick, osLeftClick, osMouseSupported } = require('./include/osmouse');
+  const vpToScreen = (vx, vy) => ({
+    sx: Math.round((winfo.screenX + vx) * winfo.dpr),
+    sy: Math.round((winfo.screenY + vy + TB) * winfo.dpr),
+  });
+  let osMouse = osMouseSupported();
+  if (!osMouse) {
+    log('[osmouse] 平台工具缺失（win=ps1 / mac=cliclick / linux=xdotool）——CDP 合成事件兜底（原生菜单大概率不弹）');
+  } else {
+    log('[osmouse] OS 真鼠标可用');
+  }
+  const doRightClick = async (vx, vy) => {
+    if (osMouse) {
+      const s = vpToScreen(vx, vy);
+      await osRightClick(s.sx, s.sy);
+    } else {
+      await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: vx, y: vy });
+      await sleep(120);
+      await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: vx, y: vy, button: 'right', clickCount: 1 });
+      await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: vx, y: vy, button: 'right', clickCount: 1 });
+    }
   };
-  const leftClickVp = async (vx, vy) => {
-    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: vx, y: vy });
-    await sleep(120);
-    await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: vx, y: vy, button: 'left', clickCount: 1 });
-    await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: vx, y: vy, button: 'left', clickCount: 1 });
-  };
-  await rightClick(target.x, target.y);
+  try { await page.bringToFront(); } catch (_) {}
+  await doRightClick(target.x, target.y);
   await sleep(900);
   let triggered = false, ratio = 0;
 
-  // —— OCR 主路径：OS 全屏截图 → 识别「翻译」→ 屏幕坐标映射回视口 → CDP 点击 ——
-  // 2026-10-14 聚焦轮#2 实证：右键发生在后台 tab（可见页是 RPA 残留百度页），菜单不可见——
-  //   ① rightClick 前必须 page.bringToFront()；② screenshot-desktop 首次调用要拉起 PowerShell
-  //   （秒级延迟），先预热一次；③ 菜单渲染有时序——连拍 4 张逐张 OCR，命中即点。
-  try { await page.bringToFront(); } catch (_) {}
+  // —— OCR 主路径：OS 全屏截图 → 识别「翻译」→ OS 真鼠标左键点击菜单项（屏幕坐标直用 OCR bbox）——
   try { await screenshotDesktop({ format: 'png' }); } catch (_) { /* 预热失败不阻塞 */ }
   try {
     let ocr = null; let fullBuf = null;
@@ -130,13 +140,26 @@ async function tryRightClickTranslate(page) {
       if (!ocr) { log(`[ocr-retry ${attempt}] 未见「翻译」项，${attempt < 4 ? '300ms 后连拍' : '放弃'}`); await sleep(300); }
     }
     if (ocr) {
-      const vx = Math.round(ocr.sx / ocr.dpr - winfo.screenX);
-      const vy = Math.round(ocr.sy / ocr.dpr - winfo.screenY - TB);
-      log(`OCR 命中右键菜单「${ocr.text}」屏幕(${ocr.sx},${ocr.sy}) dpr=${ocr.dpr.toFixed(2)} → 视口(${vx},${vy}) [win=(${winfo.screenX},${winfo.screenY}) TB=${TB}]`);
-      await leftClickVp(vx, vy);
-      await sleep(1500);
+      // OCR bbox 就是屏幕设备像素坐标——OS 鼠标直接用；CDP 兜底才需要映射回视口
+      log(`OCR 命中右键菜单「${ocr.text}」屏幕(${ocr.sx},${ocr.sy}) dpr=${ocr.dpr.toFixed(2)}`);
+      if (osMouse) {
+        await osLeftClick(ocr.sx, ocr.sy);
+      } else {
+        const vx = Math.round(ocr.sx / ocr.dpr - winfo.screenX);
+        const vy = Math.round(ocr.sy / ocr.dpr - winfo.screenY - TB);
+        await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: vx, y: vy });
+        await sleep(120);
+        await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: vx, y: vy, button: 'left', clickCount: 1 });
+        await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: vx, y: vy, button: 'left', clickCount: 1 });
+      }
+      await sleep(2500);
       ratio = await ratioNow();
       if (ratio > 0.1) triggered = true;
+      // 翻译气泡有时弹出且遮挡——无菜单时也查一次页面 CJK（翻译可能已由气泡默认触发）
+      if (!triggered) {
+        const t = await page.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 200)).catch(() => '');
+        log(`点击后页面采样: ${t.replace(/\s+/g, ' ').slice(0, 80)} CJK=${(ratio * 100).toFixed(1)}%`);
+      }
     } else {
       log('OCR 未识别到「翻译」项（原生菜单未截到 / OCR 误判）——按用户要求不降级');
     }
