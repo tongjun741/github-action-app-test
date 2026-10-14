@@ -49,6 +49,19 @@ async function ocrFindTranslateItem(fullPngBuf, screenCssW) {
   if (!_gocrWorker) _gocrWorker = await tesseract.createWorker('chi_sim+eng');
   const { data } = await _gocrWorker.recognize(tmp);
   const words = (data.words || []).filter((w) => w.confidence >= 40 && w.bbox);
+  // 2026-10-14：诊断证据——OCR 词表 + 全屏截图上传（未命中时能看现场：菜单开没开/识别成什么）
+  log(`[ocr-diag] 截图 ${imgW}px dpr=${dpr.toFixed(2)} 识别词数=${words.length} 词表(前25): ${words.slice(0, 25).map((w) => w.text).join(' | ')}`);
+  try {
+    if (process.env.CLOUDINARY_URL) {
+      const mod = require('cloudinary');
+      const cl = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+      cl.config({ secure: true });
+      const now = new Date();
+      const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const r = await cl.uploader.upload(tmp, { asset_folder: `e2eTest_${mm}`, resource_type: 'raw' });
+      log(`[ocr-diag] 菜单现场截图已上传: ${r.url}`);
+    }
+  } catch (_) {}
   const hit = words.find((w) => /(翻译|translate)/i.test(w.text));
   if (!hit) return null;
   return {

@@ -33,8 +33,10 @@ const FLOW_NAME = process.env.RPA_FLOW_NAME || '百度检索-教程示例';
 const RPA_KEYWORD = process.env.RPA_KEYWORD || 'ios';
 const MATCH = process.env.RPA_MATCH || 'Apple';
 const TIMEOUT_MS = Number(process.env.RPA_TIMEOUT_MS || 240000); // Run#57 实证：分身启动+百度加载+检索 >120s，翻倍
+// 2026-10-14：过程日志收集（模块级，防 main 内 TDZ 遮蔽）——结束时写入结果 JSON 随 artifact 上传
+const procLogs = [];
 
-const log = (...a) => console.log('[rpa-flow]', ...a);
+const log = (...a) => { procLogs.push(`[${new Date().toISOString().slice(11, 19)}] ${a.map(String).join(' ').slice(0, 300)}`); console.log('[rpa-flow]', ...a); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function uploadShot(browser, tag) {
@@ -55,6 +57,7 @@ async function uploadShot(browser, tag) {
 
 async function main() {
   const out = { platform: PLATFORM, ts: new Date().toISOString(), results: [] };
+  // 2026-10-14：log 已在模块级改为「收集 procLogs + 控制台输出」双写（不在 main 内遮蔽，防 TDZ）。
   const push = (status, detail) => {
     out.results.push({ caseId: 'rpa_flow', id: 'rpa_flow', name: '执行RPA流程', type: 'client_rpa_flow', platform: PLATFORM, status, detail, criteria: '执行RPA流程“百度检索-教程示例”，参数关键词=ios，流程应完成百度检索并在结果中出现 Apple 相关内容', ts: new Date().toISOString() });
     console.log(`  [${status === 'pass' ? '✓' : '✗'}] 执行RPA流程 — ${detail.slice(0, 120)}`);
@@ -440,13 +443,9 @@ async function main() {
     log(`轮询 CDP ${CDP} 等待 RPA 结果（最长 ${TIMEOUT_MS / 1000}s）`);
     const puppeteer = require('puppeteer-core');
     const deadline = Date.now() + TIMEOUT_MS;
-    let matched = null;
-    let lastDiag = 0;
-    let lastHomeDiag = 0; // 2026-10-14：百度首页卡住诊断节流
-    // 2026-10-14：过程日志收集——push 时写入结果 JSON，随 artifact 上传（用户要求 RPA 日志保留进报告）
-    const procLogs = [];
-    const origLog = log;
-    const log = (...a) => { const line = a.map(String).join(' '); procLogs.push(`[${new Date().toISOString().slice(11, 19)}] ${line}`); origLog(...a); };
+  let matched = null;
+  let lastDiag = 0;
+  let lastHomeDiag = 0; // 2026-10-14：百度首页卡住诊断节流
     let openTried = false;
     let everConnected = false; // Run#60 实证：CDP 连上后 openClone 兜底仍按时间触发（「打开」按钮已不存在，白报异常）——改为从未连上才兜底
     while (Date.now() < deadline) {

@@ -235,10 +235,11 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       const OCR_KW_PWD = /密码/;                          // 优先：含「密码」词（最专一，避开误命中「保存」其他文字）
       const OCR_KW_SAVE = /(保存|记住|save|remember)/i;   // 次选：保存/记住
       try {
-        const fs = require('fs');
         const tesseract = require('tesseract.js');
         const shotBuf = Buffer.from(await page.screenshot({ encoding: 'base64', type: 'png' }), 'base64');
-        const shotPath = `/tmp/save-bubble-ocr-${Date.now()}.png`;
+        // Windows 无 /tmp——用 os.tmpdir()（跨平台）；文件名拼时间戳防冲突
+        const os = require('node:os');
+        const shotPath = path.join(os.tmpdir(), `save-bubble-ocr-${Date.now()}.png`);
         fs.writeFileSync(shotPath, shotBuf);
         const readPngSize = (b) => ({ w: b.readUInt32BE(16), h: b.readUInt32BE(20) }); // PNG IHDR：宽/高在 offset16/20
         const img = readPngSize(shotBuf);
