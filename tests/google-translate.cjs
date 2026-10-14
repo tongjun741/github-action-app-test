@@ -12,8 +12,10 @@
  *   5) 判定：页面出现中文（CJK 占比 > 10%）= 翻译成功；API 探测返回中文 = 加速可达
  *
  * 注：右键菜单是浏览器原生 UI（page.screenshot 截不到），故用 OCR 方案：screenshot-desktop 截全屏
- *     （含原生菜单）→ tesseract.js 识别「翻译」项 → 屏幕坐标经窗口位置+DPR 映射回视口坐标 → CDP 真鼠标点击。
+ *     （含原生菜单）→ 以点击坐标为锚点裁 ROI + 放大 2~3× → tesseract.js(chi_sim) 按行识别「翻译」项
+ *     → 屏幕坐标经窗口位置+DPR 映射回视口坐标 → OS 真鼠标点击。
  *     页面级翻译触发仅以 OCR 命中右键菜单「翻译」项为准，不再以 API 探测/bubble/widget 兜底。
+ *     （2026-10-14 修复：整页 OCR 读不出小号中文菜单——改 ROI 放大 + 行级匹配 + conf≥25 + /(翻译|译|translate)/）
  * 输出：results-GTranslate.json
  */
 const fs = require('node:fs');
@@ -40,21 +42,56 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 //   → 经窗口屏幕位置(window.screenX/Y)+DPR 映射回视口坐标 → CDP 真鼠标点击。
 //   原生菜单 page.screenshot 截不到，故必须 OS 级截图。OCR 未命中/异常即判定失败，不降级网格扫描/API 探测。
 let _gocrWorker = null;
-async function ocrFindTranslateItem(fullPngBuf, screenCssW) {
-  // 全屏 PNG buffer → OCR 词级识别 → 返回「翻译」项屏幕设备像素中心 + dpr
-  // 2026-10-14：存 shots/<操作系统>/<平台>/ 目录（Excel 截图文件名含目录名）
+async function ocrFindTranslateItem(fullPngBuf, screenCssW, clickScreen) {
+  // 全屏 PNG buffer → OCR → 返回「翻译」项屏幕设备像素中心 + dpr
+  //
+  // 2026-10-14【OCR 修复】实锤根因（本地 tesseract.js 5.1.1 逐字复现 CI 日志）：
+  //   a) 整页 OCR 把小号（~13px）中文菜单压在 busy 背景上读成拉丁乱码（"BEaE"/"@E" conf 0），全图无「翻/译」token；
+  //   b) 即便裁出放大到可读，Tesseract 仍把「翻译成中文（简体）」逐字切词（`译`/`成`/`中`/`文`/`(简体`/`)`），
+  //      **首字「翻」丢失**、且幸存「译」conf 仅 33 < 40 → 词级 /(翻译|translate)/ 结构上匹配不到。
+  //   对照实验：chi_sim-only 识别 CJK 词数是 chi_sim+eng 的 2 倍（108 vs 52），+eng 反而产生拉丁乱码。
+  // 修复四点：① 语言改 chi_sim（去掉 +eng）；② 以点击屏幕坐标为锚点裁 ROI + 放大 2~3× 再 OCR（菜单恒出现在点击处）；
+  //          ③ 按行聚合词再匹配（应对逐字分词）；④ 置信度 40→25，正则扩为 /(翻译|译|translate)/。
+  // 存 shots/<操作系统>/<平台>/ 目录（Excel 截图文件名含目录名）
   const { shotDirFor } = require('./include/shot');
   const dir = path.join(process.cwd(), shotDirFor(process.env.E2E_PLATFORM || 'unknown'));
   fs.mkdirSync(dir, { recursive: true });
-  const tmp = path.join(dir, `rc-menu-${Date.now()}.png`);
+  const stamp = Date.now();
+  const tmp = path.join(dir, `rc-menu-${stamp}.png`);
   fs.writeFileSync(tmp, fullPngBuf);
   const imgW = fullPngBuf.readUInt32BE(16); // PNG IHDR 宽（设备像素）
+  const imgH = fullPngBuf.readUInt32BE(20); // PNG IHDR 高（设备像素）
   const dpr = imgW / screenCssW;            // 截图宽 / 主屏 CSS 宽 = DPR
-  if (!_gocrWorker) _gocrWorker = await tesseract.createWorker('chi_sim+eng');
-  const { data } = await _gocrWorker.recognize(tmp);
-  const words = (data.words || []).filter((w) => w.confidence >= 40 && w.bbox);
-  // 2026-10-14：诊断证据——OCR 词表 + 全屏截图上传（未命中时能看现场：菜单开没开/识别成什么）
-  log(`[ocr-diag] 截图 ${imgW}px dpr=${dpr.toFixed(2)} 识别词数=${words.length} 词表(前25): ${words.slice(0, 25).map((w) => w.text).join(' | ')}`);
+
+  // ROI：以点击屏幕设备坐标为锚点，取覆盖右键菜单的窗口（Chrome 原生菜单自点击点向右下展开）
+  let ox = 0, oy = 0, cw = imgW, ch = imgH, scale = 1, roiPath = null;
+  if (clickScreen && Number.isFinite(clickScreen.sx) && Number.isFinite(clickScreen.sy)) {
+    // 参数经实图扫描定标（win10_r0 实测 300x520@x3 / 220x430@x4 均可命中「译成中文(简体)」）
+    const padL = 14, padT = 14, padR = 286, padB = 506; // 设备像素；菜单自点击点向右下展开
+    ox = Math.max(0, Math.min(imgW - 1, Math.round(clickScreen.sx - padL)));
+    oy = Math.max(0, Math.min(imgH - 1, Math.round(clickScreen.sy - padT)));
+    cw = Math.max(1, Math.min(imgW - ox, padR + padL));
+    ch = Math.max(1, Math.min(imgH - oy, padB + padT));
+    scale = cw < 260 ? 4 : 3;
+    try {
+      const { Jimp } = require('jimp');
+      const im = await Jimp.read(tmp);
+      im.crop({ x: ox, y: oy, w: cw, h: ch });
+      im.scale(scale);
+      roiPath = path.join(dir, `rc-menu-roi-${stamp}.png`);
+      await im.write(roiPath);
+    } catch (e) { // 裁剪失败 → 退回整页
+      log(`[ocr-diag] ROI 裁剪失败，退回整页: ${String(e && e.message).slice(0, 60)}`);
+      roiPath = null; ox = 0; oy = 0; cw = imgW; ch = imgH; scale = 1;
+    }
+  }
+  const ocrTarget = roiPath || tmp;
+
+  if (!_gocrWorker) _gocrWorker = await tesseract.createWorker('chi_sim');
+  const { data } = await _gocrWorker.recognize(ocrTarget);
+  const words = (data.words || []).filter((w) => w.bbox && w.confidence >= 25);
+  // 诊断证据——OCR 词表（前25）+ 全屏/ROI 截图上传（未命中时能看现场：菜单开没开/识别成什么）
+  log(`[ocr-diag] 截图 ${imgW}x${imgH} dpr=${dpr.toFixed(2)} ROI=(${ox},${oy},${cw}x${ch}) x${scale} 识别词数=${words.length} 词表(前25): ${words.slice(0, 25).map((w) => w.text).join(' | ')}`);
   try {
     if (process.env.CLOUDINARY_URL) {
       const mod = require('cloudinary');
@@ -62,16 +99,31 @@ async function ocrFindTranslateItem(fullPngBuf, screenCssW) {
       cl.config({ secure: true });
       const now = new Date();
       const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const r = await cl.uploader.upload(tmp, { asset_folder: `e2eTest_${mm}`, resource_type: 'raw' });
-      log(`[ocr-diag] 菜单现场截图已上传: ${r.url}`);
+      for (const p of [tmp, roiPath].filter(Boolean)) {
+        const r = await cl.uploader.upload(p, { asset_folder: `e2eTest_${mm}`, resource_type: 'raw' });
+        log(`[ocr-diag] 菜单现场截图已上传: ${r.url}`);
+      }
     }
   } catch (_) {}
-  const hit = words.find((w) => /(翻译|translate)/i.test(w.text));
-  if (!hit) return null;
+
+  // 按行聚合（y 容差随放大倍数放大），行文本 join 后再匹配——应对 Tesseract 逐字分词
+  const tol = 12 * scale;
+  const lines = [];
+  for (const w of words.slice().sort((a, b) => a.bbox.y0 - b.bbox.y0)) {
+    let L = lines.find((l) => Math.abs(l.y - w.bbox.y0) <= tol);
+    if (!L) { L = { y: w.bbox.y0, items: [] }; lines.push(L); }
+    L.items.push(w);
+  }
+  for (const L of lines) L.items.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+  const RE = /(翻译|译|translate)/i;
+  const hitLine = lines.find((L) => RE.test(L.items.map((i) => i.text).join('')));
+  if (!hitLine) return null;
+  const kw = hitLine.items.find((i) => RE.test(i.text)) || hitLine.items[0];
+  // ROI 坐标 → 全图设备像素：ox + bbox/scale（无 ROI 时 ox=0, scale=1 即为整页坐标）
   return {
-    sx: Math.round((hit.bbox.x0 + hit.bbox.x1) / 2),
-    sy: Math.round((hit.bbox.y0 + hit.bbox.y1) / 2),
-    dpr, text: hit.text,
+    sx: Math.round(ox + ((kw.bbox.x0 + kw.bbox.x1) / 2) / scale),
+    sy: Math.round(oy + ((kw.bbox.y0 + kw.bbox.y1) / 2) / scale),
+    dpr, text: hitLine.items.map((i) => i.text).join(''),
   };
 }
 async function tryRightClickTranslate(page) {
@@ -121,6 +173,7 @@ async function tryRightClickTranslate(page) {
   };
   try { await page.bringToFront(); } catch (_) {}
   await doRightClick(target.x, target.y);
+  const clickScreen = vpToScreen(target.x, target.y); // 菜单锚点（屏幕设备像素）→ 供 OCR 裁 ROI
   await sleep(900);
   let triggered = false, ratio = 0;
 
@@ -130,7 +183,7 @@ async function tryRightClickTranslate(page) {
     let ocr = null; let fullBuf = null;
     for (let attempt = 1; attempt <= 4 && !ocr; attempt++) {
       fullBuf = await screenshotDesktop({ format: 'png' });
-      ocr = await ocrFindTranslateItem(fullBuf, winfo.screenCssW);
+      ocr = await ocrFindTranslateItem(fullBuf, winfo.screenCssW, clickScreen);
       if (!ocr) { log(`[ocr-retry ${attempt}] 未见「翻译」项，${attempt < 4 ? '300ms 后连拍' : '放弃'}`); await sleep(300); }
     }
     if (ocr) {
@@ -273,11 +326,15 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error('[gtranslate] 失败:', e && (e.stack || e.message));
-  const out = { platform: PLATFORM, ts: new Date().toISOString(), results: [
-    { id: 'google_translate', name: '右键Google翻译', type: 'client_google_translate', platform: PLATFORM, status: 'error', detail: String(e && e.message), ts: new Date().toISOString() },
-  ] };
-  try { fs.writeFileSync(OUT, JSON.stringify(out, null, 2)); } catch (_) {}
-  process.exit(1);
-});
+module.exports = { ocrFindTranslateItem, tryRightClickTranslate };
+
+if (require.main === module) {
+  main().catch((e) => {
+    console.error('[gtranslate] 失败:', e && (e.stack || e.message));
+    const out = { platform: PLATFORM, ts: new Date().toISOString(), results: [
+      { id: 'google_translate', name: '右键Google翻译', type: 'client_google_translate', platform: PLATFORM, status: 'error', detail: String(e && e.message), ts: new Date().toISOString() },
+    ] };
+    try { fs.writeFileSync(OUT, JSON.stringify(out, null, 2)); } catch (_) {}
+    process.exit(1);
+  });
+}

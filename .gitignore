@@ -14,3 +14,7 @@ client.zip
 _tmp_ci/
 _tmp_e2e_logs2.txt
 .workbuddy/
+
+# 运行时生成（本地跑 tesseract/截图 会在仓库根产生）
+shots/
+*.traineddata
