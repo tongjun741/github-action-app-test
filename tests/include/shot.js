@@ -31,13 +31,36 @@ function watermarkText() {
   return INSTALLER ? `${PLATFORM} | ${INSTALLER}` : PLATFORM;
 }
 
-let _jimp = null;
+let _jimpMod = null;
 async function loadJimp() {
-  if (!_jimp) {
-    const mod = await import('jimp');
-    _jimp = mod.default || mod.Jimp || mod;
+  // jimp v1 API（本地实测 2026-10-14）：具名导出 { Jimp, loadFont, measureText }；
+  // 字体常量已移除——.fnt 文件在 @jimp/plugin-print/fonts/open-sans/<size>-white/ 下。
+  if (!_jimpMod) {
+    const mod = require('jimp');
+    _jimpMod = mod.default || mod;
   }
-  return _jimp;
+  return _jimpMod;
+}
+
+let _font32 = null;
+async function loadFont32() {
+  if (_font32) return _font32;
+  const path = require('node:path');
+  const { loadFont } = await loadJimp();
+  let fnt = null;
+  for (const cand of [
+    '@jimp/plugin-print/fonts/open-sans/open-sans-32-white/open-sans-32-white.fnt',
+    'jimp/fonts/open-sans/open-sans-32-white/open-sans-32-white.fnt',
+  ]) {
+    try {
+      const base = path.dirname(require.resolve(cand.split('/fonts/')[0] + '/package.json'));
+      const p = path.join(base, 'fonts', 'open-sans', 'open-sans-32-white', 'open-sans-32-white.fnt');
+      if (require('node:fs').existsSync(p)) { fnt = p; break; }
+    } catch (_) {}
+  }
+  if (!fnt) throw new Error('32px white font not found');
+  _font32 = await loadFont(fnt);
+  return _font32;
 }
 
 /**
@@ -53,15 +76,21 @@ async function fullShot(baseName, opts = {}) {
     const file = path.join(dir, `${baseName}-${Date.now()}.png`);
     const buf = await screenshotDesktop({ format: 'png' });
     // 顶部水印条：高 ~56px（按图高自适应 4%），半透明深色底 + 白字，左上角
+    // jimp v1（本地实测）：loadFont 顶层函数；print({font,text,x,y})；measureText 顶层。
     try {
-      const Jimp = await loadJimp();
+      const { Jimp, measureText } = await loadJimp();
+      const font = await loadFont32();
       const img = await Jimp.read(buf);
       const barH = Math.max(40, Math.round(img.height * 0.045));
-      const font = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
+      const txt = watermarkText();
+      // 文本过长时缩字号不可行（位图字体固定）——按宽度截断
+      const maxW = img.width - 24;
+      let shown = txt;
+      try {
+        while (shown.length > 8 && measureText(font, shown) > maxW) shown = shown.slice(0, -8) + '…';
+      } catch (_) { shown = shown.slice(0, Math.floor(maxW / 18)); }
       const bar = new Jimp({ width: img.width, height: barH, color: 0x000000cc });
-      // 水印文字：平台 | 安装包名（过长截断，避免溢出）
-      const txt = watermarkText().slice(0, Math.floor(img.width / 18));
-      bar.print({ font, x: 12, y: Math.max(4, Math.round((barH - 32) / 2)) }, txt);
+      bar.print({ font, text: shown, x: 12, y: Math.max(4, Math.round((barH - 32) / 2)) });
       const composited = img.composite(bar, 0, 0);
       await composited.write(file);
     } catch (e) {
