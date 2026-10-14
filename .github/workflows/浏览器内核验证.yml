@@ -230,8 +230,11 @@ jobs:
           # 2026-10-14 用户要求：安装包文件名进截图水印 + Excel
           echo "E2E_INSTALLER_NAME=$(basename "$dl")" >> "$GITHUB_ENV"
           # 2026-10-14 用户要求：分辨率 ≥1440×1080——mac runner 默认 1920×1080 已达标；
-          # 尝试用 screenresolution 校验/设置，工具缺失或失败仅告警不阻塞。
-          r=$(system_profiler SPDisplaysDataType 2>/dev/null | grep -E 'Resolution|分辨率' | head -2 | tr '\n' ' ')
+          # 仅校验，工具缺失/失败只告警不阻塞。⚠️ shell 是 bash -e -o pipefail：
+          # grep|head 管道会让 grep 收 SIGPIPE(141)、grep 无匹配返回 1——pipefail 均判败 → set -e 杀脚本。
+          # 防御：整段放 if/|| true 里，永不阻塞下载。
+          r=""
+          if r=$(system_profiler SPDisplaysDataType 2>/dev/null | grep -E 'Resolution|分辨率' | tr '\n' ' '); then :; fi
           echo "当前显示分辨率: ${r:-未知}"
           case "$r" in
             *1440*|*1512*|*1600*|*1680*|*1920*) echo "分辨率达标(≥1440 宽)";;
