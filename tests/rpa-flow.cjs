@@ -535,9 +535,12 @@ async function main() {
     } catch (_) {}
 
     await uploadShot(browser, 'final');
-    // 2026-10-14：最终截图（本地路径或 Cloudinary URL）与过程日志写入结果 JSON，报告可见
+    // 2026-10-14 用户要求：最终取证截图 = OS 全屏 + 水印（平台+安装包名）+ shots/<平台>/ 目录
     let finalShot = '';
-    try { finalShot = await uploadShot(browser, 'final-ex'); } catch (_) {}
+    try {
+      const { fullShot } = require('./include/shot');
+      finalShot = (await fullShot('rpa-final')) || '';
+    } catch (e) { log(`全屏截图异常: ${e.message.slice(0, 60)}`); }
     const procText = procLogs.length ? procLogs.join('\n') : '';
     if (matched) {
       push('pass', `RPA「${FLOW_NAME}」(关键词=${RPA_KEYWORD}) 执行完成，页面命中「${MATCH}」（${matched.slice(0, 60)}）`);

@@ -163,6 +163,10 @@ jobs:
             }
           }
           Write-Host "下载客户端: $dl"
+          # 2026-10-14 用户要求：安装包文件名进截图水印 + Excel——写 GITHUB_ENV
+          Add-Content -Path $env:GITHUB_ENV -Value "E2E_INSTALLER_NAME=$(Split-Path $dl -Leaf)"
+          # 2026-10-14 用户要求：桌面分辨率 ≥1440×1080 —— 调 tools/set-display-res.ps1 设 1600x1200（脚本内失败仅告警不阻塞）
+          powershell -ExecutionPolicy Bypass -File tools/set-display-res.ps1 -Width 1600 -Height 1200
           for ($i=1; $i -le 5; $i++) {
             try { Invoke-WebRequest -Uri $dl -OutFile "$env:TEMP\hy_setup.exe" -ErrorAction Stop; break }
             catch { Write-Warning "下载失败(第 $i 次)"; Start-Sleep 5 }
@@ -183,7 +187,7 @@ jobs:
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils
+          sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils scrot imagemagick
           if [ -z "${{ github.event.inputs.software_download_url }}" ]; then
             # 2026-10-12 用户指定：固定客户端版本（ubuntu 12.9.911，不再动态读 static.config.json）
             dl="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_12.9.911_zh_setup.deb"
@@ -191,13 +195,15 @@ jobs:
             dl="${{ github.event.inputs.software_download_url }}"
           fi
           echo "下载客户端: $dl"
+          # 2026-10-14 用户要求：安装包文件名进截图水印 + Excel
+          echo "E2E_INSTALLER_NAME=$(basename "$dl")" >> "$GITHUB_ENV"
           for i in 1 2 3 4 5; do
             curl -fSL --retry 3 --retry-delay 5 -o /tmp/hy.deb "$dl" && break
             echo "下载失败(第 $i 次)"; sleep 5
           done
           [ -f /tmp/hy.deb ] || { echo "客户端下载失败"; exit 1; }
           sudo dpkg -i /tmp/hy.deb || sudo apt-get -f install -y
-          sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
+          sudo Xvfb -ac :99 -screen 0 1600x1200x24 > /dev/null 2>&1 &
           mkdir -p ~/.config/HuaYoung
           # 客户端安装到 /opt（root 属主）：放开 main.js 所在资源的写权限，否则 modifyMain.js 注入
           # remoteDebugPort 会 EACCES 失败 → 分身内核不会带 --remote-debugging-port=9221 → CDP 连不上。
@@ -221,6 +227,16 @@ jobs:
             dl="${{ github.event.inputs.software_download_url }}"
           fi
           echo "下载客户端: $dl"
+          # 2026-10-14 用户要求：安装包文件名进截图水印 + Excel
+          echo "E2E_INSTALLER_NAME=$(basename "$dl")" >> "$GITHUB_ENV"
+          # 2026-10-14 用户要求：分辨率 ≥1440×1080——mac runner 默认 1920×1080 已达标；
+          # 尝试用 screenresolution 校验/设置，工具缺失或失败仅告警不阻塞。
+          r=$(system_profiler SPDisplaysDataType 2>/dev/null | grep -E 'Resolution|分辨率' | head -2 | tr '\n' ' ')
+          echo "当前显示分辨率: ${r:-未知}"
+          case "$r" in
+            *1440*|*1512*|*1600*|*1680*|*1920*) echo "分辨率达标(≥1440 宽)";;
+            *) echo "::warning::分辨率可能未达 1440×1080：$r";;
+          esac
           for i in 1 2 3; do
             curl -L --retry 3 --retry-delay 5 -o /tmp/hy.dmg "$dl" && break
             echo "下载失败(第 $i 次)"; sleep 5
@@ -393,6 +409,7 @@ jobs:
             results-RPA_Flow-*.json
             results-GTranslate-*.json
             screenshot-${{ matrix.slug }}.png
+            shots/
             shot-*.png
             rpa-*.png
             gtranslate-*.png
@@ -433,7 +450,7 @@ jobs:
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils
+          sudo apt-get install -y fonts-wqy-zenhei libnotify4 xvfb x11-xserver-utils desktop-file-utils scrot imagemagick
           if [ -z "${{ github.event.inputs.software_download_url }}" ]; then
             # 2026-10-12 用户指定：固定客户端版本（ubuntu 12.9.911，第二台设备与首台一致）
             dl="https://dl.szdamai.com/downloads/ubuntu_app_zh/HuaYoungApp_Ubuntu_12.9.911_zh_setup.deb"
@@ -441,13 +458,15 @@ jobs:
             dl="${{ github.event.inputs.software_download_url }}"
           fi
           echo "下载客户端: $dl"
+          # 2026-10-14 用户要求：安装包文件名进截图水印 + Excel
+          echo "E2E_INSTALLER_NAME=$(basename "$dl")" >> "$GITHUB_ENV"
           for i in 1 2 3 4 5; do
             curl -fSL --retry 3 --retry-delay 5 -o /tmp/hy.deb "$dl" && break
             echo "下载失败(第 $i 次)"; sleep 5
           done
           [ -f /tmp/hy.deb ] || { echo "客户端下载失败"; exit 1; }
           sudo dpkg -i /tmp/hy.deb || sudo apt-get -f install -y
-          sudo Xvfb -ac :99 -screen 0 1280x1024x24 > /dev/null 2>&1 &
+          sudo Xvfb -ac :99 -screen 0 1600x1200x24 > /dev/null 2>&1 &
           mkdir -p ~/.config/HuaYoung
           if [ -f /opt/花漾客户端/resources/app.asar ]; then sudo chmod a+w /opt/花漾客户端/resources/app.asar; fi
           if [ -d /opt/花漾客户端/resources/app ]; then sudo chmod -R a+w /opt/花漾客户端/resources/app; fi
@@ -492,6 +511,7 @@ jobs:
             results-Cookie_Sync.json
             results-Sync_Flows.json
             cookie-sync-*.png
+            shots/
             shot-*.png
             rpa-*.png
             gtranslate-*.png
@@ -552,6 +572,8 @@ jobs:
           if ! file installer.exe | grep -q "executable\|PE32\|PE32+"; then
             echo "错误：installer.exe 类型异常（疑似下载损坏）: $(file installer.exe)"; exit 1
           fi
+          # 2026-10-14 用户要求：安装包文件名进截图水印 + Excel
+          echo "E2E_INSTALLER_NAME=$(basename "$download_url")" >> "$GITHUB_ENV"
 
       - name: 复制仓库文件到虚拟机共享目录 (c:\work)
         run: |
@@ -718,6 +740,8 @@ jobs:
           fi
           # iphey 截图（checkers 生成）也一并带回，上传 artifact 留档
           cp win7/shared/work/iphey-*.png . 2>/dev/null || true
+          # 2026-10-14：VM 内 shots/（全屏水印截图）目录带回
+          if [ -d win7/shared/work/shots ]; then cp -R win7/shared/work/shots .; fi
           exit $FAIL
 
       - uses: actions/upload-artifact@v4
@@ -728,6 +752,7 @@ jobs:
             results-Windows_7.json
             screenshot-Windows_7.png
             iphey-*.png
+            shots/
           if-no-files-found: warn
 
   report:
@@ -758,20 +783,29 @@ jobs:
         run: node tests/report.mjs --dir artifacts --out report.xlsx
 
       # 2026-10-13 用户要求：所有测试结果截图打包成 zip（文件名与 Excel 明细「截图文件」列对应）
+      # 2026-10-14 变更：截图在 shots/<平台>/ 目录下（Excel 截图文件名含目录名）——保留目录结构打包。
       - name: 打包测试截图 zip
         shell: bash
         run: |
-          mkdir -p shots
-          # artifacts 经 merge-multiple 解到同目录：results json 与各脚本 png 混在一起——挑 png
+          # artifacts 经 merge-multiple 解到同目录：results json、各脚本散图、shots/<平台>/ 全屏水印图
           found=0
+          # 散图（旧命名 rpa-*/gtranslate-* 等顶层 png）移入 shots/loose/ 统一目录结构
+          mkdir -p shots_all
+          if compgen -G "artifacts/shots/*" > /dev/null; then
+            cp -R artifacts/shots/* shots_all/ && found=$((found + $(find artifacts/shots -name '*.png' | wc -l)))
+          fi
+          loose=0
+          mkdir -p shots_all/loose
           for f in artifacts/*.png; do
             [ -f "$f" ] || continue
-            cp "$f" shots/ && found=$((found+1))
+            cp "$f" shots_all/loose/ && loose=$((loose+1))
           done
-          echo "截图数: $found"
+          found=$((found + loose))
+          echo "截图数: $found（含散图 $loose）"
           if [ "$found" -gt 0 ]; then
-            cd shots && zip -q "../screenshots.zip" *.png && cd ..
+            cd shots_all && zip -qr "../screenshots.zip" . && cd ..
             ls -la screenshots.zip
+            unzip -l screenshots.zip | tail -5
           else
             echo "::warning::未收集到任何截图 png"
             touch screenshots.zip

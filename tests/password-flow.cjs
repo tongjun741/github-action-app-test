@@ -269,8 +269,13 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       } catch (e) { log(`OCR 识别异常(不降级): ${e.message.slice(0, 80)}`); }
       // （已移除 DOM boundingBox / 键盘 Enter 降级兜底：本用例仅用 OCR 识别，命中即点，未命中记 ocr-none）
       await sleep(5000); // 等保存动作生效
-      // 气泡现场取证（截图）
+      // 气泡现场取证（截图）+ 2026-10-14 用户要求：OS 全屏水印截图（shots/<平台>/ 目录，进 Excel）
       await shotToCloudinary(page, `save-bubble-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`).catch(() => { });
+      try {
+        const { fullShot } = require('./include/shot');
+        const fsShot = await fullShot(`password-save-bubble-${(process.env.E2E_PLATFORM || 'x').replace(/\s+/g, '_')}`);
+        if (fsShot) log(`全屏水印截图: ${fsShot}`);
+      } catch (_) {}
       log(`气泡处理方式: ${bubbleAction}`);
       loginOk = true;
       loginDetail = `已提交登录表单并尝试保存(气泡=${bubbleAction})，当前URL=${url}`;

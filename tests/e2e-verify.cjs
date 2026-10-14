@@ -151,10 +151,18 @@ function writePlaceholder(reason) {
 }
 
 async function saveShot(browser, name) {
+  // 2026-10-14 用户要求：截图 = OS 全屏 + 水印（平台+安装包名）+ shots/<平台>/ 目录。
+  // browser.takeScreenshot() 视口版仅兜底（全屏失败时保底）。
+  try {
+    const { fullShot } = require('./include/shot');
+    const base = String(name).replace(/\.png$/, '');
+    const full = await fullShot(base);
+    if (full) { log(`已保存全屏截图: ${full}`); return; }
+  } catch (_) {}
   try {
     const b64 = await browser.takeScreenshot();
     fs.writeFileSync(name, Buffer.from(b64, 'base64'));
-    log(`已保存截图: ${name}`);
+    log(`已保存截图(视口兜底): ${name}`);
   } catch (e) {
     log(`截图失败(忽略): ${e.message}`);
   }

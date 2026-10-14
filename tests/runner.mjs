@@ -165,13 +165,24 @@ async function run() {
           checkCase(page, c, { proxyIp, engine }),
           new Promise((_, rej) => setTimeout(() => rej(new Error('用例判定超时(120s)')), 120000)),
         ]);
-        // 2026-10-13 用户要求：所有测试结果统一截图（每用例判定后），文件名进 results 供报告标注
+        // 2026-10-14 用户要求：所有测试截图 = OS 级全屏（不能只截浏览器视口）+ 顶部水印（平台+安装包名）+
+        // 存 shots/<平台>/ 目录（Excel 截图文件名含目录名）。page.screenshot 视口截图仅兜底。
         try {
-          const shotName = `shot-${platform.replace(/\s+/g, '_')}-${c.id}.png`;
-          await page.screenshot({ path: shotName, fullPage: false }).catch(() => {});
-          if (existsSync(shotName)) {
-            res.screenshot = shotName;
-            console.log(`  [shot] ${shotName}`);
+          const shotMod = await import('./include/shot.js');
+          const fullShot = shotMod.fullShot || shotMod.default?.fullShot;
+          const shotName = `shot-${platform.replace(/\s+/g, '_')}-${c.id}`;
+          const full = await fullShot(shotName);
+          if (full) {
+            res.screenshot = full;
+            console.log(`  [shot] ${full}`);
+          } else {
+            // 全屏失败兜底：旧视口截图（无水印，聊胜于无）
+            const fallback = `shot-${platform.replace(/\s+/g, '_')}-${c.id}.png`;
+            await page.screenshot({ path: fallback, fullPage: false }).catch(() => {});
+            if (existsSync(fallback)) {
+              res.screenshot = fallback;
+              console.log(`  [shot] ${fallback}(视口兜底)`);
+            }
           }
         } catch (_) { /* 截图失败不影响判定 */ }
         } catch (e) {

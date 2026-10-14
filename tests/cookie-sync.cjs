@@ -190,8 +190,15 @@ async function main() {
       };
     });
     log(`探测结果: ${JSON.stringify(probe)}`);
-    shotPath = path.join(process.cwd(), `cookie-sync-${Date.now()}.png`);
-    await page2.screenshot({ path: shotPath }).catch(() => { });
+    // 2026-10-14 用户要求：OS 全屏水印截图（shots/<平台>/ 目录）；视口截图保底
+    try {
+      const { fullShot } = require('./include/shot');
+      shotPath = await fullShot('cookie-sync') || '';
+    } catch (_) { shotPath = ''; }
+    if (!shotPath) {
+      shotPath = path.join(process.cwd(), `cookie-sync-${Date.now()}.png`);
+      await page2.screenshot({ path: shotPath }).catch(() => { });
+    }
     // 判定：URL 确实在 wdku.net 域 +（storage token 或页面元素）且没有「登录/注册」主导航 → pass
     const onWdku = /wdku\.net/i.test(probe.url);
     if (onWdku && (probe.storageToken || (probe.loggedHints && !probe.loggedOut))) {
