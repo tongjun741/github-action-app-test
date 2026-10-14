@@ -205,13 +205,24 @@ async function tryRightClickTranslate(page) {
       // OCR bbox 就是屏幕设备像素坐标——OS 鼠标直接用
       log(`OCR 命中右键菜单「${ocr.text}」屏幕(${ocr.sx},${ocr.sy}) dpr=${ocr.dpr.toFixed(2)}`);
       await osLeftClick(ocr.sx, ocr.sy);
-      await sleep(2500);
-      ratio = await ratioNow();
-      if (ratio > 0.1) triggered = true;
+      // 2026-10-14 调试轮 38536551187 实锤：点击成功后 2.5s 采样 CJK=0% 即判负太早——
+      // 页面翻译是渐进式 DOM 改写（tiktok support 为重页面），轮询至 ~20s 再定论。
+      for (let i = 1; i <= 8 && !triggered; i++) {
+        await sleep(2500);
+        ratio = await ratioNow();
+        if (ratio > 0.1) triggered = true;
+        else log(`[translate-poll ${i}/8] 点击后 ${(i * 2.5).toFixed(1)}s CJK=${(ratio * 100).toFixed(1)}%`);
+      }
       if (!triggered) {
         const t = await page.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 200)).catch(() => '');
         log(`点击后页面采样: ${t.replace(/\s+/g, ' ').slice(0, 80)} CJK=${(ratio * 100).toFixed(1)}%`);
       }
+      // 点击后证据截图（无论成败）——runner 占位图在本步之前拍，真正现场只有这里有
+      try {
+        const { fullShot } = require('./include/shot');
+        const ev = await fullShot('gtranslate-post-click');
+        if (ev) log(`[evidence] 点击后全屏截图: ${ev}`);
+      } catch (_) {}
     } else {
       log('OCR 未识别到「翻译」项（原生菜单未截到 / OCR 误判）——按用户要求不降级');
     }
