@@ -442,6 +442,11 @@ async function main() {
     const deadline = Date.now() + TIMEOUT_MS;
     let matched = null;
     let lastDiag = 0;
+    let lastHomeDiag = 0; // 2026-10-14：百度首页卡住诊断节流
+    // 2026-10-14：过程日志收集——push 时写入结果 JSON，随 artifact 上传（用户要求 RPA 日志保留进报告）
+    const procLogs = [];
+    const origLog = log;
+    const log = (...a) => { const line = a.map(String).join(' '); procLogs.push(`[${new Date().toISOString().slice(11, 19)}] ${line}`); origLog(...a); };
     let openTried = false;
     let everConnected = false; // Run#60 实证：CDP 连上后 openClone 兜底仍按时间触发（「打开」按钮已不存在，白报异常）——改为从未连上才兜底
     while (Date.now() < deadline) {
@@ -480,7 +485,7 @@ async function main() {
             // baidu/bing/google 域名页直接查正文；其它非 chrome-error 页也查正文（兜底捕获任何含 Apple 的检索结果）
             if (/chrome-error:|devtools:|szdamai\.local\/?$|about:blank/i.test(url)) {
               // 全量轮#3/#7 隧道竞态自愈：错误页（title 是目标站但页面是 chrome-error）自动 reload
-              // ——隧道通常几秒~几十秒内就绪，reload 后引擎/页面可恢复加载（不碰引擎执行）
+              // ——隧道通常几秒~几十秒内就绪， reload 后引擎/页面可恢复加载（不碰引擎执行）
               if (/chrome-error:/i.test(url)) {
                 const ti = await p.title().catch(() => '');
                 if (/baidu|bing|google/i.test(ti) || /baidu|bing|google/i.test(url)) {
@@ -488,6 +493,24 @@ async function main() {
                 }
               }
               continue;
+            }
+            // 2026-10-14 引擎卡首页诊断：百度首页停留 >60s 未见检索动作——读输入框/按钮状态定位引擎卡点
+            if (/baidu\.com\/?$/i.test(url) && Date.now() - (deadline - TIMEOUT_MS) > 60000 && Date.now() - lastHomeDiag > 30000) {
+              lastHomeDiag = Date.now();
+              try {
+                const homeDiag = await p.evaluate(() => {
+                  const kw = document.querySelector('#kw, input[name=wd]');
+                  const btn = document.querySelector('#su, input[type=submit]');
+                  return {
+                    kwValue: kw ? String(kw.value || '') : null,
+                    kwExists: !!kw,
+                    btnExists: !!btn,
+                    readyState: document.readyState,
+                    bodySnippet: (document.body ? document.body.innerText : '').replace(/\s+/g, ' ').slice(0, 120),
+                  };
+                });
+                log(`[home-diag] 百度首页停留>60s——kw=${homeDiag.kwValue} kwExists=${homeDiag.kwExists} btn=${homeDiag.btnExists} ready=${homeDiag.readyState} body=${homeDiag.bodySnippet}`);
+              } catch (e) { log(`[home-diag] 读取失败: ${e.message.slice(0, 50)}`); }
             }
             const text = await p.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 8000)).catch(() => '');
             if (text.includes(MATCH)) { matched = url; break; }
@@ -513,10 +536,18 @@ async function main() {
     } catch (_) {}
 
     await uploadShot(browser, 'final');
+    // 2026-10-14：最终截图（本地路径或 Cloudinary URL）与过程日志写入结果 JSON，报告可见
+    let finalShot = '';
+    try { finalShot = await uploadShot(browser, 'final-ex'); } catch (_) {}
+    const procText = procLogs.length ? procLogs.join('\n') : '';
     if (matched) {
       push('pass', `RPA「${FLOW_NAME}」(关键词=${RPA_KEYWORD}) 执行完成，页面命中「${MATCH}」（${matched.slice(0, 60)}）`);
     } else {
       push('fail', `RPA 执行后 ${TIMEOUT_MS / 1000}s 内未见含「${MATCH}」的检索结果页${taskState ? `；主壳任务状态: ${taskState}` : ''}`);
+    }
+    if (out.results.length) {
+      out.results[out.results.length - 1].screenshot = finalShot || out.results[out.results.length - 1].screenshot || '';
+      out.results[out.results.length - 1].procLog = procText; // 过程日志随 JSON 上传（report.mjs 明细展示）
     }
     fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
     log(`已写出 ${OUT}`);

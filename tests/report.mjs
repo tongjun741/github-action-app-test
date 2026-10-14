@@ -89,9 +89,11 @@ async function buildReport(platformFiles, outPath) {
       const isNewPlaceholder = /占位/.test(String(r.detail || '')) || (r.status === 'skipped' && !String(r.detail || '').trim());
       const isPrevPlaceholder = prev && (/占位/.test(String(prev.detail || '')) || (prev.status === 'skipped' && !String(prev.detail || '').trim()));
       if (!prev || isPrevPlaceholder || (!isNewPlaceholder && prev.status !== 'pass' && prev.status !== 'fail')) {
-        grid[r.caseId][pf.platform] = { status: r.status, detail: r.detail, screenshot: r.screenshot || (prev && prev.screenshot) };
+        grid[r.caseId][pf.platform] = { status: r.status, detail: r.detail, screenshot: r.screenshot || (prev && prev.screenshot), procLog: r.procLog || (prev && prev.procLog) || '' };
       } else if (prev && r.screenshot && !prev.screenshot) {
         prev.screenshot = r.screenshot; // 真结果已保留但缺截图——补
+      } else if (prev && r.procLog && !prev.procLog) {
+        prev.procLog = r.procLog; // 过程日志同理——补
       }
       if (!cases.includes(r.caseId)) cases.push(r.caseId);
     }
@@ -201,6 +203,7 @@ async function buildReport(platformFiles, outPath) {
     { header: '状态', key: 'status', width: 12 },
     { header: '说明', key: 'detail', width: 70 },
     { header: '截图文件', key: 'screenshot', width: 30 },
+    { header: '过程日志', key: 'procLog', width: 80 },
     { header: '验证标准', key: 'criteria', width: 60 },
   ];
   const h3 = ws3.getRow(1);
@@ -213,12 +216,13 @@ async function buildReport(platformFiles, outPath) {
       const row = ws3.addRow({
         platform: p, name: meta.name, type: meta.type,
         status: STATUS_LABEL[v.status] || v.status, detail: v.detail || '',
-        screenshot: v.screenshot || '', criteria: meta.criteria || '',
+        screenshot: v.screenshot || '', procLog: v.procLog || '', criteria: meta.criteria || '',
       });
       const sc = row.getCell('status');
       sc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + (STATUS_FILL[v.status] || 'FFFFFF') } };
       sc.font = { color: { argb: 'FF' + (STATUS_FONT[v.status] || '000000') }, bold: true };
       row.getCell('detail').alignment = { wrapText: true };
+      row.getCell('procLog').alignment = { wrapText: true, vertical: 'top' };
       row.getCell('criteria').alignment = { wrapText: true };
     }
   }
