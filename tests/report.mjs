@@ -74,7 +74,22 @@ function loadResults(args) {
 
 async function buildReport(platformFiles, outPath) {
   // platformFiles: [{ platform, results, meta }]
-  const platforms = platformFiles.map((p) => p.platform);
+  // 2026-10-14 用户纠偏：平台列序、用例行序必须与原表（生产环境-12.9-148内核.xlsx）完全一致，
+  // 不随 results 文件出现顺序漂移。
+  // 原表平台列序：Windows 10 | macOS arm64 | macOS x64 | Ubuntu 22 | Windows 7（仅关注是否能打开会话）
+  const PLATFORM_ORDER = ['Windows 10', 'macOS arm64', 'macOS x64', 'Ubuntu 22', 'Windows 7'];
+  // 原表用例行序（20 行，R3-R22）：caseId 按此排序；矩阵里新增/未知 caseId 追加尾部（不丢失）
+  const CASE_ORDER = [
+    'open_session', 'kernel_version', 'pixelscan', 'iphey', 'browserleaks_ip', 'whoer',
+    'ipbinding', 'nopecha', 'fingerprint_scan', 'devtools_detector', 'plugins_load',
+    'password_save', 'password_autofill', 'cookie_sync', 'localstorage_sync', 'indexdb_sync',
+    'history_sync', 'bookmark_sync', 'rpa_flow', 'google_translate',
+  ];
+  const platformsRaw = platformFiles.map((p) => p.platform);
+  const platforms = [
+    ...PLATFORM_ORDER.filter((p) => platformsRaw.includes(p)),
+    ...platformsRaw.filter((p) => !PLATFORM_ORDER.includes(p)),
+  ];
   const cases = [];
   const index = {}; // caseId -> {name, criteria, type}
   const grid = {}; // caseId -> platform -> {status, detail}
@@ -98,6 +113,14 @@ async function buildReport(platformFiles, outPath) {
       if (!cases.includes(r.caseId)) cases.push(r.caseId);
     }
   }
+  // 2026-10-14：按原表固定行序排序——已知 caseId 按 CASE_ORDER，未知追加尾部
+  cases.sort((a, b) => {
+    const ia = CASE_ORDER.indexOf(a), ib = CASE_ORDER.indexOf(b);
+    if (ia === -1 && ib === -1) return 0;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
 
   const wb = new ExcelJS.Workbook();
   const kernel = platformFiles[0]?.meta?.kernel || '';
@@ -112,7 +135,8 @@ async function buildReport(platformFiles, outPath) {
   // 原表结构：R1 = 空|Win10|mac arm64|mac x64|Ubuntu22|Win7|验证标准|示例；R2 = 测试版本行
   const ws = wb.addWorksheet('验证结果');
   const S1_PLATFORMS = platforms.filter((p) => p !== 'Windows 10 (第二台设备)');
-  const ws1Header = ['验证项', ...S1_PLATFORMS.map((p) => (p === 'Windows 7' ? 'Windows 7（仅关注是否能打开会话）' : p)), '验证标准', '示例'];
+  // 2026-10-14：A1 留空对齐原表（原表 R1 = 空 | 平台列... | 验证标准 | 示例）
+  const ws1Header = ['', ...S1_PLATFORMS.map((p) => (p === 'Windows 7' ? 'Windows 7（仅关注是否能打开会话）' : p)), '验证标准', '示例'];
   ws.columns = [
     { header: ws1Header[0], key: 'name', width: 34 },
     ...S1_PLATFORMS.map((p) => ({ header: p === 'Windows 7' ? 'Windows 7（仅关注是否能打开会话）' : p, key: p, width: 22 })),
