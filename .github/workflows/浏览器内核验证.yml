@@ -408,7 +408,9 @@ jobs:
           echo "[debug-hold] 挂起结束"
 
       - uses: actions/upload-artifact@v4
-        if: always() && inputs.debug_hold != true && inputs.debug_verify != true
+        # 2026-10-14：debug_verify 调试轮也要上传（否则单平台调试看不到 results/截图，没法调）；
+        # 仅纯挂起（debug_hold）不上传。空白平台（调试模式下被 skip 的 matrix job）由 if-no-files-found: warn 兜住。
+        if: always() && inputs.debug_hold != true
         with:
           name: results-${{ matrix.slug }}
           path: |

@@ -172,6 +172,21 @@ async function tryRightClickTranslate(page) {
     await osRightClick(s.sx, s.sy);
   };
   try { await page.bringToFront(); } catch (_) {}
+  // 2026-10-14 mac 实锤修复（macx64_r0 现场图）：分身浏览器窗口可能被主壳（花漾客户端）窗口
+  // 遮挡——全局菜单栏显示「花漾客户端」，OS 右键屏幕落点打在主壳上，浏览器右键菜单根本没弹；
+  // page.bringToFront() 只保证 tab 在浏览器内激活，不保证浏览器窗口在 OS 层置前。
+  // 修复：右键前先 OS 左键点击浏览器窗口标题栏（窗口顶部中心，避开 mac 红绿灯/关闭按钮），
+  // 点击即激活并置前窗口。win 同做（无害）；linux 跳过（Xvfb 无 WM，点击不重排 z 序且可能误触页面）。
+  if (process.platform !== 'linux') {
+    try {
+      const w2 = await page.evaluate(() => ({ x: window.screenX, y: window.screenY, w: window.outerWidth, dpr: window.devicePixelRatio }));
+      const ax = Math.round((w2.x + w2.w / 2) * w2.dpr);
+      const ay = Math.round((w2.y + 8) * w2.dpr);
+      log(`[osmouse] 窗口激活：OS 左键点浏览器标题栏(${ax},${ay}) [win=(${w2.x},${w2.y}) outerW=${w2.w} dpr=${w2.dpr}]`);
+      await osLeftClick(ax, ay);
+      await sleep(400);
+    } catch (e) { log(`[osmouse] 窗口激活点击失败(继续右键): ${String(e && e.message).slice(0, 60)}`); }
+  }
   await doRightClick(target.x, target.y);
   const clickScreen = vpToScreen(target.x, target.y); // 菜单锚点（屏幕设备像素）→ 供 OCR 裁 ROI
   await sleep(900);
