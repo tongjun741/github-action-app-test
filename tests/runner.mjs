@@ -17,7 +17,7 @@
 //   PROXY_IP        代理出口公网 IP（用于 WebRTC 一致性判定，可选）
 //   OUT             输出文件路径（默认 results-<platform>.json，多平台时每个平台一个文件）
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { checkCase } from './checkers.mjs';
@@ -166,21 +166,25 @@ async function run() {
           new Promise((_, rej) => setTimeout(() => rej(new Error('用例判定超时(120s)')), 120000)),
         ]);
         // 2026-10-14 用户要求：所有测试截图 = OS 级全屏（不能只截浏览器视口）+ 顶部水印（平台+安装包名）+
-        // 存 shots/<平台>/ 目录（Excel 截图文件名含目录名）。page.screenshot 视口截图仅兜底。
+        // 存 shots/<操作系统>/<平台>/ 目录（Excel 截图文件名含目录名）。page.screenshot 视口截图仅兜底。
         try {
           const shotMod = await import('./include/shot.js');
           const fullShot = shotMod.fullShot || shotMod.default?.fullShot;
-          const shotName = `shot-${platform.replace(/\s+/g, '_')}-${c.id}`;
+          const shotDirFor = shotMod.shotDirFor || shotMod.default?.shotDirFor;
+          const platKey = platform.replace(/\s+/g, '_');
+          const shotName = `shot-${platKey}-${c.id}`;
           const full = await fullShot(shotName);
           if (full) {
             res.screenshot = full;
             console.log(`  [shot] ${full}`);
           } else {
-            // 全屏失败兜底：旧视口截图（无水印，聊胜于无）
-            const fallback = `shot-${platform.replace(/\s+/g, '_')}-${c.id}.png`;
+            // 全屏失败兜底：旧视口截图（无水印，聊胜于无）——同样进 OS 目录，避免散落 cwd
+            const dir = shotDirFor ? shotDirFor(platKey) : join('shots', platKey);
+            fs.mkdirSync(dir, { recursive: true });
+            const fallback = path.join(dir, `${shotName}.png`);
             await page.screenshot({ path: fallback, fullPage: false }).catch(() => {});
             if (existsSync(fallback)) {
-              res.screenshot = fallback;
+              res.screenshot = fallback.replace(/\\/g, '/');
               console.log(`  [shot] ${fallback}(视口兜底)`);
             }
           }

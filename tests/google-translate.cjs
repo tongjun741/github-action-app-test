@@ -42,8 +42,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let _gocrWorker = null;
 async function ocrFindTranslateItem(fullPngBuf, screenCssW) {
   // 全屏 PNG buffer → OCR 词级识别 → 返回「翻译」项屏幕设备像素中心 + dpr
-  // 2026-10-14：存 shots/<平台>/ 目录（Excel 截图文件名含目录名）
-  const dir = path.join(process.cwd(), 'shots', (process.env.E2E_PLATFORM || 'unknown').replace(/\s+/g, '_'));
+  // 2026-10-14：存 shots/<操作系统>/<平台>/ 目录（Excel 截图文件名含目录名）
+  const { shotDirFor } = require('./include/shot');
+  const dir = path.join(process.cwd(), shotDirFor(process.env.E2E_PLATFORM || 'unknown'));
   fs.mkdirSync(dir, { recursive: true });
   const tmp = path.join(dir, `rc-menu-${Date.now()}.png`);
   fs.writeFileSync(tmp, fullPngBuf);

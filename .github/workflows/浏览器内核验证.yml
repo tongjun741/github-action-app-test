@@ -790,11 +790,11 @@ jobs:
         run: node tests/report.mjs --dir artifacts --out report.xlsx
 
       # 2026-10-13 用户要求：所有测试结果截图打包成 zip（文件名与 Excel 明细「截图文件」列对应）
-      # 2026-10-14 变更：截图在 shots/<平台>/ 目录下（Excel 截图文件名含目录名）——保留目录结构打包。
+      # 2026-10-14 变更：截图在 shots/<操作系统>/<平台>/ 目录下（Excel 截图文件名含目录名）——保留目录结构打包。
       - name: 打包测试截图 zip
         shell: bash
         run: |
-          # artifacts 经 merge-multiple 解到同目录：results json、各脚本散图、shots/<平台>/ 全屏水印图
+          # artifacts 经 merge-multiple 解到同目录：results json、各脚本散图、shots/<操作系统>/<平台>/ 全屏水印图
           found=0
           # 散图（旧命名 rpa-*/gtranslate-* 等顶层 png）移入 shots/loose/ 统一目录结构
           mkdir -p shots_all

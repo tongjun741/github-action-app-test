@@ -5,11 +5,16 @@
  *   1) 所有平台桌面分辨率 ≥1440×1080（workflow 侧设置；此处仅读取）
  *   2) 所有截图 = OS 级全屏（含任务栏/Dock），不能只截浏览器视口 —— 用 screenshot-desktop
  *   3) 截图顶部加明显水印：当前平台 + 安装包文件名
- *   4) Excel 里的截图文件名包含所在目录名 —— 存 shots/<平台>/ 下，screenshot 字段带目录前缀
+ *   4) Excel 里的截图文件名包含所在目录名 —— 存 shots/<操作系统>/<平台>/ 下，screenshot 字段带目录前缀
+ *
+ * 2026-10-14（补充）：截图按操作系统分目录。结构示例：
+ *   shots/windows/Windows_10/、shots/windows/Windows_7/
+ *   shots/macos/macOS_arm64/、shots/macos/macOS_x64/
+ *   shots/linux/Ubuntu_22/
  *
  * 用法：
  *   const { fullShot, shotDirFor, watermarkText } = require('./include/shot');
- *   const relPath = await fullShot('shot-Windows_10-open_session'); // → shots/Windows_10/shot-...-<ts>.png
+ *   const relPath = await fullShot('shot-Windows_10-open_session'); // → shots/windows/Windows_10/shot-...-<ts>.png
  *
  * 失败兜底：screenshot-desktop 失败（如无显示服务器）返回 null，调用方记日志、不影响判定。
  */
@@ -20,10 +25,21 @@ const screenshotDesktop = require('screenshot-desktop');
 const PLATFORM = (process.env.E2E_PLATFORM || 'unknown').replace(/\s+/g, '_');
 const INSTALLER = process.env.E2E_INSTALLER_NAME || process.env.INSTALLER_NAME || '';
 
-// 截图目录：shots/<平台>/。CI 工作目录即仓库根。
+// 操作系统家族映射：平台名 → 顶层目录（windows / macos / linux）
+function osFamilyOf(platform) {
+  const p = String(platform || '').toLowerCase();
+  if (p.startsWith('windows') || p === 'win' || p === 'win32') return 'windows';
+  if (p.startsWith('macos') || p.startsWith('mac') || p === 'darwin') return 'macos';
+  if (p.startsWith('ubuntu') || p.startsWith('linux') || p === 'debian') return 'linux';
+  return 'other';
+}
+
+// 截图目录：shots/<操作系统>/<平台>/。CI 工作目录即仓库根。
+// 例：shots/windows/Windows_10/、shots/macos/macOS_arm64/、shots/linux/Ubuntu_22/
 function shotDirFor(platform) {
   const p = String(platform || PLATFORM).replace(/\s+/g, '_');
-  return path.join('shots', p);
+  const os = osFamilyOf(p);
+  return path.join('shots', os, p);
 }
 
 function watermarkText() {
@@ -67,7 +83,7 @@ async function loadFont32() {
  * OS 级全屏截图 + 顶部水印条。
  * @param {string} baseName 截图基础名（不含扩展名），如 'shot-Windows_10-open_session'
  * @param {object} opts { upload: async (localPath)=>url } 可选上传函数（如 Cloudinary）
- * @returns {Promise<string|null>} 相对路径（shots/<平台>/<baseName>-<ts>.png）或 null（失败）
+ * @returns {Promise<string|null>} 相对路径（shots/<操作系统>/<平台>/<baseName>-<ts>.png）或 null（失败）
  */
 async function fullShot(baseName, opts = {}) {
   try {
