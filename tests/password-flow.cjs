@@ -478,36 +478,57 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       }
       log(`分身浏览器已${cdpDown ? '关闭' : '未确认关闭（继续验证密码记录）'}`);
 
+      // ===== 2026-10-15 用户要求：关闭浏览器后等数据同步（默认 60s），再查密码是否保存好 =====
+      // 背景：轮#4 实锤点击「保存」生效（气泡关闭）但面板计数 0——可能是云端同步延迟，立即查太早。
+      // 等 60s（可 PW_SYNC_WAIT_S 覆盖）后先查一次；若仍 0，再轮询重查（面板文本可能异步刷新）。
+      const SYNC_WAIT = Math.max(0, Number(process.env.PW_SYNC_WAIT_S ?? 60));
+      if (SYNC_WAIT > 0) {
+        log(`A3.5 等待数据同步 ${SYNC_WAIT}s（浏览器已关，密码同步到云端/详情面板）...`);
+        await sleep(SYNC_WAIT * 1000);
+        log('A3.5 同步等待结束，开始查密码记录');
+      }
+
       log('A4 详情页查密码记录');
       // Run#37 dump 决定性发现：A3 关分身后主壳【本来就在 UA152 详情页】——
       // body 含完整详情面板（UA152|全球|Cookie N站点|网站密码 N站点，N对|打开浏览器|正在访问…），
       // UA152 不是 <a> 元素（历轮「找不到 <a>」即此因）。无需导航，直接解析面板计数。
-      let panelDump = '';
-      try {
-        panelDump = await wdioBrowser.execute(() => (document.body ? document.body.innerText : '').replace(/\n+/g, '|'));
-      } catch (_) { }
+      // 2026-10-15 用户要求：同步等待后首查；若仍 0，轮询重查（面板文本可能异步刷新，最多再查 2 次 × 10s）
+      const readPanel = async () => {
+        let dump = '';
+        try {
+          dump = await wdioBrowser.execute(() => (document.body ? document.body.innerText : '').replace(/\n+/g, '|'));
+        } catch (_) { }
+        let pw = '';
+        try {
+          pw = await wdioBrowser.execute(() => {
+            const els = Array.from(document.querySelectorAll('*')).filter((e) => e.children.length === 0);
+            const idx = els.findIndex((e) => (e.textContent || '').trim() === '网站密码');
+            if (idx < 0) return '';
+            for (let k = idx + 1; k < Math.min(idx + 12, els.length); k++) {
+              const t = (els[k].textContent || '').trim();
+              if (/^\d+站点/.test(t)) return t;
+              if (/^\d+$/.test(t)) {
+                const nxt = (els[k + 1] ? els[k + 1].textContent : '').trim();
+                if (nxt.startsWith('站点')) return `${t}${nxt}`;
+              }
+            }
+            return '';
+          });
+        } catch (_) { }
+        return { dump, pw };
+      };
+      let { dump: panelDump, pw: pwText } = await readPanel();
       const onDetail = /网站密码/.test(panelDump) && /打开浏览器|正在访问/.test(panelDump);
       log(onDetail ? '确认已在 UA152 详情页（网站密码面板可见）' : `未检出详情页特征，面板片段: ${panelDump.slice(200, 400)}`);
-      // 直接解析「网站密码」面板计数（面板静态文本带计数，无需点开任何入口）
-      let pwText = '';
-      try {
-        pwText = await wdioBrowser.execute(() => {
-          const els = Array.from(document.querySelectorAll('*')).filter((e) => e.children.length === 0);
-          const idx = els.findIndex((e) => (e.textContent || '').trim() === '网站密码');
-          if (idx < 0) return '';
-          for (let k = idx + 1; k < Math.min(idx + 12, els.length); k++) {
-            const t = (els[k].textContent || '').trim();
-            if (/^\d+站点/.test(t)) return t;
-            if (/^\d+$/.test(t)) {
-              const nxt = (els[k + 1] ? els[k + 1].textContent : '').trim();
-              if (nxt.startsWith('站点')) return `${t}${nxt}`;
-            }
-          }
-          return '';
-        });
-      } catch (_) { }
-      const found = /wdku\.net/i.test(panelDump) || /^[1-9]\d*站点/.test(pwText || '');
-      log(`网站密码面板计数: ${pwText || '(未解析到)'}（Cookie: ${(panelDump.match(/\d+站点[，,]\d+cookies?/) || [''])[0]}）`);
+      let found = /wdku\.net/i.test(panelDump) || /^[1-9]\d*站点/.test(pwText || '');
+      log(`网站密码面板计数(首查): ${pwText || '(未解析到)'}（Cookie: ${(panelDump.match(/\d+站点[，,]\d+cookies?/) || [''])[0]}）`);
+      for (let retry = 1; retry <= 2 && !found; retry++) {
+        log(`面板仍为 0，等 10s 重查(${retry}/2)——详情页文本可能异步刷新`);
+        await sleep(10000);
+        ({ dump: panelDump, pw: pwText } = await readPanel());
+        found = /wdku\.net/i.test(panelDump) || /^[1-9]\d*站点/.test(pwText || '');
+        log(`网站密码面板计数(重查${retry}): ${pwText || '(未解析到)'}`);
+      }
       saveStatus = found ? 'pass' : 'fail';
       saveDetail = found
         ? `网站密码记录已出现（面板: ${pwText || '含 wdku.net'}）`
