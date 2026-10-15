@@ -52,6 +52,70 @@ const log = (...a) => console.log('[e2e-verify]', ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * 从「客户端主进程 lowdb 文件」读取登录 jwt。
+ * 根因（2026-10-15 实证）：花漾客户端是 Electron，jwt **不写 localStorage**——
+ *   portalstatics `src/utils/jwt.ts` 里 `isElectron()` 分支走 IPC `sendSync('get-jwt')`，
+ *   仅 Web 版才 `localStorage.setItem('jwt')`。故 `browser.execute(()=>localStorage.getItem('jwt'))` 恒为空。
+ * 实际存储：主进程 lowdb 文件 `<appData>/<AppName>/db.json` 的 `account.jwt`
+ *   （见 portalstatics `electron/src/components/db.ts` initDbStorage：dbFile = appData/getName()/db.json；
+ *    jwt 写入见 `electron/src/components/api/auth.ts` -> `db.getDb().set('account', { jwt }).write()`）。
+ * 扫描各平台 appData/config 根目录下的「任意子目录/db.json」，取第一个含合法 JWT（三段点分）的 account.jwt。
+ */
+function readClientJwtFromDb() {
+  try {
+    const bases = [];
+    if (process.platform === 'win32') {
+      if (process.env.APPDATA) bases.push(process.env.APPDATA);
+      bases.push(path.join(os.homedir(), 'AppData', 'Roaming'));
+    } else if (process.platform === 'darwin') {
+      bases.push(path.join(os.homedir(), 'Library', 'Application Support'));
+    } else {
+      bases.push(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'));
+    }
+    for (const base of bases) {
+      let entries = [];
+      try { entries = fs.readdirSync(base); } catch (_) { continue; }
+      for (const e of entries) {
+        const f = path.join(base, e, 'db.json');
+        try {
+          const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+          const jwt = j && j.account && j.account.jwt;
+          if (jwt && typeof jwt === 'string' && jwt.split('.').length === 3) {
+            log(`[auth] 已从客户端 db.json 读取 jwt: ${f}`);
+            return jwt;
+          }
+        } catch (_) { /* 非本 app 或非 JSON，跳过 */ }
+      }
+    }
+  } catch (_) { /* 忽略 */ }
+  return '';
+}
+
+async function readTeamId(browser) {
+  const grab = () => {
+    const s = (window.location.search || '') + '&' + (window.location.href || '');
+    const m = s.match(/teamId=(\d+)/);
+    return m ? m[1] : '';
+  };
+  try {
+    const t = await browser.execute(grab);
+    if (t) return String(t);
+  } catch (_) { /* ignore */ }
+  // 兜底：遍历所有窗口找带 teamId 的（客户端多窗口）
+  try {
+    const handles = await browser.getWindowHandles();
+    for (const h of handles) {
+      try {
+        await browser.switchToWindow(h);
+        const t = await browser.execute(grab);
+        if (t) return String(t);
+      } catch (_) { /* ignore */ }
+    }
+  } catch (_) { /* ignore */ }
+  return '';
+}
+
+/**
  * 在给定目录里找「客户端主程序」exe（绕开 bat/GBK 中文路径编码坑）。
  * ⚠️ 直接取第一个 *.exe 会命中卸载器（如 `Uninstall 花漾客户端.exe`，字典序在前），
  *    导致 chromedriver 启动卸载器后立即退出（"Chrome has crashed"）。
@@ -470,14 +534,15 @@ async function main() {
     // 客户端 UI 即 portalstatics web 页面：jwt 在 localStorage，teamId 在主界面 URL（?teamId=xxx）。
     let newCloneName = '';
     try {
-      const auth = await browser.execute(() => {
-        const jwt = localStorage.getItem('jwt') || '';
-        const m = (window.location.search || '').match(/teamId=(\d+)/);
-        return { jwt, teamId: m ? m[1] : '' };
-      });
-      if (auth && auth.jwt) {
-        fs.writeFileSync(path.join(process.cwd(), '.e2e-auth.json'), JSON.stringify(auth));
-        log(`[auth] jwt/teamId 已导出（teamId=${auth.teamId || '?'}）`);
+      // jwt：客户端是 Electron，jwt 不写 localStorage → 从主进程 db.json 读（见 readClientJwtFromDb）
+      // 登录后 db.json 可能稍晚落盘，最多轮询 6 次（6s）
+      let jwt = readClientJwtFromDb();
+      for (let i = 0; i < 6 && !jwt; i++) { await sleep(1000); jwt = readClientJwtFromDb(); }
+      // teamId：主界面 URL 的 ?teamId=（portalstatics getTeamIdFromUrl 同源逻辑）
+      const teamId = await readTeamId(browser);
+      if (jwt && teamId) {
+        fs.writeFileSync(path.join(process.cwd(), '.e2e-auth.json'), JSON.stringify({ jwt, teamId }));
+        log(`[auth] jwt/teamId 已导出（teamId=${teamId}）`);
         // 创建本 job 专属新分身（用户要求：每平台独立分身，消除 password/LS 同步跨平台干扰）
         if (process.env.E2E_FRESH_CLONE === '1') {
           try {
@@ -491,7 +556,7 @@ async function main() {
           } catch (e) { log(`[fresh-clone] 创建失败，回退 ${CLONE}: ${e.message.slice(0, 80)}`); }
         }
       } else {
-        log('[auth] 未能读取 jwt（clone-manager 将不可用，继续跑 UA152 兼容路径）');
+        log(`[auth] 未能读取 jwt/teamId（jwt=${jwt ? '有' : '空'}, teamId=${teamId || '空'}；clone-manager 不可用，继续跑 UA152 兼容路径）`);
       }
     } catch (e) { log(`[auth] 导出 jwt 异常(忽略): ${e.message.slice(0, 60)}`); }
 
