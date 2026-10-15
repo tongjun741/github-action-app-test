@@ -538,8 +538,10 @@ async function main() {
       // 登录后 db.json 可能稍晚落盘，最多轮询 6 次（6s）
       let jwt = readClientJwtFromDb();
       for (let i = 0; i < 6 && !jwt; i++) { await sleep(1000); jwt = readClientJwtFromDb(); }
-      // teamId：主界面 URL 的 ?teamId=（portalstatics getTeamIdFromUrl 同源逻辑）
-      const teamId = await readTeamId(browser);
+      // teamId：优先取 workflow 注入的 TEAM_ID（稳定可靠，且即 UA152 所属团队），
+      // 兜底再试主界面 URL 的 ?teamId=（portalstatics getTeamIdFromUrl 同源逻辑）。
+      // 注意：客户端主程序页 URL 为 http://szdamai.local/ 不含 teamId，纯靠 readTeamId 会取空 → 回退 UA152。
+      const teamId = process.env.TEAM_ID || await readTeamId(browser);
       if (jwt && teamId) {
         fs.writeFileSync(path.join(process.cwd(), '.e2e-auth.json'), JSON.stringify({ jwt, teamId }));
         log(`[auth] jwt/teamId 已导出（teamId=${teamId}）`);
