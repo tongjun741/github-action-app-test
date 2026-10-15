@@ -38,10 +38,31 @@ async function api(method, urlPath, body, query) {
   return json;
 }
 
-/** 创建本平台专属新分身（参照 UA152 规格：Global + 独立指纹 + 不绑 IP + 不录像），返回分身名 */
-async function createClone(platform, runId) {
+/** 查询指定分身的主通道 ipId（pageV2 → list[0].channels[] 里 primary=true 的 ipId；无绑 IP 返回 null） */
+async function getPrimaryIpId(cloneName) {
+  const r = await api('POST', '/api/shop/pageV2', { names: [cloneName], pageNum: 1, pageSize: 10 });
+  const shop = ((r.data && r.data.list) || [])[0];
+  if (!shop) return null;
+  const channels = shop.channels || [];
+  const primary = channels.find((c) => c.primary) || channels[0];
+  return (primary && primary.ipId) || null;
+}
+
+/** 把 ipId 绑到分身（PUT /api/ip/bindShop，primary=true 主通道）。返回是否成功 */
+async function bindIpToClone(ipId, shopId) {
+  await api('PUT', '/api/ip/bindShop', { ipId, shopIdList: [shopId], primary: true });
+  return true;
+}
+
+/** 创建本平台专属新分身（参照 UA152 规格：Global + 独立指纹 + 不录像），并继承参考分身的主 IP。
+ *  refCloneName：参考分身（默认 UA152）——取其 primary 通道 ipId 绑到新分身，保证 IP 环境一致（用户要求 2026-10-15）。
+ *  返回 { name, id, ipBound } */
+async function createClone(platform, runId, refCloneName = 'UA152') {
   const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
   const name = `${PREFIX}${String(platform).replace(/\s+/g, '_')}-${runId || 'local'}-${stamp}`;
+  // 先取参考分身的主 IP（创建前取——绑定的 IP 才可用）
+  let refIpId = null;
+  try { refIpId = await getPrimaryIpId(refCloneName); } catch (e) { /* 查询失败按无 IP 处理 */ }
   const r = await api('POST', '/api/shop/batch', {
     namePrefix: name,
     count: 1,
@@ -51,7 +72,13 @@ async function createClone(platform, runId) {
   });
   const shop = (r.data || [])[0];
   if (!shop || !shop.id) throw new Error(`创建返回异常: ${JSON.stringify(r).slice(0, 150)}`);
-  return shop.name || name;
+  // 继承参考分身的主 IP（用户要求：新分身必须绑定现有 IP，保证出口一致）
+  let ipBound = false;
+  if (refIpId) {
+    try { await bindIpToClone(refIpId, shop.id); ipBound = true; }
+    catch (e) { throw new Error(`新分身已创建(id=${shop.id})但绑 IP 失败(ipId=${refIpId}): ${e.message.slice(0, 120)}`); }
+  }
+  return { name: shop.name || name, id: shop.id, ipBound };
 }
 
 /** 删除指定名字的分身（不存在时静默成功） */
@@ -74,4 +101,4 @@ async function cleanupStaleClones(maxAgeMin = 0) {
   return targets.length;
 }
 
-module.exports = { createClone, deleteClone, cleanupStaleClones };
+module.exports = { createClone, deleteClone, cleanupStaleClones, getPrimaryIpId, bindIpToClone };

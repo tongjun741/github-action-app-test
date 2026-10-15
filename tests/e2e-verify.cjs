@@ -482,10 +482,11 @@ async function main() {
         if (process.env.E2E_FRESH_CLONE === '1') {
           try {
             const { createClone } = require('./clone-helper');
-            newCloneName = await createClone(PLATFORM, process.env.GITHUB_RUN_ID);
-            log(`[fresh-clone] 新分身已创建: ${newCloneName}（本 job 内所有步骤共用）`);
+            // 继承 UA152 的主 IP（用户要求：新分身必须绑定现有 IP，保证出口一致）
+            const fresh = await createClone(PLATFORM, process.env.GITHUB_RUN_ID, CLONE);
+            newCloneName = fresh.name;
+            log(`[fresh-clone] 新分身已创建: ${fresh.name} (id=${fresh.id}, 继承IP=${fresh.ipBound ? '是' : '否(参考分身无绑定IP)'})`);
             // 传递给后续步骤（RPA/翻译/密码/同步）：CLONE_NAME 覆盖 + CLONE_CREATED 标记（删除步用）
-            const ghEnv = path.join(process.env.GITHUB_ENV || '', '');
             if (process.env.GITHUB_ENV) fs.appendFileSync(process.env.GITHUB_ENV, `CLONE_NAME=${newCloneName}\nCLONE_CREATED=${newCloneName}\n`);
           } catch (e) { log(`[fresh-clone] 创建失败，回退 ${CLONE}: ${e.message.slice(0, 80)}`); }
         }
