@@ -418,11 +418,55 @@ async function fingerprint_plugins(page, c, opts) {
       await new Promise((r) => setTimeout(r, 1000));
     }
     // 截图存证（chrome:// 页面 fullPage 在部分版本异常，用普通截图兜底）
+    // 2026-10-15 用户要求：截图前「缩小页面」，确保全部插件一屏可见（默认 800x600 视口只截到 3 个，第 4 个在折叠线下）。
     try {
+      // 1) 页面缩放到 70%（等价浏览器 Ctrl+-）——对 playwright/puppeteer 通用；
+      //    chrome://extensions 是 WebUI(含 shadow DOM)，documentElement + extensions-manager 双保险。
+      await page.evaluate(() => {
+        try {
+          const z = '0.7';
+          if (document.documentElement) document.documentElement.style.zoom = z;
+          if (document.body) document.body.style.zoom = z;
+          const mgr = document.querySelector('extensions-manager');
+          if (mgr) mgr.style.zoom = z;
+        } catch (_) {}
+      }).catch(() => {});
+      // 2) 尽量拉高/拉宽视口，让全部卡片入镜（CDP 可用时；失败不影响主路径）
+      let cdp = null;
+      try {
+        if (typeof page.context === 'function' && page.context() && typeof page.context().newCDPSession === 'function') {
+          cdp = await page.context().newCDPSession(page);
+        } else if (typeof page.createCDPSession === 'function') {
+          cdp = await page.createCDPSession();
+        }
+      } catch (_) { cdp = null; }
+      if (cdp) {
+        try {
+          await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1600, deviceScaleFactor: 1, mobile: false });
+        } catch (_) {}
+      } else {
+        // 无 CDP：退回各引擎原生 setViewport（CDP 连接的真实浏览器可能不支持，忽略失败）
+        try { if (typeof page.setViewport === 'function') await page.setViewport({ width: 1400, height: 1600 }); } catch (_) {}
+        try { if (typeof page.setViewportSize === 'function') await page.setViewportSize({ width: 1400, height: 1600 }); } catch (_) {}
+      }
+      await new Promise((r) => setTimeout(r, 500)); // 等重排
       const shotPath = path.join(process.cwd(), `plugins-${Date.now()}.png`);
       await page.screenshot({ path: shotPath }).catch(async () => {
         await page.screenshot({ path: shotPath, fullPage: true });
       });
+      // 清理：还原视口与缩放，避免影响后续用例
+      if (cdp) {
+        try { await cdp.send('Emulation.clearDeviceMetricsOverride'); } catch (_) {}
+        try { await cdp.detach(); } catch (_) {}
+      }
+      await page.evaluate(() => {
+        try {
+          if (document.documentElement) document.documentElement.style.zoom = '';
+          if (document.body) document.body.style.zoom = '';
+          const mgr = document.querySelector('extensions-manager');
+          if (mgr) mgr.style.zoom = '';
+        } catch (_) {}
+      }).catch(() => {});
       shotUrl = await uploadShotToCloudinary(shotPath, `plugins(${process.env.E2E_PLATFORM || '?'})`);
       if (shotUrl) {
         console.log(`::notice title=plugins截图(${process.env.E2E_PLATFORM || '?'})::${Buffer.from(shotUrl).toString('base64')}`);
