@@ -135,6 +135,8 @@ async function main() {
       "if(__app&&__app.commandLine){",
       "__app.commandLine.appendSwitch('use-fake-ui-for-media-stream');",
       "__app.commandLine.appendSwitch('use-fake-device-for-media-stream');",
+      "// 主窗口最大化：避免窗口宽于桌面导致 OS 级全屏截图裁掉右侧插件/工具栏",
+      "__app.commandLine.appendSwitch('start-maximized');",
       "console.log('[e2e-patch] fake media switches injected into app.commandLine');",
       '}',
       '}catch(e){console.warn(\'[e2e-patch] skip fake media inject:\',e&&e.message);}',
@@ -147,7 +149,10 @@ async function main() {
     // 使 app.commandLine 的开关对主应用（含在线客服 getUserMedia 触发的 macOS TCC 麦克风框）生效。
     fileContent = fakeMediaBootstrap + fileContent;
     // 进行内容替换，设置分身浏览器窗口大小
-    fileContent = fileContent.replace(windowSizePattern, 'this.windowSize="1920,1080"');
+    // 2026-10-15：由 1920,1080 改为 1600,1200 —— 与 Windows 桌面分辨率(1600x1200)一致，
+    // 避免窗口宽于桌面导致 OS 级全屏截图裁掉右侧插件/扩展（截图显得“窄”、插件显示不全）。
+    // 配合下方 --start-maximized，窗口始终撑满桌面。
+    fileContent = fileContent.replace(windowSizePattern, 'this.windowSize="1600,1200"');
 
     // 尝试向分身浏览器(browserSwitches)注入假媒体开关：覆盖克隆浏览器启动参数
     // （app.commandLine 的开关不一定被独立的分身浏览器进程继承，故这里直接打它的启动参数）
@@ -160,7 +165,7 @@ async function main() {
         bsPattern,
         // 注：--password-store=basic / --enable-automatic-password-saving 已按用户要求移除
         //（2026-10-10：密码保存必须模拟人工点击气泡，不得改浏览器启动参数绕过）
-        '$1;s.push("--use-fake-ui-for-media-stream");s.push("--use-fake-device-for-media-stream");s.push("--remote-debugging-address=0.0.0.0");s.push("--remote-allow-origins=*")'
+        '$1;s.push("--use-fake-ui-for-media-stream");s.push("--use-fake-device-for-media-stream");s.push("--remote-debugging-address=0.0.0.0");s.push("--remote-allow-origins=*");s.push("--start-maximized")'
       );
       console.log('✓ 已向 browserSwitches 注入 假媒体+CDP外网 开关（不含密码相关参数，按用户要求）');
     } else {
