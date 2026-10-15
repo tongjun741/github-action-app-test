@@ -299,7 +299,8 @@ async function pollCloneNames(browser, ms) {
 }
 
 /** 进入分身列表并打开目标分身（复用 origin e2eTest 的 UI 路径与选择器） */
-async function openClone(browser) {
+async function openClone(browser, cloneName) {
+  const CLONE_TO_OPEN = cloneName || CLONE;
   log('进入首页');
   await browser.$('.icon-shouye_24').waitForExist({ timeout: 60 * 1000 });
   await browser.$('.icon-shouye_24').click();
@@ -327,14 +328,14 @@ async function openClone(browser) {
     log(`[diag] 第 ${attempt} 次重试后分身名(${names.length}): ${JSON.stringify(names)}`);
   }
 
-  let target = matchClone(names, CLONE);
+  let target = matchClone(names, CLONE_TO_OPEN);
 
   // 第 1 页没命中 → 先尝试放大每页条数（多数情况一次搞定）
   if (!target) {
     await tryIncreasePageSize(browser);
     names = await listCloneNamesFromAnchors(browser);
     log(`[diag] 放大每页条数后分身名(${names.length}): ${JSON.stringify(names)}`);
-    target = matchClone(names, CLONE);
+    target = matchClone(names, CLONE_TO_OPEN);
   }
 
   // 仍未命中 → 逐页翻（最多 20 页），跨页累积用于失败诊断
@@ -347,7 +348,7 @@ async function openClone(browser) {
       const pageNames = await listCloneNamesFromAnchors(browser);
       log(`[diag] 第 ${i + 2} 页分身名(${pageNames.length}): ${JSON.stringify(pageNames)}`);
       pageNames.forEach((n) => all.add(n));
-      target = matchClone(pageNames, CLONE);
+      target = matchClone(pageNames, CLONE_TO_OPEN);
       if (target) break;
     }
     names = Array.from(all);
@@ -358,7 +359,7 @@ async function openClone(browser) {
   if (!target) {
     const any = await listCloneNamesAnyEl(browser);
     log(`[diag] 分身名(任意元素 ${any.length}): ${JSON.stringify(any)}`);
-    target = matchClone(any, CLONE);
+    target = matchClone(any, CLONE_TO_OPEN);
     viaAnyEl = !!target;
   }
 
@@ -465,8 +466,36 @@ async function main() {
     }
     log('登录完成');
 
+    // 2026-10-15 新分身方案：导出 jwt/teamId 到 .e2e-auth.json，供 clone-manager.cjs 调 API 建/删分身。
+    // 客户端 UI 即 portalstatics web 页面：jwt 在 localStorage，teamId 在主界面 URL（?teamId=xxx）。
+    let newCloneName = '';
     try {
-      await openClone(browser);
+      const auth = await browser.execute(() => {
+        const jwt = localStorage.getItem('jwt') || '';
+        const m = (window.location.search || '').match(/teamId=(\d+)/);
+        return { jwt, teamId: m ? m[1] : '' };
+      });
+      if (auth && auth.jwt) {
+        fs.writeFileSync(path.join(process.cwd(), '.e2e-auth.json'), JSON.stringify(auth));
+        log(`[auth] jwt/teamId 已导出（teamId=${auth.teamId || '?'}）`);
+        // 创建本 job 专属新分身（用户要求：每平台独立分身，消除 password/LS 同步跨平台干扰）
+        if (process.env.E2E_FRESH_CLONE === '1') {
+          try {
+            const { createClone } = require('./clone-helper');
+            newCloneName = await createClone(PLATFORM, process.env.GITHUB_RUN_ID);
+            log(`[fresh-clone] 新分身已创建: ${newCloneName}（本 job 内所有步骤共用）`);
+            // 传递给后续步骤（RPA/翻译/密码/同步）：CLONE_NAME 覆盖 + CLONE_CREATED 标记（删除步用）
+            const ghEnv = path.join(process.env.GITHUB_ENV || '', '');
+            if (process.env.GITHUB_ENV) fs.appendFileSync(process.env.GITHUB_ENV, `CLONE_NAME=${newCloneName}\nCLONE_CREATED=${newCloneName}\n`);
+          } catch (e) { log(`[fresh-clone] 创建失败，回退 ${CLONE}: ${e.message.slice(0, 80)}`); }
+        }
+      } else {
+        log('[auth] 未能读取 jwt（clone-manager 将不可用，继续跑 UA152 兼容路径）');
+      }
+    } catch (e) { log(`[auth] 导出 jwt 异常(忽略): ${e.message.slice(0, 60)}`); }
+
+    try {
+      await openClone(browser, newCloneName || CLONE);
     } catch (e) {
       await saveShot(browser, SHOT);
       throw e;

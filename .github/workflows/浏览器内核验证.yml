@@ -90,6 +90,11 @@ on:
         required: false
         default: true
         type: boolean
+      fresh_clone:
+        description: '每平台 job 创建专属新分身并共用（默认 true——消除密码/LS 跨平台干扰；job 结束自动删除。Ubuntu 分身留给 Cookie 同步 job 用后由收尾清理）'
+        required: false
+        default: true
+        type: boolean
   schedule:
     - cron: '0 9 * * 1' # 每周一 09:00 UTC 自动跑一轮
   # 2026-10-10 用户纠偏：不再 push 自动触发——修复期间每次 push 都起全量验证轮，
@@ -124,6 +129,8 @@ jobs:
           - { platform: "Ubuntu 22",   os: ubuntu-22.04,   slug: Ubuntu_22,   client: '/opt/花漾客户端/huayoung', install: 'ubuntu' }
           # Windows 7 不走此矩阵（无 GitHub Win7 托管 runner），改由下方 verify-win7 (Docker) job 单独跑
     runs-on: ${{ github.event.inputs.runs_on_override || matrix.os }}
+    outputs:
+      ubuntu_clone_name: ${{ steps.ubuntu_clone.outputs.name }}
     env:
       CLIENT_BINARY: ${{ matrix.client }}
       TEAM_ID: ${{ github.event.inputs.team_id || '213505445724246' }}
@@ -336,6 +343,7 @@ jobs:
           WDKU_USERNAME: ${{ secrets.WDKU_USERNAME }}
           WDKU_PASSWORD: ${{ secrets.WDKU_PASSWORD }}
           OUT: results-${{ matrix.slug }}.json
+          E2E_FRESH_CLONE: ${{ inputs.fresh_clone != false && '1' || '' }}
         run: node tests/e2e-verify.cjs
 
       # R21 执行RPA流程（用户指定：百度检索-教程示例，关键词=ios，匹配 Apple）
@@ -409,6 +417,27 @@ jobs:
           done
           echo "[debug-hold] 挂起结束"
 
+      # 2026-10-15 新分身方案：Ubuntu 的新分身名暴露为 job output（verify-cookie-sync 跨 job 用同一分身验同步）
+      - name: 导出 Ubuntu 新分身名 (job output)
+        id: ubuntu_clone
+        if: always() && matrix.install == 'ubuntu'
+        run: |
+          NAME="${CLONE_CREATED:-}"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "ubuntu_clone_name=$NAME"
+
+      # 2026-10-15 新分身方案：job 结束 always 删除本 job 创建的分身。
+      # Ubuntu 例外——其新分身要留给 verify-cookie-sync job（第二台设备）跨 job 验证同步后，由 report job 前的清理步统一删。
+      - name: 删除本 job 新分身 (always)
+        if: always() && inputs.fresh_clone != false && inputs.debug_hold != true && matrix.install != 'ubuntu'
+        continue-on-error: true
+        run: |
+          if [ -n "$CLONE_CREATED" ] && [ -f .e2e-auth.json ]; then
+            node tests/clone-manager.cjs delete --name "$CLONE_CREATED" || echo "::warning::分身删除失败(不阻塞): $CLONE_CREATED"
+          else
+            echo "无新分身需删除（CLONE_CREATED 空）"
+          fi
+
       - uses: actions/upload-artifact@v4
         # 2026-10-14：debug_verify 调试轮也要上传（否则单平台调试看不到 results/截图，没法调）；
         # 仅纯挂起（debug_hold）不上传。空白平台（调试模式下被 skip 的 matrix job）由 if-no-files-found: warn 兜住。
@@ -434,7 +463,7 @@ jobs:
   # 前置：verify job 内 password-flow 已完成 wdku.net 登录（Cookie 落到分身云端）。
   verify-cookie-sync:
     name: 验证 Cookie 同步 (第二台设备)
-    needs: verify          # 必须等第一台机器登录完成，Cookie 才有同步源
+    needs: verify          # 必须等第一台机器登录完成，Cookie 才有同步源（Ubuntu 新分身名经 needs.verify.outputs 传入）
     # 2026-10-13 调试增强：debug_verify/debug_sync 时也跑（覆盖 Group2 sync4+Cookie 调试）；
     # 仅 debug_hold 纯挂起不跑验证时跳过。普通全量轮(input 全 false)照常跑。
     if: ${{ !cancelled() && inputs.debug_hold != true && inputs.debug_sync_mode != 'write' }}
@@ -442,7 +471,9 @@ jobs:
     env:
       CLIENT_BINARY: /opt/花漾客户端/huayoung
       TEAM_ID: ${{ github.event.inputs.team_id || '213505445724246' }}
-      CLONE_NAME: ${{ github.event.inputs.clone_name || 'UA152' }}
+      # 2026-10-15 新分身方案：优先用 verify job 的 Ubuntu 新分身（fresh_clone 开时），
+      # Cookie 同步 = 第二台设备开同一分身——正是「跨设备同步」的语义。
+      CLONE_NAME: ${{ needs.verify.outputs.ubuntu_clone_name || github.event.inputs.clone_name || 'UA152' }}
       REMOTE_DEBUG_PORT: ${{ github.event.inputs.cdp_port || '9221' }}
       E2E_PLATFORM: Windows 10   # 详情页 UI 与 Win10 一致；runner 本身是 Ubuntu
     steps:
@@ -513,6 +544,17 @@ jobs:
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
           OUT: results-Sync_Flows.json
         run: node tests/sync-flows.cjs
+
+      # 2026-10-15 新分身方案：cookie-sync 是 Ubuntu 新分身的最后使用者——验证完就地删除
+      - name: 删除 Ubuntu 新分身 (always)
+        if: always() && inputs.fresh_clone != false
+        continue-on-error: true
+        run: |
+          UB="${CLONE_NAME:-}"
+          case "$UB" in
+            E2E-*) node tests/clone-manager.cjs delete --name "$UB" || echo "::warning::Ubuntu 分身删除失败: $UB" ;;
+            *) echo "非新分身($UB)，跳过删除" ;;
+          esac
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -775,6 +817,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      # 2026-10-15 新分身方案兜底：清理所有 E2E- 前缀残留分身（Ubuntu 分身给 cookie-sync 用完后在此删；
+      # 各平台 job 删除步失败漏掉的也在此兜底）。无认证文件时跳过（说明本轮没建新分身）。
+      - name: 清理 E2E 残留分身 (兜底)
+        if: inputs.fresh_clone != false
+        continue-on-error: true
+        run: |
+          UB_CLONE="${{ needs.verify.outputs.ubuntu_clone_name }}"
+          echo "Ubuntu 新分身: ${UB_CLONE:-（无）}"
+          # cookie-sync 的 .e2e-auth.json 在它的 runner 上——此处无认证文件则无法调 API，跳过（分身由下轮 cleanup 前置清理）
+          if [ -f .e2e-auth.json ]; then
+            node tests/clone-manager.cjs cleanup --prefix E2E- || echo "::warning::残留清理失败(不阻塞)"
+          else
+            echo "::notice::本 runner 无 .e2e-auth.json——E2E 分身将在下轮开跑前的 cleanup 步统一清理"
+          fi
 
       - name: Use Node.js 24
         uses: actions/setup-node@v6

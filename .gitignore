@@ -18,3 +18,6 @@ _tmp_e2e_logs2.txt
 # 运行时生成（本地跑 tesseract/截图 会在仓库根产生）
 shots/
 *.traineddata
+
+# E2E 分身管理认证（jwt，严禁提交/上传）
+.e2e-auth.json
