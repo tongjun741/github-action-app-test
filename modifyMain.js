@@ -135,8 +135,6 @@ async function main() {
       "if(__app&&__app.commandLine){",
       "__app.commandLine.appendSwitch('use-fake-ui-for-media-stream');",
       "__app.commandLine.appendSwitch('use-fake-device-for-media-stream');",
-      "// 主窗口最大化：避免窗口宽于桌面导致 OS 级全屏截图裁掉右侧插件/工具栏",
-      "__app.commandLine.appendSwitch('start-maximized');",
       "console.log('[e2e-patch] fake media switches injected into app.commandLine');",
       '}',
       '}catch(e){console.warn(\'[e2e-patch] skip fake media inject:\',e&&e.message);}',
@@ -165,7 +163,7 @@ async function main() {
         bsPattern,
         // 注：--password-store=basic / --enable-automatic-password-saving 已按用户要求移除
         //（2026-10-10：密码保存必须模拟人工点击气泡，不得改浏览器启动参数绕过）
-        '$1;s.push("--use-fake-ui-for-media-stream");s.push("--use-fake-device-for-media-stream");s.push("--remote-debugging-address=0.0.0.0");s.push("--remote-allow-origins=*");s.push("--start-maximized")'
+        '$1;s.push("--use-fake-ui-for-media-stream");s.push("--use-fake-device-for-media-stream");s.push("--remote-debugging-address=0.0.0.0");s.push("--remote-allow-origins=*")'
       );
       console.log('✓ 已向 browserSwitches 注入 假媒体+CDP外网 开关（不含密码相关参数，按用户要求）');
     } else {
