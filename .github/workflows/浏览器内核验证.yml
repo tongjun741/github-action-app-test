@@ -393,6 +393,8 @@ jobs:
       - name: 调试挂起 (保持隧道在线, Agent 自动探测)
         # debug_sync 模式不挂起：让 verify-cookie-sync job 能紧接着跑跨设备读取（不被 300min 挂起阻塞）
         if: (inputs.debug_hold == true || inputs.debug_verify == true) && inputs.debug_sync != true
+        # 2026-10-15 轮#5 实锤：Win 默认 pwsh 跑 bash 语法报 ParserError（[ "$MINS" -gt 300 ]）→ 显式 bash
+        shell: bash
         run: |
           MINS=${{ inputs.debug_hold_minutes || '30' }}
           [ "$MINS" -gt 300 ] 2>/dev/null && MINS=300
