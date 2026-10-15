@@ -342,17 +342,19 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
             }
           }
         } catch (e) { log(`[btn-geom] 几何检测异常(跳过): ${String(e && e.message).slice(0, 50)}`); }
-        if (w && osMouseSupported()) {
+        if (btn && osMouseSupported()) {
+          // 2026-10-15 轮#3 实锤：OCR 词「保存」命中了说明行「系统会将密码保存到...」(y442) 又点空——
+          // 几何蓝实心按钮是像素级精确锚定（轮#3 命中 (1239,382) 与实测分毫不差），故几何优先、OCR 词降兜底。
+          log(`几何兜底优先：点蓝实心主按钮(${btn.cx},${btn.cy})（OCR 词"${w ? w.text : '无'}"可能命中说明行，不可靠）`);
+          await osLeftClick(btn.cx, btn.cy);
+          bubbleAction = `geom:blue-btn@(${btn.cx},${btn.cy})`;
+          await sleep(1000);
+        } else if (w && osMouseSupported()) {
           const cx = Math.round((w.bbox.x0 + w.bbox.x1) / 2);
           const cy = Math.round((w.bbox.y0 + w.bbox.y1) / 2);
           log(`OCR 命中保存按钮词「${w.text}」(conf=${Math.round(w.confidence)}), 屏幕坐标(${cx},${cy})——OS 真鼠标点击`);
           await osLeftClick(cx, cy);
           bubbleAction = `ocr:${w.text}@(${cx},${cy})`;
-          await sleep(1000);
-        } else if (!w && btn && osMouseSupported()) {
-          log(`OCR 未命中按钮词（按钮文字过小），几何兜底点深蓝主按钮(${btn.cx},${btn.cy})`);
-          await osLeftClick(btn.cx, btn.cy);
-          bubbleAction = `geom:dark-btn@(${btn.cx},${btn.cy})`;
           await sleep(1000);
         } else if ((w || btn) && !osMouseSupported()) {
           log(`命中(${w ? '词' : '几何'})但 OS 鼠标工具缺失——按用户要求不降级 CDP 合成事件，不点击`);
