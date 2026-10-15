@@ -232,8 +232,19 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       // 图片像素→视口 CSS 像素：DPR>1 时 page.screenshot 会放大，按 innerWidth/innerHeight 映射回 CDP 坐标。
       // 仅 OCR：OCR 命中即 CDP 真鼠标点击；未命中/异常记 ocr-none，不回退 DOM/Enter/网格（用户要求不降级）。
       let bubbleAction = 'ocr-none';
-      const OCR_KW_PWD = /密码/;                          // 优先：含「密码」词（最专一，避开误命中「保存」其他文字）
-      const OCR_KW_SAVE = /(保存|记住|save|remember)/i;   // 次选：保存/记住
+      // 2026-10-15 修复：旧逻辑 OCR_KW_PWD=/密码/ + words.find() 全屏取第一个命中词——
+      // 实锤（轮 38550806785 现场图逐词回放）命中的是气泡**标题行**「要保存密码吗?」的「保存密码」四字
+      // （y234-256），点击打在标题上，没点中下方按钮 ⇒ 密码从未确认保存 ⇒ A4 面板计数=0。
+      // 气泡真实结构（1600×1200 Win10 实测）：
+      //   标题「要保存密码吗?」(y~234) → 用户名行(y~276) → 密码行(y~317)
+      //   → 三个并排选项按钮(y~363-400，宽~70px 等宽等距；左=深蓝底主按钮 RGB(4,30,73)，中/右=白底)
+      //   → 说明文字「系统会将密码保存到此设备上的密码管理工具中。」(y~436-447)
+      // 按钮文字仅 ~9px 且白字彩底，OCR（放大/反色/二值化均试）读不出可靠文本 ⇒ 双策略：
+      //   A) OCR 词级：优先「保存」类词，但必须排除标题行（标题特征：同一词串含「吗?」或 y 与「保存密码」标题同带）
+      //   B) 几何兜底：深蓝主按钮（RGB≈(4,30,73) 深色底、白字）像素检测——找气泡区域内「深色实心块」，
+      //      取其中心点击。深蓝主按钮 = 默认主选项（「保存」）。
+      const OCR_KW_SAVE = /(保存|记住|save|remember)/i;
+      const OCR_KW_TITLE = /(吗\s*\?|？)/;   // 标题行特征：句尾问号
       try {
         const tesseract = require('tesseract.js');
         // 2026-10-14 用户铁律：永远不用 CDP 合成事件；点击一律 OS 真鼠标（工具缺失则本用例不点击）。
@@ -247,9 +258,90 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
         if (!global.__ocrWorker) global.__ocrWorker = await tesseract.createWorker('chi_sim+eng');
         const { data } = await global.__ocrWorker.recognize(shotPath);
         const words = (data.words || []).filter((w) => w.confidence >= 40 && w.bbox);
-        const wp = words.find((w) => OCR_KW_PWD.test(w.text));
-        const ws = words.find((w) => OCR_KW_SAVE.test(w.text));
-        const w = wp || ws;
+        // —— 策略 A：OCR 词级命中（优先「保存」，排除标题行）——
+        // 标题锚定（宽容 OCR 错字：「密码」可能读成「室码」）：行文本匹配 要X存Y码Z吗 模式
+        const tol = 14;
+        const lines = [];
+        for (const wd of words.slice().sort((a, b) => a.bbox.y0 - b.bbox.y0)) {
+          let L = lines.find((l) => Math.abs(l.y - wd.bbox.y0) <= tol);
+          if (!L) { L = { y: wd.bbox.y0, items: [] }; lines.push(L); }
+          L.items.push(wd);
+        }
+        for (const L of lines) L.items.sort((a, b) => a.bbox.x0 - b.bbox.x0);
+        const lineText = (L) => L.items.map((i) => i.text).join('');
+        let titleAnchor = null, titleLine = null;
+        for (const L of lines) {
+          const t = lineText(L);
+          if (/(保存|存).{0,6}(码|密码).{0,4}(吗|\?|？)/.test(t) || /(要).{0,4}(保存|存)/.test(t)) {
+            titleLine = L;
+            titleAnchor = L.items.find((i) => /(要|保存|存)/.test(i.text)) || L.items[0];
+            log(`[bubble] 标题锚: y${L.y} 锚词"${titleAnchor.text}" @x${titleAnchor.bbox.x0}`);
+            break;
+          }
+        }
+        let w = null;
+        if (titleLine) {
+          for (const L of lines) {
+            if (L === titleLine) continue;
+            const cand = L.items.find((i) => OCR_KW_SAVE.test(i.text));
+            if (cand) { w = cand; break; }
+          }
+        } else {
+          w = words.find((x) => OCR_KW_SAVE.test(x.text)) || null;
+        }
+        // —— 策略 B：几何兜底——蓝色实心主按钮检测（按钮文字 ~9px OCR 读不出；实锚 RGB(13,88,208)）——
+        // 气泡三按钮布局（Win10 实测）：左「一律不保存」/ 中「保存」(蓝实心主按钮) / 右「不保存」，
+        // 说明行「系统会将密码保存到此设备上的密码管理工具中。」。
+        // 算法（离线实图验证命中 (1239,382) 分毫不差）：标题锚下方 55~230px → 蓝行带（主带）→ 列分段 → 实心率>60% 的段 = 主按钮。
+        let btn = null;
+        try {
+          const { Jimp } = require('jimp');
+          const img = await Jimp.read(shotPath);
+          const { width: W, height: H, data: px } = img.bitmap;
+          const isBlue = (i) => px[i + 2] > 150 && px[i + 2] - px[i] > 40 && px[i + 2] - px[i + 1] > 40;
+          const ax = titleAnchor ? titleAnchor.bbox.x0 : 0;
+          const ay = titleLine ? Math.max(...titleLine.items.map((i) => i.bbox.y1)) : 0;
+          if (titleAnchor) {
+            const X0 = Math.max(0, ax - 60), X1 = Math.min(W - 1, ax + 360);
+            const Y0 = Math.min(H - 1, ay + 55), Y1 = Math.min(H - 1, ay + 230);
+            const rows = [];
+            for (let y = Y0; y < Y1; y++) {
+              let n = 0;
+              for (let x = X0; x < X1; x++) if (isBlue((y * W + x) * 4)) n++;
+              if (n > 10) rows.push({ y, n });
+            }
+            const bands = [];
+            for (const r of rows) {
+              const b = bands[bands.length - 1];
+              if (b && r.y - b.y1 <= 3) { b.y1 = r.y; b.maxN = Math.max(b.maxN, r.n); } else bands.push({ y0: r.y, y1: r.y, maxN: r.n });
+            }
+            if (bands.length) {
+              const main = bands.reduce((a, b) => b.maxN > a.maxN ? b : a);
+              const cols = [];
+              for (let x = X0; x < X1; x++) {
+                let n = 0;
+                for (let y = main.y0; y <= main.y1; y++) if (isBlue((y * W + x) * 4)) n++;
+                if (n >= 4) cols.push(x);
+              }
+              const segs = [];
+              for (const x of cols) {
+                const s = segs[segs.length - 1];
+                if (s && x - s.x1 <= 4) s.x1 = x; else segs.push({ x0: x, x1: x });
+              }
+              for (const s of segs) {
+                if (s.x1 - s.x0 < 20) continue;
+                let blue = 0;
+                const total = (s.x1 - s.x0 + 1) * (main.y1 - main.y0 + 1);
+                for (let y = main.y0; y <= main.y1; y++) for (let x = s.x0; x <= s.x1; x++) if (isBlue((y * W + x) * 4)) blue++;
+                if (blue / total > 0.6) {
+                  btn = { cx: Math.round((s.x0 + s.x1) / 2), cy: Math.round((main.y0 + main.y1) / 2) };
+                  log(`[btn-geom] 蓝实心主按钮: x${s.x0}-${s.x1} y${main.y0}-${main.y1} → 点击(${btn.cx},${btn.cy})`);
+                  break;
+                }
+              }
+            }
+          }
+        } catch (e) { log(`[btn-geom] 几何检测异常(跳过): ${String(e && e.message).slice(0, 50)}`); }
         if (w && osMouseSupported()) {
           const cx = Math.round((w.bbox.x0 + w.bbox.x1) / 2);
           const cy = Math.round((w.bbox.y0 + w.bbox.y1) / 2);
@@ -257,11 +349,16 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
           await osLeftClick(cx, cy);
           bubbleAction = `ocr:${w.text}@(${cx},${cy})`;
           await sleep(1000);
-        } else if (w && !osMouseSupported()) {
-          log(`OCR 命中「${w.text}」但 OS 鼠标工具缺失——按用户要求不降级 CDP 合成事件，不点击`);
+        } else if (!w && btn && osMouseSupported()) {
+          log(`OCR 未命中按钮词（按钮文字过小），几何兜底点深蓝主按钮(${btn.cx},${btn.cy})`);
+          await osLeftClick(btn.cx, btn.cy);
+          bubbleAction = `geom:dark-btn@(${btn.cx},${btn.cy})`;
+          await sleep(1000);
+        } else if ((w || btn) && !osMouseSupported()) {
+          log(`命中(${w ? '词' : '几何'})但 OS 鼠标工具缺失——按用户要求不降级 CDP 合成事件，不点击`);
           bubbleAction = 'ocr-hit-noclick(tool-missing)';
         } else {
-          log(`OCR 未命中保存关键词（识别词数=${words.length}），按用户要求不降级（仅 OCR）`);
+          log(`OCR 未命中保存关键词（识别词数=${words.length}，几何兜底=${btn ? '有' : '无'}），按用户要求不降级（仅 OCR）`);
         }
       } catch (e) { log(`OCR 识别异常(不降级): ${e.message.slice(0, 80)}`); }
       // （已移除 DOM boundingBox / 键盘 Enter 降级兜底：本用例仅用 OCR 识别，命中即点，未命中记 ocr-none）
