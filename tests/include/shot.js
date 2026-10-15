@@ -105,13 +105,14 @@ async function fullShot(baseName, opts = {}) {
       }
     }
     if (!buf) buf = await screenshotDesktop({ format: 'png' });
-    // 顶部水印条：高 ~56px（按图高自适应 4%），半透明深色底 + 白字，左上角
-    // jimp v1（本地实测）：loadFont 顶层函数；print({font,text,x,y})；measureText 顶层。
+    // 水印：白字 + 黑色阴影（2026-10-15 用户要求去掉背景色条，改为文字阴影）。
+    // 做法：白字印到透明图 → invert 成黑字（alpha 保留）→ 偏移叠加到原图作阴影；主白字再直接印。
+    // 这样任意底色（亮/暗）上都能读清，且不再有深色背景条。
+    // jimp v1（本地实测）：loadFont 顶层函数；print({font,text,x,y})；measureText 顶层；invert() 保留 alpha。
     try {
       const { Jimp, measureText } = await loadJimp();
       const font = await loadFont32();
       const img = await Jimp.read(buf);
-      const barH = Math.max(40, Math.round(img.height * 0.045));
       const txt = watermarkText();
       // 文本过长时缩字号不可行（位图字体固定）——按宽度截断
       const maxW = img.width - 24;
@@ -119,10 +120,21 @@ async function fullShot(baseName, opts = {}) {
       try {
         while (shown.length > 8 && measureText(font, shown) > maxW) shown = shown.slice(0, -8) + '…';
       } catch (_) { shown = shown.slice(0, Math.floor(maxW / 18)); }
-      const bar = new Jimp({ width: img.width, height: barH, color: 0x000000cc });
-      bar.print({ font, text: shown, x: 12, y: Math.max(4, Math.round((barH - 32) / 2)) });
-      const composited = img.composite(bar, 0, 0);
-      await composited.write(file);
+      const tx = 12;
+      const ty = Math.max(6, Math.round(img.height * 0.02)); // 顶部留一点边距
+      const off = 2; // 阴影偏移 px
+      // 阴影层：透明图印白字 → invert 成黑字 → 叠加（偏移 off）
+      try {
+        const shadow = new Jimp({ width: img.width, height: img.height, color: 0x00000000 });
+        shadow.print({ font, text: shown, x: tx + off, y: ty + off });
+        shadow.invert(); // 白字→黑字（alpha 保留），形成阴影
+        img.composite(shadow, 0, 0);
+      } catch (se) {
+        console.log(`[shot] 阴影生成失败(仅白字无水印条): ${se.message.slice(0, 50)}`);
+      }
+      // 主文字（白）直接印到原图
+      img.print({ font, text: shown, x: tx, y: ty });
+      await img.write(file);
     } catch (e) {
       // 水印失败（jimp 异常）→ 保底落原始截图，水印缺失不丢证据
       fs.writeFileSync(file, buf);
