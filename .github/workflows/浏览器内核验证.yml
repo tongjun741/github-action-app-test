@@ -579,7 +579,7 @@ jobs:
     # Win7 无 GitHub 托管 runner，用 Docker/VM 方案。
     # 2026-10-10 用户指令：Win7 搁置（skip_win7 输入默认 true；要跑时手动 dispatch 填 false）
     if: inputs.skip_win7 != true && inputs.debug_hold != true && inputs.debug_verify != true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # 2026-10-16 pin：ubuntu-latest 将随 22.04 退役潮告警/漂移，固定 24.04（第二设备验证与报告合并均为纯 node 任务，无 22.04 依赖）
     env:
       TEAM_ID: ${{ github.event.inputs.team_id || '213505445724246' }}
       CLONE_NAME: ${{ github.event.inputs.clone_name || 'UA152' }}
@@ -817,7 +817,7 @@ jobs:
     # 调试模式不出报告（验证没跑）；关键：只要有任意平台是红（例如 iphey 判 fail、Win7 未产出），
     # report 就会被默认跳过——加 always() 保证无论验证结果如何都能合并出 report.xlsx。
     if: always() && inputs.debug_hold != true && inputs.debug_verify != true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # 2026-10-16 pin：ubuntu-latest 将随 22.04 退役潮告警/漂移，固定 24.04（第二设备验证与报告合并均为纯 node 任务，无 22.04 依赖）
     steps:
       - uses: actions/checkout@v6
 
