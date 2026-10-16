@@ -248,15 +248,14 @@ async function listCloneNamesFromAnchors(browser) {
     return await browser.execute(() =>
       Array.from(document.querySelectorAll('a'))
         .map((a) => (a.textContent || '').trim())
-        // 同时认 UA 前缀（存量参考分身）与 E2E- 前缀（fresh-clone 新建分身，run#38839736432
-        // 实证：只认 ^UA\d+$ 会把刚建的 E2E-xxx 分身扫成隐形 → openClone 误报「分身列表未找到」）
-        .filter((t) => /^(UA\d+|E2E-.+)$/i.test(t)));
+        // 同时认 UA 前缀（存量参考分身）、E2E- 前缀（历史 fresh-clone 分身）与 152- 前缀（2026-10-16 起新分身）
+        .filter((t) => /^(UA\d+|E2E-.+|152-.+)$/i.test(t)));
   } catch (_) {
     return [];
   }
 }
 
-/** 兜底：任意叶子节点上恰好是 UA123/E2E-xxx 的文本（新版 UI 可能不是 <a>） */
+/** 兜底：任意叶子节点上恰好是 UA123/E2E-xxx/152-xxx 的文本（新版 UI 可能不是 <a>） */
 async function listCloneNamesAnyEl(browser) {
   try {
     return await browser.execute(() => {
@@ -264,7 +263,7 @@ async function listCloneNamesAnyEl(browser) {
       document.querySelectorAll('*').forEach((el) => {
         if (el.children.length === 0) {
           const t = (el.textContent || '').trim();
-          if (/^(UA\d+|E2E-.+)$/i.test(t)) s.add(t);
+          if (/^(UA\d+|E2E-.+|152-.+)$/i.test(t)) s.add(t);
         }
       });
       return Array.from(s);
@@ -553,10 +552,10 @@ async function main() {
             // 注意：require 相对路径必须带 .cjs 扩展名（Node 只自动补 .js/.json/.node，
             // 漏扩展名会报 Cannot find module './clone-helper' → 回退 UA152，run#38716147734 四平台实证）
             const { createClone } = require('./clone-helper.cjs');
-            // 继承 UA152 的主 IP（用户要求：新分身必须绑定现有 IP，保证出口一致）
-            const fresh = await createClone(PLATFORM, process.env.GITHUB_RUN_ID, CLONE);
+            // 参考参数：152 内核 + 系统 IP 隔离 + 系统本地代理（不再继承参考分身 IP，见 clone-helper.cjs）
+            const fresh = await createClone(PLATFORM, process.env.GITHUB_RUN_ID);
             newCloneName = fresh.name;
-            log(`[fresh-clone] 新分身已创建: ${fresh.name} (id=${fresh.id}, 继承IP=${fresh.ipBound ? '是' : '否(参考分身无绑定IP)'})`);
+            log(`[fresh-clone] 新分身已创建: ${fresh.name} (id=${fresh.id}, IP隔离=system/系统代理)`);
             // 传递给后续步骤（RPA/翻译/密码/同步）：CLONE_NAME 覆盖 + CLONE_CREATED 标记（删除步用）
             if (process.env.GITHUB_ENV) fs.appendFileSync(process.env.GITHUB_ENV, `CLONE_NAME=${newCloneName}\nCLONE_CREATED=${newCloneName}\n`);
           } catch (e) { log(`[fresh-clone] 创建失败，回退 ${CLONE}: ${e.message.slice(0, 80)}`); }

@@ -18,8 +18,8 @@
  *
  * 用法（CI 步骤）：
  *   node tests/clone-manager.cjs create --platform Windows_10 [--run 38687447544]   # 创建，打印 CLONE_NAME=
- *   node tests/clone-manager.cjs delete --name E2E-xxx                               # 删除指定
- *   node tests/clone-manager.cjs cleanup --prefix E2E-                               # 按前缀清理残留（容错）
+ *   node tests/clone-manager.cjs delete --name 152-xxx                              # 删除指定
+ *   node tests/clone-manager.cjs cleanup --prefix 152-                               # 按前缀清理残留（容错）
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -59,16 +59,22 @@ async function api(method, urlPath, body, query) {
   return json;
 }
 
-// —— 创建：参照 UA152 规格（type=Global、count=1、自动生成新指纹、不绑 IP 直连）——
+// —— 创建：参照 2026-10-16 用户指定参考参数（152 内核 + 系统 IP 隔离 + 系统本地代理）——
 async function create(platform, runId) {
   const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-  const name = `E2E-${platform}-${runId || 'local'}-${stamp}`;
+  const name = `152-${platform}-${runId || 'local'}-${stamp}`;
   const r = await api('POST', '/api/shop/batch', {
     namePrefix: name,
     count: 1,
     type: 'Global',
     clientPlatform: PLATFORMS[process.platform] || 'Windows',
-    recordPolicy: 'Disabled',      // E2E 分身不录像
+    recordPolicy: 'Disabled',       // E2E 分身不录像
+    platformId: 45343429365818,     // 固定平台ID（用户指定）
+    ipIsolationType: 'system',      // 系统级 IP 隔离
+    homePageType: 'defaults',       // 默认主页
+    pcParams: { platform: 'Windows', browser: 'Chrome', version: 152 },
+    bindFingerprint: true,          // 独立指纹
+    shopLanProxy: { enabled: true, networkType: 'UseSystem', probeOnSession: true },
   });
   const shop = (r.data || [])[0];
   if (!shop || !shop.id) throw new Error(`创建返回异常: ${JSON.stringify(r).slice(0, 200)}`);
@@ -109,10 +115,10 @@ async function main() {
     if (!name) throw new Error('delete 需要 --name');
     await del([name]);
   } else if (cmd === 'cleanup') {
-    const prefix = arg('prefix') || 'E2E-';
+    const prefix = arg('prefix') || '152-';
     await cleanup(prefix);
   } else {
-    console.log('用法: clone-manager.cjs <create|delete|cleanup> [--platform X] [--run N] [--name E2E-xx] [--prefix E2E-]');
+    console.log('用法: clone-manager.cjs <create|delete|cleanup> [--platform X] [--run N] [--name 152-xx] [--prefix 152-]');
     process.exit(2);
   }
 }

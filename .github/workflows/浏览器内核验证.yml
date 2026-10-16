@@ -561,7 +561,7 @@ jobs:
         run: |
           UB="${CLONE_NAME:-}"
           case "$UB" in
-            E2E-*) node tests/clone-manager.cjs delete --name "$UB" || echo "::warning::Ubuntu 分身删除失败: $UB" ;;
+            E2E-*|152-*) node tests/clone-manager.cjs delete --name "$UB" || echo "::warning::Ubuntu 分身删除失败: $UB" ;;
             *) echo "非新分身($UB)，跳过删除" ;;
           esac
 
@@ -827,9 +827,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # 2026-10-15 新分身方案兜底：清理所有 E2E- 前缀残留分身（Ubuntu 分身给 cookie-sync 用完后在此删；
+      # 2026-10-16 新分身方案兜底：清理所有 152- 前缀残留分身（Ubuntu 分身给 cookie-sync 用完后在此删；
       # 各平台 job 删除步失败漏掉的也在此兜底）。无认证文件时跳过（说明本轮没建新分身）。
-      - name: 清理 E2E 残留分身 (兜底)
+      - name: 清理 152- 残留分身 (兜底)
         if: inputs.fresh_clone != false
         continue-on-error: true
         run: |
@@ -837,7 +837,7 @@ jobs:
           echo "Ubuntu 新分身: ${UB_CLONE:-（无）}"
           # cookie-sync 的 .e2e-auth.json 在它的 runner 上——此处无认证文件则无法调 API，跳过（分身由下轮 cleanup 前置清理）
           if [ -f .e2e-auth.json ]; then
-            node tests/clone-manager.cjs cleanup --prefix E2E- || echo "::warning::残留清理失败(不阻塞)"
+            node tests/clone-manager.cjs cleanup --prefix 152- || echo "::warning::残留清理失败(不阻塞)"
           else
             echo "::notice::本 runner 无 .e2e-auth.json——E2E 分身将在下轮开跑前的 cleanup 步统一清理"
           fi
