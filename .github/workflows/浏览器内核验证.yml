@@ -431,6 +431,9 @@ jobs:
       - name: 删除本 job 新分身 (always)
         if: always() && inputs.fresh_clone != false && inputs.debug_hold != true && matrix.install != 'ubuntu'
         continue-on-error: true
+        # 必须显式 shell: bash——Windows runner 默认 PowerShell 会把 `if [ -n ... ]` 判为语法错误
+        # （run#38716147734 Win10 实证: Missing '(' after 'if'，分身删除被跳过）
+        shell: bash
         run: |
           if [ -n "$CLONE_CREATED" ] && [ -f .e2e-auth.json ]; then
             node tests/clone-manager.cjs delete --name "$CLONE_CREATED" || echo "::warning::分身删除失败(不阻塞): $CLONE_CREATED"
