@@ -548,7 +548,9 @@ async function main() {
         // 创建本 job 专属新分身（用户要求：每平台独立分身，消除 password/LS 同步跨平台干扰）
         if (process.env.E2E_FRESH_CLONE === '1') {
           try {
-            const { createClone } = require('./clone-helper');
+            // 注意：require 相对路径必须带 .cjs 扩展名（Node 只自动补 .js/.json/.node，
+            // 漏扩展名会报 Cannot find module './clone-helper' → 回退 UA152，run#38716147734 四平台实证）
+            const { createClone } = require('./clone-helper.cjs');
             // 继承 UA152 的主 IP（用户要求：新分身必须绑定现有 IP，保证出口一致）
             const fresh = await createClone(PLATFORM, process.env.GITHUB_RUN_ID, CLONE);
             newCloneName = fresh.name;
