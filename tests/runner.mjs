@@ -239,10 +239,17 @@ async function run() {
     } else if (process.platform === 'darwin') {
       displayResolution = execSync('system_profiler SPDisplaysDataType 2>/dev/null | grep -E "Resolution" | head -3 | sed "s/.*: //" | tr "\\n" ","', { timeout: 15000, shell: '/bin/bash' }).toString().trim();
     } else {
-      // Linux/Xvfb: 从 DISPLAY 环境的 xdpyinfo 取（无则退回 $DISPLAY 名）
+      // Linux/Xvfb: xdpyinfo 优先（多数镜像有）；不可用则从 CDP 浏览器 window.screen 取（run#38859682117 实证 xdpyinfo 缺失）
       try {
         displayResolution = execSync('xdpyinfo 2>/dev/null | grep dimensions | sed "s/.*: //;s/ pixels.*//" | head -1', { timeout: 15000, shell: '/bin/bash' }).toString().trim();
-      } catch (_) { displayResolution = process.env.DISPLAY || '(xdpyinfo 不可用)'; }
+      } catch (_) { displayResolution = ''; }
+      if (!displayResolution && browser && page) {
+        try {
+          const scr = await page.evaluate(() => `${window.screen.width}x${window.screen.height}${devicePixelRatio > 1 ? `@${devicePixelRatio}x` : ''}`);
+          displayResolution = `${scr}(via window.screen)`;
+        } catch (_) { /* 浏览器不可用 */ }
+      }
+      if (!displayResolution) displayResolution = process.env.DISPLAY ? `(DISPLAY=${process.env.DISPLAY}, 实测不可用)` : '(xdpyinfo/window.screen 均不可用)';
     }
   } catch (e) { displayResolution = `(实测失败: ${String(e && e.message).slice(0, 40)})`; }
   console.log(`[runner] 显示分辨率实测: ${displayResolution}`);
