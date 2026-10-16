@@ -1,7 +1,11 @@
 /**
  * google-translate.cjs —— 右键 Google 翻译用例（源表 R22，脚本化 2026-10-12）
  *
- * 标准：分身开启谷歌翻译加速 → 访问 tiktok support（英文页）→ 触发翻译 → 页面变中文。
+ * 标准：分身开启谷歌翻译加速 → 访问 tiktok support → 右键翻译 → 页面被翻译。
+ * 翻译方向随浏览器 UI 语言自适应（不再单向要求「页面变中文」）：
+ *   - Windows runner 客户端 UI=中文 → 菜单「翻译成中文(简体)」→ 英文源页翻译后 CJK↑。
+ *   - macOS/Ubuntu runner 客户端 UI=英文 → 菜单「Translate to English」→ 中文源页翻译后 CJK↓。
+ *     （run#38859682117 实锤：mac 用英文源页时「Translate to English」对英文页是 no-op，CJK 恒 0% → 误判失败）
  * 无 Webshare 环境降级：直连也测（翻译加速是客户端本地代理行为，不依赖出口 IP）。
  *
  * 执行路径（同一进程内自起客户端 + 开分身，避免 OPEN_CLONE_ONLY 跨进程销毁竞态）：
@@ -32,7 +36,14 @@ const PLATFORM = process.env.E2E_PLATFORM || 'Windows 10';
 const CDP_PORT = Number(process.env.REMOTE_DEBUG_PORT || 9221);
 const CDP = process.env.CLIENT_CDP_ENDPOINT || `http://127.0.0.1:${CDP_PORT}`;
 const OUT = process.env.OUT || 'results-GTranslate.json';
-const URL_TARGET = 'https://www.tiktok.com/support?lang=en';
+// 平台相关目标页：浏览器 UI 语言决定右键菜单给出的「翻译方向」（run#38859682117 根因）。
+//   Windows runner 客户端 UI=中文 → 菜单「翻译成中文(简体)」→ 需英文源页，翻译后页面变中文(CJK↑)。
+//   macOS/Ubuntu runner 客户端 UI=英文 → 菜单「Translate to English」→ 需中文源页，翻译后页面变英文(CJK↓)。
+//   若中文源页 + 英文 UI 仍用英文源页，「Translate to English」对英文页是 no-op，CJK 恒 0% → 误判失败。
+const IS_ZH_UI = /windows/i.test(PLATFORM);
+const URL_TARGET = IS_ZH_UI
+  ? 'https://www.tiktok.com/support?lang=en'
+  : 'https://www.tiktok.com/support?lang=zh';
 
 const log = (...a) => console.log('[gtranslate]', ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -190,7 +201,7 @@ async function tryRightClickTranslate(page) {
   await doRightClick(target.x, target.y);
   const clickScreen = vpToScreen(target.x, target.y); // 菜单锚点（屏幕设备像素）→ 供 OCR 裁 ROI
   await sleep(900);
-  let triggered = false, ratio = 0;
+  let triggered = false, ratio = 0, clicked = false, menuText = '';
 
   // —— OCR 主路径：OS 全屏截图 → 识别「翻译」→ OS 真鼠标左键点击菜单项（屏幕坐标直用 OCR bbox）——
   // 2026-10-16 run#38844581228 修复：macOS 的 screenshot-desktop 依赖 TCC 屏幕录制权限
@@ -219,19 +230,26 @@ async function tryRightClickTranslate(page) {
     }
     if (ocr) {
       // OCR bbox 就是屏幕设备像素坐标——OS 鼠标直接用
-      log(`OCR 命中右键菜单「${ocr.text}」屏幕(${ocr.sx},${ocr.sy}) dpr=${ocr.dpr.toFixed(2)}`);
+      menuText = ocr.text || '';
+      const targetZh = /chinese|中文|简体|译成|翻译成|to\s*chinese/i.test(menuText);
+      const targetEn = /english|英文|to\s*english/i.test(menuText);
+      log(`OCR 命中右键菜单「${menuText}」屏幕(${ocr.sx},${ocr.sy}) dpr=${ocr.dpr.toFixed(2)} 翻译方向=${targetZh ? '→中文' : targetEn ? '→英文' : '未知'}`);
+      clicked = true;
       await osLeftClick(ocr.sx, ocr.sy);
-      // 2026-10-14 调试轮 38536551187 实锤：点击成功后 2.5s 采样 CJK=0% 即判负太早——
-      // 页面翻译是渐进式 DOM 改写（tiktok support 为重页面），轮询至 ~20s 再定论。
+      // 判定：页面主语言是否翻转到目标语言（不再单向要求 CJK↑，兼容两种方向，修复 mac no-op 误判）
+      //   targetZh：基线英文页 → 翻译后 CJK 占比应 >10%
+      //   targetEn：基线中文页 → 翻译后 CJK 占比应 <10%（页面变英文）
       for (let i = 1; i <= 8 && !triggered; i++) {
         await sleep(2500);
         ratio = await ratioNow();
-        if (ratio > 0.1) triggered = true;
-        else log(`[translate-poll ${i}/8] 点击后 ${(i * 2.5).toFixed(1)}s CJK=${(ratio * 100).toFixed(1)}%`);
+        if (targetZh && ratio > 0.1) triggered = true;
+        else if (targetEn && ratio < 0.1) triggered = true;
+        else if (!targetZh && !targetEn && ratio > 0.1) triggered = true;
+        if (!triggered) log(`[translate-poll ${i}/8] 点击后 ${(i * 2.5).toFixed(1)}s CJK=${(ratio * 100).toFixed(1)}% 方向=${targetZh ? '→中文' : targetEn ? '→英文' : '?'}`);
       }
       if (!triggered) {
         const t = await page.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 200)).catch(() => '');
-        log(`点击后页面采样: ${t.replace(/\s+/g, ' ').slice(0, 80)} CJK=${(ratio * 100).toFixed(1)}%`);
+        log(`点击后页面采样: ${t.replace(/\s+/g, ' ').slice(0, 80)} CJK=${(ratio * 100).toFixed(1)}% 方向=${targetZh ? '→中文' : targetEn ? '→英文' : '?'}`);
       }
       // 点击后证据截图（无论成败）——runner 占位图在本步之前拍，真正现场只有这里有
       try {
@@ -245,13 +263,13 @@ async function tryRightClickTranslate(page) {
   } catch (e) { log(`OCR 右键菜单异常(不降级): ${e.message.slice(0, 80)}`); }
 
   try { await client.detach(); } catch (_) {}
-  return { ok: triggered, ratio };
+  return { ok: triggered, ratio, clicked, menuText };
 }
 
 async function main() {
   const out = { platform: PLATFORM, ts: new Date().toISOString(), results: [] };
   const push = (status, detail) => {
-    out.results.push({ caseId: 'google_translate', id: 'google_translate', name: '右键Google翻译', type: 'client_google_translate', platform: PLATFORM, status, detail, criteria: '分身开启谷歌翻译加速，使用Webshare的IP访问https://www.tiktok.com/support?lang=en，右键选择翻译后应该能正常翻译页面', ts: new Date().toISOString() });
+    out.results.push({ caseId: 'google_translate', id: 'google_translate', name: '右键Google翻译', type: 'client_google_translate', platform: PLATFORM, status, detail, criteria: '分身开启谷歌翻译加速，访问 tiktok support 后右键翻译，页面应被翻译（Windows→译中文 CJK↑ / macOS·Ubuntu→译英文 CJK↓）', ts: new Date().toISOString() });
     console.log(`  [${status === 'pass' ? '✓' : '✗'}] 右键Google翻译 — ${detail.slice(0, 120)}`);
   };
   // 尊重大矩阵 ignored：用户要求忽略「右键Google翻译」时，直接记 ignored 不执行、不计入红/绿
@@ -351,7 +369,12 @@ async function main() {
         process.exit(0);
       }
       // 仅 OCR：未命中即 fail，不回退 API 探测 / bubble / widget（那些是翻译加速代理证据，不等于右键翻译本身）
-      push('fail', `OCR 未命中/未触发右键翻译菜单「翻译」项（${rc && rc.err || '菜单未命中'}），按用户要求仅用 OCR 不降级`);
+      if (rc && rc.clicked) {
+        const dir = /chinese|中文|简体|译成|翻译成|to\s*chinese/i.test(rc.menuText || '') ? '→中文' : /english|英文|to\s*english/i.test(rc.menuText || '') ? '→英文' : '';
+        push('fail', `OCR 命中右键菜单「${rc.menuText || '翻译'}」项并已点击，但页面未翻转到目标语言（点击后 CJK=${(rc.ratio * 100).toFixed(1)}%），翻译加速未生效（方向${dir}）`);
+      } else {
+        push('fail', `OCR 未命中/未触发右键翻译菜单「翻译」项（${rc && rc.err || '菜单未命中'}），按用户要求仅用 OCR 不降级`);
+      }
       fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
       log(`已写出 ${OUT}`);
       try { await pptr.disconnect(); } catch (_) {}
