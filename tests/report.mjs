@@ -49,17 +49,38 @@ function loadResults(args) {
     }
   }
   for (const f of args.inputs) if (existsSync(f)) files.push(f);
-  const all = [];
+  const norm = []; // [{ platform, results, meta }]
   for (const f of files) {
-    const j = JSON.parse(readFileSync(f, 'utf8'));
-    if (Array.isArray(j)) { for (const x of j) all.push(x); }
-    else if (j.platform && j.results) { all.push(j); }
+    let j;
+    try { j = JSON.parse(readFileSync(f, 'utf8')); } catch (e) { console.warn(`[report] 跳过无法解析的文件: ${f}`); continue; }
+    // 平台归属判定：仅接受「明确且非占位」的 platform，否则视为陈旧碎片/无归属，跳过（防幽灵列/行）
+    const platOf = (o) => {
+      const p = o && typeof o.platform === 'string' ? o.platform.trim() : '';
+      return (p && !/^(none|null|undefined)$/i.test(p)) ? p : null;
+    };
+    if (Array.isArray(j)) {
+      // 数组形态：独立脚本常把 platform 写在每条结果上（如 google-translate.cjs）——按 platform 分组
+      const byP = new Map();
+      for (const x of j) {
+        const p = x && x.platform ? x.platform : null;
+        if (!p) continue; // 无平台归属的碎片结果跳过
+        if (!byP.has(p)) byP.set(p, []);
+        byP.get(p).push(x);
+      }
+      for (const [p, rs] of byP) norm.push({ platform: p, results: rs });
+    } else if (j && Array.isArray(j.results)) {
+      const p = platOf(j);
+      if (!p) { console.warn(`[report] 跳过无 platform 的文件: ${f}`); continue; }
+      norm.push({ platform: p, results: j.results, meta: j.meta });
+    } else {
+      console.warn(`[report] 跳过无法识别结构的文件: ${f}`);
+    }
   }
-  // 2026-10-13：同名 platform 的多个文件（如 results-RPA_Flow.json 与 results-Windows_10.json 同为
+  // 同名 platform 的多个文件（如 results-RPA_Flow.json 与 results-Windows_10.json 同为
   // platform="Windows 10"）合并为一个平台条目——否则矩阵会生成重复列。
   const byPlatform = [];
   const idx = new Map();
-  for (const pf of all) {
+  for (const pf of norm) {
     if (idx.has(pf.platform)) {
       const t = byPlatform[idx.get(pf.platform)];
       t.results.push(...pf.results);
@@ -85,11 +106,13 @@ async function buildReport(platformFiles, outPath) {
     'password_save', 'password_autofill', 'cookie_sync', 'localstorage_sync', 'indexdb_sync',
     'history_sync', 'bookmark_sync', 'rpa_flow', 'google_translate',
   ];
+  // 2026-10-16 用户纠偏：跳过已知幽灵平台（陈旧产物误带 platform，导致凭空多出列/行/汇总项）
+  const SKIP_PLATFORMS = new Set(['Windows 10 (第二台设备)']);
   const platformsRaw = platformFiles.map((p) => p.platform);
   const platforms = [
     ...PLATFORM_ORDER.filter((p) => platformsRaw.includes(p)),
     ...platformsRaw.filter((p) => !PLATFORM_ORDER.includes(p)),
-  ];
+  ].filter((p) => !SKIP_PLATFORMS.has(p));
   const cases = [];
   const index = {}; // caseId -> {name, criteria, type}
   const grid = {}; // caseId -> platform -> {status, detail}
@@ -134,7 +157,7 @@ async function buildReport(platformFiles, outPath) {
   // ---- Sheet 1: 验证结果（用户原表格式：平台列在前 + 验证标准 + 示例；2026-10-13 用户要求）----
   // 原表结构：R1 = 空|Win10|mac arm64|mac x64|Ubuntu22|Win7|验证标准|示例；R2 = 测试版本行
   const ws = wb.addWorksheet('验证结果');
-  const S1_PLATFORMS = platforms.filter((p) => p !== 'Windows 10 (第二台设备)');
+  const S1_PLATFORMS = platforms.filter((p) => !SKIP_PLATFORMS.has(p));
   // 2026-10-14：A1 留空对齐原表（原表 R1 = 空 | 平台列... | 验证标准 | 示例）
   const ws1Header = ['', ...S1_PLATFORMS.map((p) => (p === 'Windows 7' ? 'Windows 7（仅关注是否能打开会话）' : p)), '验证标准', '示例'];
   ws.columns = [
