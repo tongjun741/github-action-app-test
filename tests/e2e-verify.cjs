@@ -567,7 +567,21 @@ async function main() {
     } catch (e) { log(`[auth] 导出 jwt 异常(忽略): ${e.message.slice(0, 60)}`); }
 
     try {
-      await openClone(browser, newCloneName || CLONE);
+      // 2026-10-16 run#38841601029 Win10 实证：fresh-clone 创建后 openClone 偶发
+      // 「.icon-shouye_24 60s not existing」（主界面卡加载），而 rpa-flow 重登后又能打开——纯时序抖动。
+      // 有界重试 2 次（共 3 次尝试），重试前等 5s 让客户端缓过来。
+      let lastErr = null;
+      let opened = false;
+      for (let att = 1; att <= 3 && !opened; att++) {
+        try {
+          await openClone(browser, newCloneName || CLONE);
+          opened = true;
+        } catch (e) {
+          lastErr = e;
+          if (att < 3) { log(`[openClone] 第 ${att} 次失败（${String(e.message).slice(0, 60)}），5s 后重试`); await sleep(5000); }
+        }
+      }
+      if (!opened) throw lastErr;
     } catch (e) {
       await saveShot(browser, SHOT);
       throw e;

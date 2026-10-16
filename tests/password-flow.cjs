@@ -223,7 +223,11 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
         const url = page.url();
         if (!/user\/login/.test(url)) break;
       }
-      await sleep(12000); // 密码管理器落库宽限
+      // 2026-10-16 run#38841601029 实证（新分身首登）：气泡不是登录后立刻弹——
+      // 固定 sleep 12s 再截图时气泡已消失/未弹（arm64 截图 OCR 全文=wdku 首页，无气泡）。
+      // 改为「气泡轮询窗口」：登录跳转后 30s 内每 2s 截一次 OS 全屏，OCR/几何找气泡，
+      // 找到即点（点击逻辑复用下方既有策略 A/B）；超时才走原 ocr-none 流程。
+      await sleep(12000); // 密码管理器落库宽限（保留：气泡出现前密码先落内核）
       const url = page.url();
       log(`提交后 URL: ${url}`);
       // 【OCR 识别保存密码按钮并真鼠标点击】用户要求 2026-10-13 切换为 OCR 方案。
@@ -252,9 +256,37 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
         const { osLeftClick, osMouseSupported } = require('./include/osmouse');
         const shotDesktop = require('screenshot-desktop');
         const os = require('node:os');
-        const shotPath = path.join(os.tmpdir(), `save-bubble-ocr-${Date.now()}.png`);
-        const fullBuf = await shotDesktop({ format: 'png' });
-        fs.writeFileSync(shotPath, fullBuf);
+        // 2026-10-16 run#38841601029 修复：macOS 的 screenshot-desktop 依赖 TCC 屏幕录制权限
+        // （runner 无 → "No displays detected"）。与 shot.js fullShot 同策略：mac 走系统 screencapture -x。
+        const takeOsShot = async (p) => {
+          if (process.platform === 'darwin') {
+            try {
+              const { execSync } = require('node:child_process');
+              execSync(`screencapture -x ${JSON.stringify(p)}`, { timeout: 15000 });
+              return fs.readFileSync(p);
+            } catch (e) { log(`[shot] screencapture 失败，回退 screenshot-desktop: ${e.message.slice(0, 50)}`); }
+          }
+          return await shotDesktop({ format: 'png' });
+        };
+        // 2026-10-16 气泡轮询窗口：新分身首登时气泡弹出时机不定（arm64 实证固定 12s 后截图无气泡）。
+        // 30s 内每 2s 拍一次，OCR 命中气泡标题（要保存密码吗?）即认为气泡在场，停止轮询进入点击流程；
+        // 全程未见气泡则用最后一拍走原 ocr-none 判定（保持失败可见性）。
+        let shotPath = path.join(os.tmpdir(), `save-bubble-ocr-${Date.now()}.png`);
+        let bubbleSeenAt = -1;
+        for (let t = 0; t < 15; t++) {
+          fs.writeFileSync(shotPath, await takeOsShot(shotPath));
+          if (!global.__ocrWorker) global.__ocrWorker = await tesseract.createWorker('chi_sim+eng');
+          const { data: probe } = await global.__ocrWorker.recognize(shotPath);
+          const probeWords = (probe.words || []).filter((wd) => wd.confidence >= 40 && wd.bbox);
+          const probeText = probeWords.map((wd) => wd.text).join('');
+          if (/(要|将).{0,4}(保存|存).{0,8}(密码|码)/.test(probeText) || /保存密码吗/.test(probeText)) {
+            bubbleSeenAt = t;
+            log(`[bubble] 气泡已出现（轮询第 ${t + 1} 拍，~${(t + 1) * 2}s）`);
+            break;
+          }
+          await sleep(2000);
+        }
+        if (bubbleSeenAt < 0) log('[bubble] 30s 轮询未见气泡标题——按无气泡处理（用最后一拍走判定）');
         if (!global.__ocrWorker) global.__ocrWorker = await tesseract.createWorker('chi_sim+eng');
         const { data } = await global.__ocrWorker.recognize(shotPath);
         const words = (data.words || []).filter((w) => w.confidence >= 40 && w.bbox);

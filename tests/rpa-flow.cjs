@@ -453,9 +453,9 @@ async function main() {
       if (!openTried && !everConnected && Date.now() - (deadline - TIMEOUT_MS) > 60000) {
         openTried = true;
         try {
-          log('[fallback] 60s 无 9221——尝试主壳点开 UA152 触发 CDP');
+          log(`[fallback] 60s 无 9221——尝试主壳点开 ${CLONE} 触发 CDP`);
           const { openClone } = require('./e2e-verify.cjs');
-          await openClone(browser);
+          await openClone(browser, CLONE);
           log('[fallback] openClone 已执行（若分身已在跑则仅前置）');
         } catch (e) { log(`[fallback] openClone 异常: ${e.message.slice(0, 60)}`); }
       }
