@@ -56,29 +56,68 @@ async function bindIpToClone(ipId, shopId) {
 
 /** 创建本平台专属新分身（参照 UA152 规格：Global + 独立指纹 + 不录像），并继承参考分身的主 IP。
  *  refCloneName：参考分身（默认 UA152）——取其 primary 通道 ipId 绑到新分身，保证 IP 环境一致（用户要求 2026-10-15）。
+ *  入参结构对照官方前端 portalstatics DemoWorkflowModal.tsx shopBatchPost()（run#38835837169 实证：
+ *  缺 platformId 服务端报 {"success":false,"message":"未设置平台"}）。
  *  返回 { name, id, ipBound } */
 async function createClone(platform, runId, refCloneName = 'UA152') {
   const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
   const name = `${PREFIX}${String(platform).replace(/\s+/g, '_')}-${runId || 'local'}-${stamp}`;
-  // 先取参考分身的主 IP（创建前取——绑定的 IP 才可用）
+  // 先取参考分身的主 IP（创建时就传入 ipId，一步到位绑定）
   let refIpId = null;
   try { refIpId = await getPrimaryIpId(refCloneName); } catch (e) { /* 查询失败按无 IP 处理 */ }
+  const clientPlatform = PLATFORMS[process.platform] || 'Windows';
   const r = await api('POST', '/api/shop/batch', {
     namePrefix: name,
     count: 1,
     type: 'Global',
-    clientPlatform: PLATFORMS[process.platform] || 'Windows',
+    clientPlatform,
     recordPolicy: 'Disabled',
+    // ---- 以下为 run#38835837169 补齐：服务端必填（否则「未设置平台」）----
+    // platformId：平台ID——取平台列表中 type='Other'（与官方前端 DemoWorkflow 一致）
+    platformId: await getOtherPlatformId(),
+    // 指纹参数：E2E 固定用 Chrome 最新内核（与客户端内置一致）
+    pcParams: { platform: clientPlatform, browser: 'Chrome', version: await getLatestKernelVersion() },
+    bindFingerprint: true,
+    shopLanProxy: { enabled: true, networkType: 'UseDirect', probeOnSession: false },
+    // 继承参考分身主 IP：创建时直接传 ipId（typings CreateShopsRequest.ipId），
+    // 不再走创建后 PUT bindShop 二段式（少一次调用、避免中间态）
+    ...(refIpId ? { ipId: refIpId } : {}),
   });
   const shop = (r.data || [])[0];
   if (!shop || !shop.id) throw new Error(`创建返回异常: ${JSON.stringify(r).slice(0, 150)}`);
-  // 继承参考分身的主 IP（用户要求：新分身必须绑定现有 IP，保证出口一致）
+  // 核实 IP 是否真绑上（不信创建返回，查库为准）：pageV2 看新分身 primary 通道 ipId 是否 == refIpId
   let ipBound = false;
   if (refIpId) {
-    try { await bindIpToClone(refIpId, shop.id); ipBound = true; }
-    catch (e) { throw new Error(`新分身已创建(id=${shop.id})但绑 IP 失败(ipId=${refIpId}): ${e.message.slice(0, 120)}`); }
+    try {
+      const boundId = await getPrimaryIpId(shop.name || name);
+      ipBound = boundId === refIpId;
+    } catch (e) { /* 查询失败视为未绑 */ }
+    if (!ipBound) {
+      // 创建时 ipId 未生效（服务端老版本忽略该字段）→ 显式 PUT bindShop 兜底
+      await bindIpToClone(refIpId, shop.id);
+      const boundId2 = await getPrimaryIpId(shop.name || name).catch(() => null);
+      ipBound = boundId2 === refIpId;
+      if (!ipBound) throw new Error(`新分身(id=${shop.id})绑 IP 后核实仍不一致(ipId=${refIpId})`);
+    }
   }
   return { name: shop.name || name, id: shop.id, ipBound };
+}
+
+/** 平台ID：GET /api/meta/platforms → type='Other' 分组的 endpoints[0].id
+ *  （官方前端 team.tsx metaPlatformsGet + DemoWorkflowModal platformList.find(type==='Other') 同逻辑） */
+async function getOtherPlatformId() {
+  const r = await api('GET', '/api/meta/platforms');
+  const list = r.data || [];
+  const other = list.find((p) => p.type === 'Other') || list.find((p) => p.category === 'Other');
+  const pid = other && other.endpoints && other.endpoints[0] && other.endpoints[0].id;
+  if (!pid) throw new Error('平台列表未找到 type=Other 的平台（platformId 无法确定）');
+  return pid;
+}
+
+/** 内核版本：前端经 Electron IPC get-installed-browser-versions 获取（无 HTTP API）。
+ *  E2E 固定用 138（12.9.x 客户端内核大版本；Win7 客户端为 109，但 Win7 job 默认 skipped 不走此路径） */
+async function getLatestKernelVersion() {
+  return '138';
 }
 
 /** 删除指定名字的分身（不存在时静默成功） */
