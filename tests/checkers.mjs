@@ -520,29 +520,39 @@ const CHECKERS = {
 };
 
 async function checkCase(page, caseDef, opts) {
-  // 用户要求忽略的用例（如 ipbinding：CI 无代理、分身 SOCKS 不可达、导航必抛错）直接返回「忽略」，
-  // 不执行任何导航，也不计入 CI 红/绿（runner.mjs 仅 fail/error 置红）。
-  if (caseDef.ignored) {
-    return { status: 'ignored', detail: '按用户要求忽略该用例（不执行、不计入红/绿）' };
-  }
+  // 「忽略」语义（用户 2026-10-14 纠正）：忽略 = 仍然验证 + 截图，最终由人工判断是否通过，
+  // 不是跳过不测。此前直接 return ignored 导致截图全是「上一个用例的残留页面」
+  // （run#38844581228 实证：pixelscan 截图内容实为 chrome://settings/help About 页）。
+  // 现改为：真实执行 checker（导航+判定+截图照常跑），结果 status 强制 ignored（不计红绿），
+  // detail 附上真实判定信息供人工复核。
+  const wasIgnored = !!caseDef.ignored;
   // G3 (2026-10-13)：nopecha 验证码 —— 用户要求「每次都忽略」，不执行、不计入红/绿。
   if (caseDef.type === 'manual_captcha') {
     return { status: 'ignored', detail: '按用户要求忽略该用例（每次都忽略，不计入红/绿）' };
   }
   const fn = CHECKERS[caseDef.type];
   try {
+    let res;
     if (fn === null) {
       // 显式占位类型（同步类/RPA/翻译）：由独立脚本执行（sync-flows.cjs 等），
       // runner 内仅落 manual 占位保持报告行齐全，不误触导航。
-      return { status: 'manual', detail: '由独立脚本执行（sync-flows/password-flow 后置段）——本轮占位' };
+      res = { status: 'manual', detail: '由独立脚本执行（sync-flows/password-flow 后置段）——本轮占位' };
+    } else if (!fn) {
+      if (caseDef.url) res = await navigation(page, caseDef, opts);
+      else res = { status: 'manual', detail: '未实现自动判定，需人工确认' };
+    } else {
+      res = await fn(page, caseDef, opts);
     }
-    if (!fn) {
-      if (caseDef.url) return await navigation(page, caseDef, opts);
-      return { status: 'manual', detail: '未实现自动判定，需人工确认' };
+    // ignored 用例：真实执行后 status 归为 ignored（不计红绿），detail 保留真实判定供人工复核
+    if (wasIgnored) {
+      return { ...res, status: 'ignored', detail: `[忽略·已实测] ${res.detail || ''}`.slice(0, 400) };
     }
-    return await fn(page, caseDef, opts);
+    return res;
   } catch (e) {
-    return { status: 'error', detail: String((e && e.message) || e) };
+    const detail = String((e && e.message) || e);
+    return wasIgnored
+      ? { status: 'ignored', detail: `[忽略·已实测] 执行异常: ${detail}`.slice(0, 400) }
+      : { status: 'error', detail };
   }
 }
 

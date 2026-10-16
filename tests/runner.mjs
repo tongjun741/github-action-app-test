@@ -227,8 +227,27 @@ async function run() {
   const generatedAt = new Date().toISOString();
   const kernel = matrix.meta.kernelVersion;
   const testVer = matrix.meta.testVersion || {};
+  // 2026-10-16 挂账#3：分辨率实测落档（用户要求 ≥1440×1080 需报告留实测值佐证）。
+  // Windows: 调 tools/set-display-res.ps1 已设 1600×1200；Ubuntu: Xvfb 1600×1200；mac: runner 默认。
+  // 统一用 OS 命令实测并写入 results meta.displayResolution，Excel/报告可引用。
+  let displayResolution = '';
+  try {
+    const { execSync } = await import('node:child_process');
+    if (process.platform === 'win32') {
+      const out = execSync('powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Screen]::AllScreens | ForEach-Object { $_.Bounds.Width.ToString() + \'x\' + $_.Bounds.Height.ToString() }"', { timeout: 15000 }).toString().trim();
+      displayResolution = out.split(/\r?\n/).join(', ');
+    } else if (process.platform === 'darwin') {
+      displayResolution = execSync('system_profiler SPDisplaysDataType 2>/dev/null | grep -E "Resolution" | head -3 | sed "s/.*: //" | tr "\\n" ","', { timeout: 15000, shell: '/bin/bash' }).toString().trim();
+    } else {
+      // Linux/Xvfb: 从 DISPLAY 环境的 xdpyinfo 取（无则退回 $DISPLAY 名）
+      try {
+        displayResolution = execSync('xdpyinfo 2>/dev/null | grep dimensions | sed "s/.*: //;s/ pixels.*//" | head -1', { timeout: 15000, shell: '/bin/bash' }).toString().trim();
+      } catch (_) { displayResolution = process.env.DISPLAY || '(xdpyinfo 不可用)'; }
+    }
+  } catch (e) { displayResolution = `(实测失败: ${String(e && e.message).slice(0, 40)})`; }
+  console.log(`[runner] 显示分辨率实测: ${displayResolution}`);
   const written = [];
-  const resultMeta = { kernel, testVersion: testVer, generatedAt, teamId, cloneName, cloneCdpPort: matrix.meta.cloneCdpPort || 9221 };
+  const resultMeta = { kernel, testVersion: testVer, generatedAt, teamId, cloneName, cloneCdpPort: matrix.meta.cloneCdpPort || 9221, displayResolution };
   if (scope.length === 1) {
     const out = args.out || `results-${scope[0].replace(/\s+/g, '_')}.json`;
     writeFileSync(out, JSON.stringify({ meta: resultMeta, platform: scope[0], results: resultsByPlatform[scope[0]] }, null, 2));
