@@ -269,8 +269,11 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
           return await shotDesktop({ format: 'png' });
         };
         // 2026-10-16 气泡轮询窗口：新分身首登时气泡弹出时机不定（arm64 实证固定 12s 后截图无气泡）。
-        // 30s 内每 2s 拍一次，OCR 命中气泡标题（要保存密码吗?）即认为气泡在场，停止轮询进入点击流程；
+        // 30s 内每 2s 拍一次，OCR 命中气泡标题即认为气泡在场，停止轮询进入点击流程；
         // 全程未见气泡则用最后一拍走原 ocr-none 判定（保持失败可见性）。
+        // 2026-10-16 用户补充：macOS 气泡为**英文 UI**——标题「Save password?」、按钮 Never / Save；
+        //   且 mac 的 Save 为灰底深字（OCR 可读），非 Win 的蓝底白字 ⇒ 几何蓝按钮兜底对 mac 不适用，
+        //   mac 直接认 OCR 词「Save」（下述 bubble 检测/标题锚/点击优先级均补英文分支）。
         let shotPath = path.join(os.tmpdir(), `save-bubble-ocr-${Date.now()}.png`);
         let bubbleSeenAt = -1;
         for (let t = 0; t < 15; t++) {
@@ -279,7 +282,9 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
           const { data: probe } = await global.__ocrWorker.recognize(shotPath);
           const probeWords = (probe.words || []).filter((wd) => wd.confidence >= 40 && wd.bbox);
           const probeText = probeWords.map((wd) => wd.text).join('');
-          if (/(要|将).{0,4}(保存|存).{0,8}(密码|码)/.test(probeText) || /保存密码吗/.test(probeText)) {
+          if (/(要|将).{0,4}(保存|存).{0,8}(密码|码)/.test(probeText) || /保存密码吗/.test(probeText)
+            || /save.{0,3}password/i.test(probeText)                        // mac 英文标题「Save password?」
+            || (/save/i.test(probeText) && /never/i.test(probeText))) {     // mac 英文气泡：Save + Never 两按钮
             bubbleSeenAt = t;
             log(`[bubble] 气泡已出现（轮询第 ${t + 1} 拍，~${(t + 1) * 2}s）`);
             break;
@@ -304,9 +309,12 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
         let titleAnchor = null, titleLine = null;
         for (const L of lines) {
           const t = lineText(L);
-          if (/(保存|存).{0,6}(码|密码).{0,4}(吗|\?|？)/.test(t) || /(要).{0,4}(保存|存)/.test(t)) {
+          if (/(保存|存).{0,6}(码|密码).{0,4}(吗|\?|？)/.test(t) || /(要).{0,4}(保存|存)/.test(t)
+            || /save.{0,3}password/i.test(t) || /password\s*\?/i.test(t)) {   // mac 英文标题（可能被遮挡只剩 password?）
             titleLine = L;
-            titleAnchor = L.items.find((i) => /(要|保存|存)/.test(i.text)) || L.items[0];
+            titleAnchor = L.items.find((i) => /(要|保存|存)/.test(i.text))
+              || L.items.find((i) => /save|password/i.test(i.text))
+              || L.items[0];
             log(`[bubble] 标题锚: y${L.y} 锚词"${titleAnchor.text}" @x${titleAnchor.bbox.x0}`);
             break;
           }
@@ -374,7 +382,10 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
             }
           }
         } catch (e) { log(`[btn-geom] 几何检测异常(跳过): ${String(e && e.message).slice(0, 50)}`); }
-        if (btn && osMouseSupported()) {
+        // 2026-10-16：macOS 的 Save 是灰底深字（非 Win 蓝实心），几何蓝按钮兜底对 mac 不成立；
+        //   mac 依用户提示直接认 OCR 词「Save」。故 darwin 优先 OCR 词，其余平台仍几何优先（Win 按钮白字蓝底 OCR 不可靠）。
+        const geomFirst = process.platform !== 'darwin';
+        if (geomFirst && btn && osMouseSupported()) {
           // 2026-10-15 轮#3 实锤：OCR 词「保存」命中了说明行「系统会将密码保存到...」(y442) 又点空——
           // 几何蓝实心按钮是像素级精确锚定（轮#3 命中 (1239,382) 与实测分毫不差），故几何优先、OCR 词降兜底。
           log(`几何兜底优先：点蓝实心主按钮(${btn.cx},${btn.cy})（OCR 词"${w ? w.text : '无'}"可能命中说明行，不可靠）`);
@@ -387,6 +398,12 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
           log(`OCR 命中保存按钮词「${w.text}」(conf=${Math.round(w.confidence)}), 屏幕坐标(${cx},${cy})——OS 真鼠标点击`);
           await osLeftClick(cx, cy);
           bubbleAction = `ocr:${w.text}@(${cx},${cy})`;
+          await sleep(1000);
+        } else if (btn && osMouseSupported()) {
+          // darwin 未命中 OCR 词时的几何兜底（mac 正常应走上一分支；此处仅保底）
+          log(`（mac 兜底）点几何检测到的按钮(${btn.cx},${btn.cy})`);
+          await osLeftClick(btn.cx, btn.cy);
+          bubbleAction = `geom-fallback@(${btn.cx},${btn.cy})`;
           await sleep(1000);
         } else if ((w || btn) && !osMouseSupported()) {
           log(`命中(${w ? '词' : '几何'})但 OS 鼠标工具缺失——按用户要求不降级 CDP 合成事件，不点击`);
