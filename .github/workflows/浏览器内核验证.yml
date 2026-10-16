@@ -582,6 +582,11 @@ jobs:
 
   verify-win7:
     name: 验证 Windows 7 (Docker)
+    # 独立并发组：Win7 单独跑，不与主 5 平台流水线互锁/互等（用户要求「独立跑 win7」）。
+    # 也可直接 dispatch 独立工作流 Windows7-docker.yml（workflow_dispatch）。
+    concurrency:
+      group: browser-kernel-verify-win7
+      cancel-in-progress: false
     # Win7 无 GitHub 托管 runner，用 Docker/VM 方案。
     # 2026-10-10 用户指令：Win7 搁置（skip_win7 输入默认 true；要跑时手动 dispatch 填 false）
     if: inputs.skip_win7 != true && inputs.debug_hold != true && inputs.debug_verify != true
