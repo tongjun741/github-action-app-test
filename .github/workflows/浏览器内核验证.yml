@@ -244,8 +244,14 @@ jobs:
           # 仅校验，工具缺失/失败只告警不阻塞。⚠️ shell 是 bash -e -o pipefail：
           # grep|head 管道会让 grep 收 SIGPIPE(141)、grep 无匹配返回 1——pipefail 均判败 → set -e 杀脚本。
           # 防御：整段放 if/|| true 里，永不阻塞下载。
+          # 2026-10-16 修（run#38859682117 实证 `当前显示分辨率: 未知`）：
+          #   GitHub mac runner 无头会话里 system_profiler SPDisplaysDataType 输出空（无 GUI 会话上下文），
+          #   换 Quartz DisplayBounds（CGDisplay）取真实显示分辨率；再兜底回 system_profiler。
           r=""
-          if r=$(system_profiler SPDisplaysDataType 2>/dev/null | grep -E 'Resolution|分辨率' | tr '\n' ' '); then :; fi
+          if r=$(python3 -c "import Quartz; print(f'{int(Quartz.CGDisplayBounds(Quartz.CGMainDisplayID()).size.width)}x{int(Quartz.CGDisplayBounds(Quartz.CGMainDisplayID()).size.height)}')" 2>/dev/null); then :; fi
+          if [ -z "$r" ]; then
+            if r=$(system_profiler SPDisplaysDataType 2>/dev/null | grep -E 'Resolution|分辨率' | tr '\n' ' '); then :; fi
+          fi
           echo "当前显示分辨率: ${r:-未知}"
           case "$r" in
             *1440*|*1512*|*1600*|*1680*|*1920*) echo "分辨率达标(≥1440 宽)";;
