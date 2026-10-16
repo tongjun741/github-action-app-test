@@ -248,13 +248,15 @@ async function listCloneNamesFromAnchors(browser) {
     return await browser.execute(() =>
       Array.from(document.querySelectorAll('a'))
         .map((a) => (a.textContent || '').trim())
-        .filter((t) => /^UA\d+$/i.test(t)));
+        // 同时认 UA 前缀（存量参考分身）与 E2E- 前缀（fresh-clone 新建分身，run#38839736432
+        // 实证：只认 ^UA\d+$ 会把刚建的 E2E-xxx 分身扫成隐形 → openClone 误报「分身列表未找到」）
+        .filter((t) => /^(UA\d+|E2E-.+)$/i.test(t)));
   } catch (_) {
     return [];
   }
 }
 
-/** 兜底：任意叶子节点上恰好是 UA123 的文本（新版 UI 可能不是 <a>） */
+/** 兜底：任意叶子节点上恰好是 UA123/E2E-xxx 的文本（新版 UI 可能不是 <a>） */
 async function listCloneNamesAnyEl(browser) {
   try {
     return await browser.execute(() => {
@@ -262,7 +264,7 @@ async function listCloneNamesAnyEl(browser) {
       document.querySelectorAll('*').forEach((el) => {
         if (el.children.length === 0) {
           const t = (el.textContent || '').trim();
-          if (/^UA\d+$/i.test(t)) s.add(t);
+          if (/^(UA\d+|E2E-.+)$/i.test(t)) s.add(t);
         }
       });
       return Array.from(s);
@@ -430,7 +432,7 @@ async function openClone(browser, cloneName) {
   if (!target) {
     await dumpAnchorTexts(browser);
     await saveShot(browser, SHOT);
-    throw new Error(`分身列表未找到「${CLONE}」；可见分身(${names.length}): ${names.length ? names.join(', ') : '(空/列表未渲染)'}`);
+    throw new Error(`分身列表未找到「${CLONE_TO_OPEN}」；可见分身(${names.length}): ${names.length ? names.join(', ') : '(空/列表未渲染)'}`);
   }
 
   log(`选中分身: ${target}${viaAnyEl ? '（经任意元素定位）' : ''}`);
