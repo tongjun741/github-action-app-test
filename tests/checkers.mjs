@@ -268,9 +268,150 @@ async function fingerprint_webrtc(page, c, opts) {
   };
 }
 
+// —— cookie 同意弹窗（多语言）自动点「全部接受」——
+// 2026-10-16 用户要求：whoer.net 有时需先同意 cookies（截图实证西语「Consentimiento para cookies
+//   y procesamiento de datos」+ 按钮「Configuraciones / Aceptar todo」）。未点掉时遮罩挡住页面、
+//   匿名得分不渲染 → 30s 轮询拿不到 → 恒 manual。
+// 判定口径：只在「可点击元素」（button/a/[role=button]/input/[id|class*=accept]）里按文案匹配，
+//   避免误点正文里的 "aceptar"；显式排除「配置/仅必要/拒绝」类词，防止点到 Configuraciones。
+// 点击方式：主框架用 CDP 真鼠标（page.mouse.click，属可信事件、不受客户端窗口遮挡影响），
+//   子框架（多为第三方 consent iframe）回退 DOM el.click()。
+const CONSENT_ACCEPT_RE = /(\baccept(\s+(all|everything))?(\s+cookies)?\b|\ballow\s+all\b|\bi\s+agree\b|\bagree\b|\bgot\s+it\b|\baceptar(\s+todo)?\b|\bacepto\b|\btout\s+accepter\b|\baccepter\b|\balle\s+akzeptieren\b|\bakzeptieren\b|\baccetta(\s+tutto)?\b|\baceitar(\s+tudo)?\b|全部接受|接受全部|接受|同意|すべて同意)/i;
+const CONSENT_NEG_RE = /(reject|deny|decline|only\s+necessary|necessary\s+only|essential\s+only|rechazar|denegar|s[oó]lo\s+necesarias|configura|settings|more\s+options|manage)/i;
+const CONSENT_ALL_HINT_RE = /(all|todo|tudo|tout|tutto|everything|全部|すべて|一切)/i;
+
+/** 在单个 frame 内寻找 cookie「全部接受」按钮；返回 { txt, cx, cy } 或 null（优先「全部」类、文案最短）
+ *  穿透 shadow root：不少 consent 组件（Didomi/Axeptio/Usercentrics 等）把按钮放进 shadow DOM，
+ *  普通 querySelectorAll 看不到 → 逐 root 收集再按「可点击元素 + 文案」过滤。 */
+async function findConsentButton(frame) {
+  return frame.evaluate(({ ACCEPT, NEG, ALLHINT }) => {
+    const re = new RegExp(ACCEPT, 'i');
+    const neg = new RegExp(NEG, 'i');
+    const allhint = new RegExp(ALLHINT, 'i');
+    const isClickable = (el) => {
+      const tag = (el.tagName || '').toLowerCase();
+      if (tag === 'button' || tag === 'a' || tag === 'input') return true;
+      let role = '';
+      try { role = (el.getAttribute('role') || '').toLowerCase(); } catch (_) {}
+      if (role === 'button' || role === 'link') return true;
+      let idc = '';
+      try { idc = ((el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '')).toLowerCase(); } catch (_) {}
+      return idc.includes('accept') || idc.includes('agree') || idc.includes('consent');
+    };
+    // 收集 document + 所有 shadow root 下的元素
+    const roots = [document];
+    const seenRoots = new Set();
+    const seenEl = new Set();
+    const out = [];
+    while (roots.length) {
+      const root = roots.shift();
+      if (!root || seenRoots.has(root)) continue;
+      seenRoots.add(root);
+      let els = [];
+      try { els = Array.from(root.querySelectorAll('*')); } catch (_) { els = []; }
+      for (const el of els) {
+        if (el.shadowRoot && !seenRoots.has(el.shadowRoot)) roots.push(el.shadowRoot);
+        if (seenEl.has(el)) continue;
+        seenEl.add(el);
+        if (!isClickable(el)) continue;
+        let txt = '';
+        try { txt = (el.innerText || el.value || el.textContent || '') + ''; } catch (_) { txt = ''; }
+        txt = txt.replace(/\s+/g, ' ').trim();
+        if (!txt || txt.length > 40) continue;
+        if (neg.test(txt)) continue;
+        if (!re.test(txt)) continue;
+        let r;
+        try { r = el.getBoundingClientRect(); } catch (_) { continue; }
+        if (!r || r.width <= 0 || r.height <= 0) continue;
+        const cx = Math.round(r.left + r.width / 2);
+        const cy = Math.round(r.top + r.height / 2);
+        // 必须在视口内（弹窗通常固定底部/居中）
+        if (cx < 0 || cy < 0 || cx > (window.innerWidth || 1e5) || cy > (window.innerHeight || 1e5)) continue;
+        out.push({ txt, cx, cy, score: (allhint.test(txt) ? 1000 : 0) - txt.length });
+      }
+    }
+    out.sort((a, b) => b.score - a.score);
+    return out[0] || null;
+  }, { ACCEPT: CONSENT_ACCEPT_RE.source, NEG: CONSENT_NEG_RE.source, ALLHINT: CONSENT_ALL_HINT_RE.source }).catch(() => null);
+}
+
+/** 点击后确认弹窗是否真的消失：消失返回 true；仍在（被系统弹窗/遮罩拦截）返回 false 让调用方下轮重试。
+ *  站点点同意后常整页 reload → frame 失联 → findConsentButton 返回 null，也视为已消失。 */
+async function confirmConsentGone(frame, label) {
+  await new Promise((r) => setTimeout(r, 1000));
+  const still = await findConsentButton(frame);
+  const gone = !(still && still.txt === label);
+  if (!gone) console.log(`[consent] 「${label}」点击后弹窗仍在，判定未生效（可能被系统弹窗/遮罩拦截），下轮重试`);
+  return gone;
+}
+
+/** 尝试点掉 cookie 同意弹窗（遍历所有 frame）；命中返回按钮文案，未命中返回 null */
+async function acceptCookieConsent(page) {
+  let frames = [];
+  try { frames = (typeof page.frames === 'function') ? page.frames() : []; } catch (_) { frames = []; }
+  if (!frames || !frames.length) frames = [page];
+  let mainFrame = null;
+  try { mainFrame = (typeof page.mainFrame === 'function') ? page.mainFrame() : null; } catch (_) { mainFrame = null; }
+  for (const f of frames) {
+    const found = await findConsentButton(f);
+    if (!found) continue;
+    const isMain = mainFrame ? (f === mainFrame) : (frames[0] === f);
+    if (isMain && page.mouse && typeof page.mouse.click === 'function') {
+      try {
+        await page.mouse.click(found.cx, found.cy, { delay: 30 });
+        if (await confirmConsentGone(f, found.txt)) {
+          console.log(`[consent] 已点掉 cookie 同意「${found.txt}」(CDP鼠标@${found.cx},${found.cy})，弹窗已消失`);
+          return found.txt;
+        }
+        continue;
+      } catch (e) {
+        console.log(`[consent] CDP 鼠标点击失败(${String(e.message).slice(0, 60)})，回退 DOM click`);
+      }
+    }
+    try {
+      await f.evaluate((label) => {
+        const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp(esc, 'i');
+        const roots = [document];
+        const seenRoots = new Set();
+        const seenEl = new Set();
+        while (roots.length) {
+          const root = roots.shift();
+          if (!root || seenRoots.has(root)) continue;
+          seenRoots.add(root);
+          let els = [];
+          try { els = Array.from(root.querySelectorAll('*')); } catch (_) { els = []; }
+          for (const el of els) {
+            if (el.shadowRoot && !seenRoots.has(el.shadowRoot)) roots.push(el.shadowRoot);
+            if (seenEl.has(el)) continue;
+            seenEl.add(el);
+            const tag = (el.tagName || '').toLowerCase();
+            let role = '';
+            try { role = (el.getAttribute('role') || '').toLowerCase(); } catch (_) {}
+            if (!(tag === 'button' || tag === 'a' || tag === 'input' || role === 'button' || role === 'link')) continue;
+            const tx = ((el.innerText || el.value || el.textContent || '') + '').replace(/\s+/g, ' ').trim();
+            if (tx && tx.length <= 40 && re.test(tx)) { el.click(); return true; }
+          }
+        }
+        return false;
+      }, found.txt);
+      if (await confirmConsentGone(f, found.txt)) {
+        console.log(`[consent] 已点掉 cookie 同意「${found.txt}」(DOM click)，弹窗已消失`);
+        return found.txt;
+      }
+      continue;
+    } catch (e) {
+      console.log(`[consent] DOM 点击失败: ${String(e.message).slice(0, 60)}`);
+    }
+  }
+  return null;
+}
+
 // 6) whoer —— 解析匿名得分 >= 90
 // Run#52 修（历史 15+ 轮全 manual 根因）：得分由 JS 异步渲染，一次性读文本必然读不到数字。
 //   修法：① 轮询等 "XX%" 数字出现 ② 命中多个数字时取「anonymity/匿名」上下文优先 ③ dump 取证。
+// 2026-10-16 追加：cookie 同意弹窗自动点「Aceptar todo/Accept all」（西语等多语言），
+//   否则遮罩期间得分不渲染 → 恒 manual。
 async function fingerprint_whoer(page, c, opts) {
   // G1 预检：分身必须绑定IP后才访问验证站
   const ipb = await assertCloneIpBound(page).catch((e) => ({ ok: false, err: e.message }));
@@ -279,10 +420,16 @@ async function fingerprint_whoer(page, c, opts) {
   await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
   let text = '';
   let m = null;
+  let consentDone = false;
   const deadline = Date.now() + 30000;
   for (;;) {
-    text = await bodyText(page);
+    text = await bodyText(page).catch(() => '');
     m = text.match(/(?:anonymity|匿名)[^\d%]{0,20}(\d{1,3})\s*%/i) || text.match(/(\d{1,3})\s*%/);
+    // cookie 同意弹窗：未出得分且尚未点过 → 每次轮询尝试一次（弹窗可能晚出现；点掉后站点常整页 reload，故 bodyText 已加 catch）
+    if (!m && !consentDone) {
+      const hit = await acceptCookieConsent(page).catch(() => null);
+      if (hit) consentDone = true;
+    }
     if (m || Date.now() > deadline) break;
     await new Promise((r) => setTimeout(r, 2000));
   }
@@ -299,13 +446,14 @@ async function fingerprint_whoer(page, c, opts) {
       console.log(`::notice title=whoer-dump::${Buffer.from(r.url).toString('base64')}`);
     }
   } catch (_) {}
+  const consentTag = consentDone ? '；已自动点掉 cookie 同意弹窗' : '';
   // Run#53 dump 实证：whoer.net 对 CI（数据中心 IP）直接回 Cloudflare 拦截页——环境阻断，非浏览器问题
   if (/sorry, you have been blocked|you are unable to access whoer/i.test(text)) {
-    return { status: 'manual', detail: `站点 Cloudflare 拦截 CI IP（环境阻断，非浏览器问题）——需本地人工访问验证${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
+    return { status: 'manual', detail: `站点 Cloudflare 拦截 CI IP（环境阻断，非浏览器问题）——需本地人工访问验证${consentTag}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
   }
-  if (!m) return { status: 'manual', detail: `30s 轮询未解析到得分，需人工确认; ${text.slice(0, 120).replace(/\n/g, ' ')}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
+  if (!m) return { status: 'manual', detail: `30s 轮询未解析到得分，需人工确认${consentTag}; ${text.slice(0, 120).replace(/\n/g, ' ')}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
   const score = parseInt(m[1], 10);
-  return { status: score >= 90 ? 'pass' : 'fail', detail: `score=${score}%${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
+  return { status: score >= 90 ? 'pass' : 'fail', detail: `score=${score}%${consentTag}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
 }
 
 // 7) ipbinding —— WebRTC blocked
