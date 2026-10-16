@@ -441,7 +441,7 @@ jobs:
             echo "无新分身需删除（CLONE_CREATED 空）"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         # 2026-10-14：debug_verify 调试轮也要上传（否则单平台调试看不到 results/截图，没法调）；
         # 仅纯挂起（debug_hold）不上传。空白平台（调试模式下被 skip 的 matrix job）由 if-no-files-found: warn 兜住。
         if: always() && inputs.debug_hold != true
@@ -559,7 +559,7 @@ jobs:
             *) echo "非新分身($UB)，跳过删除" ;;
           esac
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: results-Cookie_Sync
@@ -763,7 +763,7 @@ jobs:
           docker logs windows > win7-docker.log 2>&1 || true
           tail -n 400 win7-docker.log || true
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: win7-diagnostics
@@ -800,7 +800,7 @@ jobs:
           if [ -d win7/shared/work/shots ]; then cp -R win7/shared/work/shots .; fi
           exit $FAIL
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: results-Windows_7
@@ -844,7 +844,7 @@ jobs:
       - name: 安装依赖
         run: npm install
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: results-*
@@ -882,7 +882,7 @@ jobs:
             touch screenshots.zip
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: verification-report
           path: |
