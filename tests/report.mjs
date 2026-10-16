@@ -106,13 +106,13 @@ async function buildReport(platformFiles, outPath) {
     'password_save', 'password_autofill', 'cookie_sync', 'localstorage_sync', 'indexdb_sync',
     'history_sync', 'bookmark_sync', 'rpa_flow', 'google_translate',
   ];
-  // 2026-10-16 用户纠偏：跳过已知幽灵平台（陈旧产物误带 platform，导致凭空多出列/行/汇总项）
-  const SKIP_PLATFORMS = new Set(['Windows 10 (第二台设备)']);
+  // 2026-10-16：「第二台设备」是 cookie-sync 的合法平台（S1 不展示、汇总/明细保留），
+  // 不做全局过滤；重复行的真根因在 loadResults 已修（空 platform 的陈旧文件被丢弃）。
   const platformsRaw = platformFiles.map((p) => p.platform);
   const platforms = [
     ...PLATFORM_ORDER.filter((p) => platformsRaw.includes(p)),
     ...platformsRaw.filter((p) => !PLATFORM_ORDER.includes(p)),
-  ].filter((p) => !SKIP_PLATFORMS.has(p));
+  ];
   const cases = [];
   const index = {}; // caseId -> {name, criteria, type}
   const grid = {}; // caseId -> platform -> {status, detail}
@@ -157,7 +157,8 @@ async function buildReport(platformFiles, outPath) {
   // ---- Sheet 1: 验证结果（用户原表格式：平台列在前 + 验证标准 + 示例；2026-10-13 用户要求）----
   // 原表结构：R1 = 空|Win10|mac arm64|mac x64|Ubuntu22|Win7|验证标准|示例；R2 = 测试版本行
   const ws = wb.addWorksheet('验证结果');
-  const S1_PLATFORMS = platforms.filter((p) => !SKIP_PLATFORMS.has(p));
+  // S1 不展示「第二台设备」（它只承载 cookie_sync 一项，原表无此列；结果仍在汇总/明细）
+  const S1_PLATFORMS = platforms.filter((p) => p !== 'Windows 10 (第二台设备)');
   // 2026-10-14：A1 留空对齐原表（原表 R1 = 空 | 平台列... | 验证标准 | 示例）
   const ws1Header = ['', ...S1_PLATFORMS.map((p) => (p === 'Windows 7' ? 'Windows 7（仅关注是否能打开会话）' : p)), '验证标准', '示例'];
   ws.columns = [
