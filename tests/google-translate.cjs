@@ -193,11 +193,27 @@ async function tryRightClickTranslate(page) {
   let triggered = false, ratio = 0;
 
   // —— OCR 主路径：OS 全屏截图 → 识别「翻译」→ OS 真鼠标左键点击菜单项（屏幕坐标直用 OCR bbox）——
-  try { await screenshotDesktop({ format: 'png' }); } catch (_) { /* 预热失败不阻塞 */ }
+  // 2026-10-16 run#38844581228 修复：macOS 的 screenshot-desktop 依赖 TCC 屏幕录制权限
+  // （runner 无 → "No displays detected"），与 password-flow/shot.js 同策略：mac 走系统 screencapture -x。
+  const takeOsShotBuf = async () => {
+    if (process.platform === 'darwin') {
+      try {
+        const { execSync } = require('node:child_process');
+        const p = require('node:path').join(require('node:os').tmpdir(), `gt-shot-${Date.now()}.png`);
+        execSync(`screencapture -x ${JSON.stringify(p)}`, { timeout: 15000 });
+        const fsM = require('node:fs');
+        const buf = fsM.readFileSync(p);
+        try { fsM.unlinkSync(p); } catch (_) {}
+        return buf;
+      } catch (e) { log(`[shot] screencapture 失败，回退 screenshot-desktop: ${e.message.slice(0, 50)}`); }
+    }
+    return await screenshotDesktop({ format: 'png' });
+  };
+  try { await takeOsShotBuf(); } catch (_) { /* 预热失败不阻塞 */ }
   try {
     let ocr = null; let fullBuf = null;
     for (let attempt = 1; attempt <= 4 && !ocr; attempt++) {
-      fullBuf = await screenshotDesktop({ format: 'png' });
+      fullBuf = await takeOsShotBuf();
       ocr = await ocrFindTranslateItem(fullBuf, winfo.screenCssW, clickScreen);
       if (!ocr) { log(`[ocr-retry ${attempt}] 未见「翻译」项，${attempt < 4 ? '300ms 后连拍' : '放弃'}`); await sleep(300); }
     }
