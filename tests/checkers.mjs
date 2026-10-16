@@ -520,14 +520,67 @@ async function manual_captcha(page, c, opts) {
   return { status: loadedCount === 3 ? 'pass' : (loadedCount > 0 ? 'fail' : 'error'), detail: `${detail} (${loadedCount}/3 加载)` };
 }
 
-// 9) fingerprint-scan —— 分数 < 50
+// 9) fingerprint-scan —— Bot score < 50
+// 2026-10-16 修（用户截图实证：still collecting，结果根本没等到）：
+//   页面是「先出骨架、再异步算分」：骨架期文案＝
+//     「Collecting... / Bot score 0/100 / FINGERPRINT HASH: collecting… / FINGERPRINT ID: collecting…」
+//   旧实现 goto 后只读一次 bodyText，两个后果都是错的：
+//     ① 骨架未渲染完 → 匹配不到 → 恒 manual（用户看到的截图就是这一态）；
+//     ② 骨架已渲染 → 把占位的「0/100」当成真分数 → score=0<50 → **假 pass**。
+//   修法：① goto 用 domcontentloaded（networkidle 对该持续上报的页面不友好，白等 45s）；
+//         ② 轮询等「结果就绪」＝ 解析到 Bot score 且页面不再含 collecting；
+//         ③ 未就绪则 manual + dump 取证（不猜分、不假绿）。
 async function fingerprint_score(page, c, opts) {
-  await gotoSafe(page, c.url, 'networkidle', 45000, opts?.engine).catch(() => {});
-  const text = await bodyText(page);
-  const m = text.match(/score[^0-9]*(\d{1,3})/i) || text.match(/(\d{1,3})\s*\/\s*100/);
-  if (!m) return { status: 'manual', detail: '无法解析指纹分数，需人工确认' };
-  const score = parseInt(m[1], 10);
-  return { status: score < 50 ? 'pass' : 'fail', detail: `score=${score}` };
+  const t0 = Date.now();
+  await gotoSafe(page, c.url, 'domcontentloaded', 30000, opts?.engine).catch(() => {});
+  let text = '';
+  let score = null;
+  let ready = false;
+  let consentDone = false;
+  const deadline = Date.now() + 80000; // 单用例外部硬超时 120s，留足余量给 goto + 截图
+  for (;;) {
+    text = await bodyText(page).catch(() => '');
+    // 「结果就绪」判定：分数位不能再是骨架占位 → 必须 (a) 解析到 Bot score 且 (b) 页面不再有 collecting 占位。
+    // collecting 必须带省略号（「Collecting...」/「collecting…」），否则 FAQ 正文里的 "collecting" 会让它永不就绪。
+    const collecting = /collecting\s*(?:…|\.{2,})/i.test(text);
+    const m = text.match(/bot\s*score[^0-9]{0,12}(\d{1,3})\s*\/\s*100/i)
+      || (/bot/i.test(text) ? text.match(/(\d{1,3})\s*\/\s*100/) : null);
+    if (m) score = parseInt(m[1], 10);
+    ready = score !== null && !collecting;
+    // 少数地区会先弹 cookie/同意层（遮罩期间不渲染结果）——命中才尝试，避免每轮白扫 frame
+    if (!ready && !consentDone && /consent|cookie|aceptar|accept all|agree to/i.test(text)) {
+      const hit = await acceptCookieConsent(page).catch(() => null);
+      if (hit) consentDone = true;
+    }
+    if (ready || Date.now() > deadline) break;
+    await new Promise((r) => setTimeout(r, 2500));
+  }
+  const waited = Math.round((Date.now() - t0) / 1000);
+  const consentTag = consentDone ? '；已自动点掉 cookie 同意弹窗' : '';
+  // 未就绪时 dump 全文，便于远程定位（骨架/拦截页/卡在哪一步）
+  let dumpUrl = '';
+  if (!ready) {
+    try {
+      const p = path.join(process.cwd(), `fingerprint-scan-${Date.now()}.txt`);
+      fs.writeFileSync(p, text.slice(0, 30000));
+      if (process.env.CLOUDINARY_URL) {
+        const mod = await import('cloudinary');
+        const cl = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+        cl.config({ secure: true });
+        const r = await cl.uploader.upload(p, { asset_folder: 'e2eTest_fingerprint_scan', resource_type: 'raw' });
+        dumpUrl = r.url;
+        console.log(`::notice title=fingerprint-scan-dump::${Buffer.from(r.url).toString('base64')}`);
+      }
+    } catch (_) {}
+  }
+  if (!ready) {
+    const why = score === null ? '未解析到 Bot score' : `已读到 ${score}/100 但页面仍处 collecting 态`;
+    return {
+      status: 'manual',
+      detail: `等待 ${waited}s 结果仍未就绪（${why}）——需人工确认${consentTag}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}; ${text.slice(0, 120).replace(/\n/g, ' ')}`,
+    };
+  }
+  return { status: score < 50 ? 'pass' : 'fail', detail: `Bot score=${score}/100（等待 ${waited}s 结果就绪）${consentTag}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
 }
 
 // 10) devtools-detector —— devtools status: close
