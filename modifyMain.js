@@ -146,11 +146,12 @@ async function main() {
     // 将假媒体开关注入到 main.js 最顶部：保证在 app.ready 之前执行，
     // 使 app.commandLine 的开关对主应用（含在线客服 getUserMedia 触发的 macOS TCC 麦克风框）生效。
     fileContent = fakeMediaBootstrap + fileContent;
-    // 进行内容替换，设置分身浏览器窗口大小
-    // 2026-10-15：由 1920,1080 改为 1600,1200 —— 与 Windows 桌面分辨率(1600x1200)一致，
-    // 避免窗口宽于桌面导致 OS 级全屏截图裁掉右侧插件/扩展（截图显得“窄”、插件显示不全）。
-    // 配合下方 --start-maximized，窗口始终撑满桌面。
-    fileContent = fileContent.replace(windowSizePattern, 'this.windowSize="1600,1200"');
+    // 进行内容替换，设置主壳窗口大小
+    // 2026-10-16 改为 "maximize"：客户端 main.js 支持 this.windowSize==='maximize' 分支
+    // （electron/src/utils/chromium.ts），会按主屏 workAreaSize 注入 --window-size=<屏宽>,<屏高>，
+    // 自动撑满各平台桌面（mac 1920x1080 / Win 1600x1200 / Ubuntu 1600x1200），避免硬编码尺寸
+    // 在更大屏（如 mac 1920x1080）上窗口偏小、留黑边（用户实测 mac 显示区域只有 1600x1200）。
+    fileContent = fileContent.replace(windowSizePattern, 'this.windowSize="maximize"');
 
     // 尝试向分身浏览器(browserSwitches)注入假媒体开关：覆盖克隆浏览器启动参数
     // （app.commandLine 的开关不一定被独立的分身浏览器进程继承，故这里直接打它的启动参数）
