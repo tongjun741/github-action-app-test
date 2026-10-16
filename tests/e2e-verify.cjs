@@ -216,12 +216,26 @@ function writePlaceholder(reason) {
 
 async function saveShot(browser, name) {
   // 2026-10-14 用户要求：截图 = OS 全屏 + 水印（平台+安装包名）+ shots/<平台>/ 目录。
-  // browser.takeScreenshot() 视口版仅兜底（全屏失败时保底）。
+  // 2026-10-16 用户纠偏：绝不能是浏览器视口白图——OS 全屏优先，失败再直采 screenshot-desktop，
+  // 仅当 OS 截图彻底不可用（如 headless 环境）才退浏览器视口。
   try {
     const { fullShot } = require('./include/shot');
     const base = String(name).replace(/\.png$/, '');
     const full = await fullShot(base);
     if (full) { log(`已保存全屏截图: ${full}`); return; }
+  } catch (_) {}
+  try {
+    const screenshotDesktop = require('screenshot-desktop');
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const { shotDirFor } = require('./include/shot');
+    const dir = shotDirFor(PLATFORM);
+    fs.mkdirSync(dir, { recursive: true });
+    const p = path.join(dir, String(name).replace(/\.png$/, '') + '.png');
+    const buf = await screenshotDesktop({ format: 'png' });
+    fs.writeFileSync(p, buf);
+    log(`已保存截图(screenshot-desktop 直采): ${p}`);
+    return;
   } catch (_) {}
   try {
     const b64 = await browser.takeScreenshot();
@@ -230,6 +244,46 @@ async function saveShot(browser, name) {
   } catch (e) {
     log(`截图失败(忽略): ${e.message}`);
   }
+}
+
+// 2026-10-16 用户要求：崩溃/失败证据 = OS 桌面截图（含崩溃对话框/桌面），不要用浏览器视口
+// （客户端崩溃时浏览器视口截到的是纯白图）。本函数只走 OS 级截图，永不回退浏览器视口。
+async function saveDesktopShot(name) {
+  try {
+    const { fullShot } = require('./include/shot');
+    const base = String(name).replace(/\.png$/, '');
+    const full = await fullShot(base);
+    if (full) { log(`已保存桌面全屏截图: ${full}`); return full; }
+  } catch (_) {}
+  try {
+    const screenshotDesktop = require('screenshot-desktop');
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const { shotDirFor } = require('./include/shot');
+    const dir = shotDirFor(PLATFORM);
+    fs.mkdirSync(dir, { recursive: true });
+    const p = path.join(dir, String(name).replace(/\.png$/, '') + '.png');
+    const buf = await screenshotDesktop({ format: 'png' });
+    fs.writeFileSync(p, buf);
+    log(`已保存桌面截图(screenshot-desktop 直采): ${p}`);
+    return p;
+  } catch (_) {}
+  try {
+    if (process.platform === 'darwin') {
+      const { execSync } = require('node:child_process');
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const { shotDirFor } = require('./include/shot');
+      const dir = shotDirFor(PLATFORM);
+      fs.mkdirSync(dir, { recursive: true });
+      const p = path.join(dir, String(name).replace(/\.png$/, '') + '.png');
+      execSync(`screencapture -x ${JSON.stringify(p)}`, { timeout: 15000 });
+      log(`已保存桌面截图(screencapture): ${p}`);
+      return p;
+    }
+  } catch (_) {}
+  log('桌面截图全部失败(忽略)');
+  return null;
 }
 
 async function dumpAnchorTexts(browser) {
@@ -510,26 +564,37 @@ async function main() {
 
   const caps = buildCaps(binary, chromedriver);
 
-  let browser;
-  browser = await remote({ capabilities: caps, logLevel: 'warn' });
-  log('客户端已启动（chromedriver 已附着主壳）');
+  // 2026-10-16 用户要求：Win10 偶发启动崩溃——给「启动客户端 + 登录」整段加有界重试
+  // （与 openClone 同款 3 次尝试 / 5s 间隔）。崩溃即 remote() 抛错或登录未就绪；
+  // 重试前清理可能残留的客户端进程 + 关掉旧 session，避免端口/锁冲突。
+  let browser = null;
+  let startupOk = false;
+  let startupErr = null;
+  for (let att = 1; att <= 3 && !startupOk; att++) {
+    try {
+      if (browser) { try { await browser.deleteSession(); } catch (_) {} browser = null; }
+      browser = await remote({ capabilities: caps, logLevel: 'warn' });
+      log(`客户端已启动（第 ${att} 次尝试，chromedriver 已附着主壳）`);
+      await login(config, password, browser);
+      startupOk = true;
+    } catch (e) {
+      startupErr = e;
+      log(`[startup] 第 ${att} 次启动/登录失败（${String(e && e.message).slice(0, 80)}）${att < 3 ? '，5s 后重试' : ''}`);
+      if (process.platform === 'win32') {
+        try { require('node:child_process').execSync('taskkill /F /IM HuaYoungApp.exe /T 2>nul || true'); } catch (_) {}
+        await sleep(2000);
+      }
+      if (att < 3) await sleep(5000);
+    }
+  }
+  if (!startupOk) {
+    // 崩溃证据：强制 OS 桌面截图（不依赖已崩溃的浏览器视口，避免纯白图）
+    await saveDesktopShot('crash-startup-' + SLUG);
+    throw startupErr;
+  }
+  log('登录完成');
 
   try {
-    try {
-      await login(config, password, browser);
-    } catch (e) {
-      // 登录失败时把页面可见文本 dump 出来，便于判断账号/团队名/密码是否正确
-      try {
-        const txt = await browser.execute(() => (document.body ? document.body.innerText : '').slice(0, 800));
-        const spans = await browser.execute(() =>
-          Array.from(document.querySelectorAll('span')).map((s) => (s.textContent || '').trim()).filter(Boolean).slice(0, 80));
-        log('[diag] 登录失败，页面文本:', JSON.stringify(txt));
-        log('[diag] 可见 span 文本:', JSON.stringify(spans));
-      } catch (_) { /* ignore */ }
-      await saveShot(browser, SHOT);
-      throw e;
-    }
-    log('登录完成');
 
     // 2026-10-15 新分身方案：导出 jwt/teamId 到 .e2e-auth.json，供 clone-manager.cjs 调 API 建/删分身。
     // 客户端 UI 即 portalstatics web 页面：jwt 在 localStorage，teamId 在主界面 URL（?teamId=xxx）。
