@@ -78,10 +78,12 @@ async function createClone(platform, runId, refCloneName = 'UA152') {
     // 指纹参数：E2E 固定用 Chrome 最新内核（与客户端内置一致）
     pcParams: { platform: clientPlatform, browser: 'Chrome', version: await getLatestKernelVersion() },
     bindFingerprint: true,
-    shopLanProxy: { enabled: true, networkType: 'UseDirect', probeOnSession: false },
-    // 继承参考分身主 IP：创建时直接传 ipId（typings CreateShopsRequest.ipId），
-    // 不再走创建后 PUT bindShop 二段式（少一次调用、避免中间态）
-    ...(refIpId ? { ipId: refIpId } : {}),
+    // 注意：ipId 与 shopLanProxy（本地代理）互斥，服务端校验「不能同时设置IP（池）和本地代理」
+    // （run#38837812806 四平台实证）。继承 IP 时不传 shopLanProxy（IP 即出口代理）；
+    // 仅在无 IP 可继承时才设直连本地代理（与官方前端 DemoWorkflow 默认一致）。
+    ...(refIpId
+      ? { ipId: refIpId }
+      : { shopLanProxy: { enabled: true, networkType: 'UseDirect', probeOnSession: false } }),
   });
   const shop = (r.data || [])[0];
   if (!shop || !shop.id) throw new Error(`创建返回异常: ${JSON.stringify(r).slice(0, 150)}`);
