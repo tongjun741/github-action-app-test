@@ -75,7 +75,7 @@ async function createClone(platform, runId, refCloneName = 'UA152') {
     // ---- 以下为 run#38835837169 补齐：服务端必填（否则「未设置平台」）----
     // platformId：平台ID——取平台列表中 type='Other'（与官方前端 DemoWorkflow 一致）
     platformId: await getOtherPlatformId(),
-    // 指纹参数：E2E 固定用 Chrome 最新内核（与客户端内置一致）
+    // 指纹参数：创建分身时指定内核版本（用户要求 2026-10-16：固定 152，与本轮验证目标 Chrome/152. 一致）
     pcParams: { platform: clientPlatform, browser: 'Chrome', version: await getLatestKernelVersion() },
     bindFingerprint: true,
     // 注意：ipId 与 shopLanProxy（本地代理）互斥，服务端校验「不能同时设置IP（池）和本地代理」
@@ -116,10 +116,11 @@ async function getOtherPlatformId() {
   return pid;
 }
 
-/** 内核版本：前端经 Electron IPC get-installed-browser-versions 获取（无 HTTP API）。
- *  E2E 固定用 138（12.9.x 客户端内核大版本；Win7 客户端为 109，但 Win7 job 默认 skipped 不走此路径） */
+/** 内核版本：创建分身时传给 pcParams.version 的浏览器内核大版本。
+ *  用户要求 2026-10-16：固定 152（本轮验证目标就是 Chromium 152 内核 Chrome/152.）。
+ *  此前按 portalstatics 默认填 138，会导致创建出的分身内核=138、与验证断言 152 对不上；现已改为 152。 */
 async function getLatestKernelVersion() {
-  return '138';
+  return '152';
 }
 
 /** 删除指定名字的分身（不存在时静默成功） */
