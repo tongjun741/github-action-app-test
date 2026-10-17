@@ -83,7 +83,9 @@ async function ocrFindTranslateItem(fullPngBuf, screenCssW, clickScreen) {
   let ox = 0, oy = 0, cw = imgW, ch = imgH, scale = 1, roiPath = null;
   if (clickScreen && Number.isFinite(clickScreen.sx) && Number.isFinite(clickScreen.sy)) {
     // 参数经实图扫描定标（win10_r0 实测 300x520@x3 / 220x430@x4 均可命中「译成中文(简体)」）
-    const padL = 14, padT = 14, padR = 286, padB = 506; // 设备像素；菜单自点击点向右下展开
+    // 2026-10-17 padB 520→1000：点中链接/图片区域时菜单插入大量链接项（Open link.../Save link...），
+    // 把「Translate」顶出 520px 窗口（run#38997128285 实证）。1000px 覆盖最长菜单。
+    const padL = 14, padT = 14, padR = 286, padB = 1000; // 设备像素；菜单自点击点向右下展开
     ox = Math.max(0, Math.min(imgW - 1, Math.round(clickScreen.sx - padL)));
     oy = Math.max(0, Math.min(imgH - 1, Math.round(clickScreen.sy - padT)));
     cw = Math.max(1, Math.min(imgW - ox, padR + padL));
@@ -140,16 +142,22 @@ async function tryRightClickTranslate(page) {
   const findTargetInViewport = () => page.evaluate(() => {
     const cands = ['article p', 'main p', 'p', 'h1', 'h2', 'section', 'div'];
     const vh = window.innerHeight;
-    for (const s of cands) {
-      const els = document.querySelectorAll(s);
-      for (const el of els) {
-        if (el.offsetParent === null) continue;
-        const txt = (el.textContent || '').trim();
-        if (txt.length <= 25) continue;
-        const r = el.getBoundingClientRect();
-        // 视口内：顶部留 80px 避开工具栏，底部留 120px 避开状态栏/滚动条；块高度适中（<=400px 防整页巨型容器）
-        if (r.width > 50 && r.height > 10 && r.height <= 400 && r.y > 80 && (r.y + r.height) < (vh - 120)) {
-          return { x: Math.round(r.x + Math.min(r.width / 2, 300)), y: Math.round(r.y + Math.min(r.height / 2, 150)) };
+    // 2026-10-17 第5层（run#38997128285）：人民网列表项全是 <a> 包裹——点中链接/图片区域时右键菜单
+    // 会插入大量链接项（Open link in new tab / Save link as / Open image...），把「Translate」
+    // 顶出 ROI 窗口。两道防线：① 优先选**非链接内**的纯文本块（closest('a') 为空）；
+    // ② ROI 高度扩到 1000px（见 ocrFindTranslateItem 的 padB）。
+    for (const pass of [0, 1]) { // pass 0=非链接块，pass 1=放宽（兜底接受链接内块）
+      for (const s of cands) {
+        const els = document.querySelectorAll(s);
+        for (const el of els) {
+          if (el.offsetParent === null) continue;
+          if (pass === 0 && el.closest('a')) continue; // 第一轮只要非链接块
+          const txt = (el.textContent || '').trim();
+          if (txt.length <= 25) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width > 50 && r.height > 10 && r.height <= 400 && r.y > 80 && (r.y + r.height) < (vh - 120)) {
+            return { x: Math.round(r.x + Math.min(r.width / 2, 300)), y: Math.round(r.y + Math.min(r.height / 2, 150)) };
+          }
         }
       }
     }
