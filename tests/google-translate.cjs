@@ -260,6 +260,18 @@ async function tryRightClickTranslate(page) {
       if (!triggered) {
         const t = await page.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 200)).catch(() => '');
         log(`点击后页面采样: ${t.replace(/\s+/g, ' ').slice(0, 80)} CJK=${(ratio * 100).toFixed(1)}% 方向=${targetZh ? '→中文' : targetEn ? '→英文' : '?'}`);
+        // 2026-10-17 诊断增强（mac 双轮 CJK 恒 63.1% 疑翻译引擎对繁体页 no-op）：
+        // dump html lang / Chrome translate 状态 / body 前 80 字，供区分「点击无效」vs「引擎拒绝翻译」
+        try {
+          const diag = await page.evaluate(() => ({
+            htmlLang: document.documentElement.lang || '',
+            bodyLang: (document.body && document.body.lang) || '',
+            translated: !!document.documentElement.dataset || /translated/i.test(document.documentElement.className || ''),
+            gtWidget: !!document.querySelector('#google_translate_element, .goog-te-banner-frame, iframe.goog-te-banner-frame'),
+            head: (document.body ? document.body.innerText : '').replace(/\s+/g, ' ').slice(0, 80),
+          }));
+          log(`[gt-diag] ${JSON.stringify(diag)}`);
+        } catch (_) {}
       }
       // 点击后证据截图（无论成败）——runner 占位图在本步之前拍，真正现场只有这里有
       try {
@@ -269,6 +281,24 @@ async function tryRightClickTranslate(page) {
       } catch (_) {}
     } else {
       log('OCR 未识别到「翻译」项（原生菜单未截到 / OCR 误判）——按用户要求不降级');
+      // 2026-10-17：miss 时上传末帧全屏取证（此前取证只在命中后上传，miss 无现场可查——
+      // run#38990702151 Ubuntu 词数=0 但无图，无法判断菜单没弹还是 OCR 误判）
+      try {
+        if (process.env.CLOUDINARY_URL && fullBuf && fullBuf.length) {
+          const mod = require('cloudinary');
+          const cl = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+          cl.config({ secure: true });
+          const { shotDirFor } = require('./include/shot');
+          const dir = path.join(process.cwd(), shotDirFor(PLATFORM));
+          fs.mkdirSync(dir, { recursive: true });
+          const missShot = path.join(dir, `rc-menu-miss-${Date.now()}.png`);
+          fs.writeFileSync(missShot, fullBuf);
+          const now = new Date();
+          const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          const r = await cl.uploader.upload(missShot, { asset_folder: `e2eTest_${mm}`, resource_type: 'raw' });
+          log(`[ocr-diag] OCR miss 末帧现场已上传: ${r.url}`);
+        }
+      } catch (_) {}
     }
   } catch (e) { log(`OCR 右键菜单异常(不降级): ${e.message.slice(0, 80)}`); }
 
