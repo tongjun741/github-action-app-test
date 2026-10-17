@@ -132,20 +132,37 @@ async function ocrFindTranslateItem(fullPngBuf, screenCssW, clickScreen) {
   };
 }
 async function tryRightClickTranslate(page) {
-  const target = await page.evaluate(() => {
+  // 2026-10-17 修复（run#38994693658 三平台实锤）：目标块必须**在当前视口内**。
+  // 旧选择器只查 offsetParent（可见）不查视口内——people.com.cn 首屏多图，首个长文本块
+  // 在折线下（y=2020 > 视口高 1200）→ OS 右键点到屏幕外，菜单永不弹（ROI 被夹成 300x1）。
+  // 修：① 只选视口内(r.y 在 80..innerHeight-120 且高度适中)的块；② 视口内无块 → 先滚到
+  // 页面中部（触发懒加载+露出正文）再找一轮。
+  const findTargetInViewport = () => page.evaluate(() => {
     const cands = ['article p', 'main p', 'p', 'h1', 'h2', 'section', 'div'];
+    const vh = window.innerHeight;
     for (const s of cands) {
       const els = document.querySelectorAll(s);
       for (const el of els) {
-        if (el.offsetParent !== null && (el.textContent || '').trim().length > 25) {
-          const r = el.getBoundingClientRect();
-          if (r.width > 50 && r.height > 10) return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+        if (el.offsetParent === null) continue;
+        const txt = (el.textContent || '').trim();
+        if (txt.length <= 25) continue;
+        const r = el.getBoundingClientRect();
+        // 视口内：顶部留 80px 避开工具栏，底部留 120px 避开状态栏/滚动条；块高度适中（<=400px 防整页巨型容器）
+        if (r.width > 50 && r.height > 10 && r.height <= 400 && r.y > 80 && (r.y + r.height) < (vh - 120)) {
+          return { x: Math.round(r.x + Math.min(r.width / 2, 300)), y: Math.round(r.y + Math.min(r.height / 2, 150)) };
         }
       }
     }
     return null;
   }).catch(() => null);
-  if (!target) return { ok: false, err: '未找到可右键的文本块' };
+  let target = await findTargetInViewport();
+  if (!target) {
+    // 视口内没有 → 滚到页面 40% 处再找一轮（首屏全是图片/头图的站点正文在中部）
+    try { await page.evaluate(() => window.scrollTo(0, Math.round(document.body.scrollHeight * 0.4))); await new Promise((r) => setTimeout(r, 800)); } catch (_) {}
+    target = await findTargetInViewport();
+    if (target) console.log('[gtranslate] 首屏无可右键块——已滚动至页面中部重选');
+  }
+  if (!target) return { ok: false, err: '未找到可右键的文本块（视口内）' };
   let client;
   try { client = await page.target().createCDPSession(); } catch (e) { return { ok: false, err: 'CDP会话失败:' + e.message.slice(0, 40) }; }
   // 窗口屏幕位置（CSS px）+ 主屏 CSS 宽（用于 DPR 与坐标映射）
