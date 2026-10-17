@@ -101,21 +101,9 @@ async function ocrFindTranslateItem(fullPngBuf, screenCssW, clickScreen) {
   if (!_gocrWorker) _gocrWorker = await tesseract.createWorker('chi_sim');
   const { data } = await _gocrWorker.recognize(ocrTarget);
   const words = (data.words || []).filter((w) => w.bbox && w.confidence >= 25);
-  // 诊断证据——OCR 词表（前25）+ 全屏/ROI 截图上传（未命中时能看现场：菜单开没开/识别成什么）
+  // 诊断证据——OCR 词表（前25）；截图改为**点击之后**上传（2026-10-17：上传阻塞 ~1.5s 是菜单
+  // 消失的风险窗口——mac run#38897029574 OCR 命中并点击后页面无翻译效果，疑似菜单已超时关闭）。
   log(`[ocr-diag] 截图 ${imgW}x${imgH} dpr=${dpr.toFixed(2)} ROI=(${ox},${oy},${cw}x${ch}) x${scale} 识别词数=${words.length} 词表(前25): ${words.slice(0, 25).map((w) => w.text).join(' | ')}`);
-  try {
-    if (process.env.CLOUDINARY_URL) {
-      const mod = require('cloudinary');
-      const cl = (mod.default && mod.default.v2) || mod.v2 || mod.default;
-      cl.config({ secure: true });
-      const now = new Date();
-      const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      for (const p of [tmp, roiPath].filter(Boolean)) {
-        const r = await cl.uploader.upload(p, { asset_folder: `e2eTest_${mm}`, resource_type: 'raw' });
-        log(`[ocr-diag] 菜单现场截图已上传: ${r.url}`);
-      }
-    }
-  } catch (_) {}
 
   // 按行聚合（y 容差随放大倍数放大），行文本 join 后再匹配——应对 Tesseract 逐字分词
   const tol = 12 * scale;
@@ -135,6 +123,7 @@ async function ocrFindTranslateItem(fullPngBuf, screenCssW, clickScreen) {
     sx: Math.round(ox + ((kw.bbox.x0 + kw.bbox.x1) / 2) / scale),
     sy: Math.round(oy + ((kw.bbox.y0 + kw.bbox.y1) / 2) / scale),
     dpr, text: hitLine.items.map((i) => i.text).join(''),
+    shotFiles: [tmp, roiPath].filter(Boolean), // 供调用方在点击后再上传（避免上传阻塞致菜单超时消失）
   };
 }
 async function tryRightClickTranslate(page) {
@@ -198,6 +187,11 @@ async function tryRightClickTranslate(page) {
       await sleep(400);
     } catch (e) { log(`[osmouse] 窗口激活点击失败(继续右键): ${String(e && e.message).slice(0, 60)}`); }
   }
+  // 2026-10-17 修复（run#38897029574 Ubuntu 实锤）：tiktok 页可能弹「Open xdg-open?」原生
+  // 对话框偷走焦点——右键根本没弹菜单（OCR 4 连拍词数=0）。右键前先 OS 级发 Escape：
+  // 此时浏览器菜单尚未打开，Esc 只会关掉前置对话框（或无操作），不会误关菜单。
+  const { osPressEscape } = require('./include/osmouse');
+  if (osPressEscape()) { log('[osmouse] 已发 Esc 清场（关前置对话框）'); await sleep(300); }
   await doRightClick(target.x, target.y);
   const clickScreen = vpToScreen(target.x, target.y); // 菜单锚点（屏幕设备像素）→ 供 OCR 裁 ROI
   await sleep(900);
@@ -229,13 +223,29 @@ async function tryRightClickTranslate(page) {
       if (!ocr) { log(`[ocr-retry ${attempt}] 未见「翻译」项，${attempt < 4 ? '300ms 后连拍' : '放弃'}`); await sleep(300); }
     }
     if (ocr) {
-      // OCR bbox 就是屏幕设备像素坐标——OS 鼠标直接用
+      // OCR bbox 就是屏幕设备像素坐标——OS 鼠标直接用。
+      // 2026-10-17：先点击、后上传取证——上传阻塞 ~1.5s 是菜单超时消失的风险窗口
+      // （run#38897029574 mac 双架构：OCR 命中→上传 2 图→再点击，点击后 CJK 恒 62.9% 无翻译效果）。
       menuText = ocr.text || '';
       const targetZh = /chinese|中文|简体|译成|翻译成|to\s*chinese/i.test(menuText);
       const targetEn = /english|英文|to\s*english/i.test(menuText);
       log(`OCR 命中右键菜单「${menuText}」屏幕(${ocr.sx},${ocr.sy}) dpr=${ocr.dpr.toFixed(2)} 翻译方向=${targetZh ? '→中文' : targetEn ? '→英文' : '未知'}`);
       clicked = true;
       await osLeftClick(ocr.sx, ocr.sy);
+      // 点击完菜单已消耗，此刻上传取证不再有菜单消失风险
+      try {
+        if (process.env.CLOUDINARY_URL && ocr.shotFiles && ocr.shotFiles.length) {
+          const mod = require('cloudinary');
+          const cl = (mod.default && mod.default.v2) || mod.v2 || mod.default;
+          cl.config({ secure: true });
+          const now = new Date();
+          const mm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+          for (const p of ocr.shotFiles) {
+            const r = await cl.uploader.upload(p, { asset_folder: `e2eTest_${mm}`, resource_type: 'raw' });
+            log(`[ocr-diag] 菜单现场截图已上传(点击后): ${r.url}`);
+          }
+        }
+      } catch (_) {}
       // 判定：页面主语言是否翻转到目标语言（不再单向要求 CJK↑，兼容两种方向，修复 mac no-op 误判）
       //   targetZh：基线英文页 → 翻译后 CJK 占比应 >10%
       //   targetEn：基线中文页 → 翻译后 CJK 占比应 <10%（页面变英文）
@@ -361,6 +371,16 @@ async function main() {
       // 仅真鼠标右键 → OCR 识别「翻译」项 → CDP 点击；命中即 pass，未命中即 fail（不回退 API/bubble/widget）。
       let rc = null;
       try { rc = await tryRightClickTranslate(page); } catch (e) { rc = { ok: false, err: e.message.slice(0, 60) }; }
+      // 2026-10-17：点击命中但页面未翻译（run#38897029574 mac 双架构 CJK 恒 62.9%）——
+      // 可能是首次点击落在菜单超时边缘。整轮重试一次：重新右键→OCR→点击（页面基线不变，方向判定重算）。
+      if (rc && rc.clicked && !rc.ok) {
+        log('首次点击未触发翻译——整轮重试一次（重新右键→OCR→点击）');
+        await sleep(1500);
+        const rc1 = rc; // 首轮证据兜底：重试轮若未命中菜单，失败文案仍报首轮的命中+点击
+        try { rc = await tryRightClickTranslate(page); } catch (e) { rc = { ok: false, err: e.message.slice(0, 60) }; }
+        if (!rc.clicked && rc1.clicked) { rc.clicked = rc1.clicked; rc.menuText = rc.menuText || rc1.menuText; rc.firstAttemptClicked = true; }
+        if (rc && rc.ok) rc.retried = true;
+      }
       if (rc && rc.ok) {
         push('pass', `右键菜单 OCR 命中「翻译」项并触发翻译生效（CJK 占比 ${(rc.ratio * 100).toFixed(1)}%，真鼠标右键→翻译项）`);
         fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
