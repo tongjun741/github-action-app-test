@@ -580,7 +580,11 @@ async function fingerprint_score(page, c, opts) {
       detail: `等待 ${waited}s 结果仍未就绪（${why}）——需人工确认${consentTag}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}; ${text.slice(0, 120).replace(/\n/g, ' ')}`,
     };
   }
-  return { status: score < 50 ? 'pass' : 'fail', detail: `Bot score=${score}/100（等待 ${waited}s 结果就绪）${consentTag}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` };
+  return {
+    status: score < 50 ? 'pass' : 'fail',
+    detail: `Bot score=${score}/100（等待 ${waited}s 结果就绪）${consentTag}${dumpUrl ? ` [dump] ${dumpUrl}` : ''}` +
+      (score >= 50 ? `；分数为自动化检测分（0=人类 100=机器人，官网 about 页确认）。CI 环境直连数据中心 IP + 新建 fresh-clone 分身可能推高分数——参考同轮 pixelscan.net 的「No automated behavior detected」对照，最终结论需人工复核（matrix criteria：分数低于 50）` : ''),
+  };
 }
 
 // 10) devtools-detector —— devtools status: close
