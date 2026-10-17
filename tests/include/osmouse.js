@@ -62,4 +62,28 @@ function osClick(x, y, button) {
   throw new Error(`unsupported platform ${process.platform}`);
 }
 
-module.exports = { osClick, osRightClick: (x, y) => osClick(x, y, 'right'), osLeftClick: (x, y) => osClick(x, y, 'left'), osMouseSupported };
+// 2026-10-17：OS 级按 Escape 键——用于右键前关掉偷焦点的原生对话框
+// （run 38897029574 Ubuntu 实锤：tiktok 页弹「Open xdg-open?」对话框，右键菜单根本没弹，
+//  OCR 4 连拍词数=0）。在**右键之前**发 Esc：此时浏览器右键菜单尚未打开，Esc 只会关掉
+// 前置对话框/无操作，不会误关菜单。
+function osPressEscape() {
+  try {
+    if (process.platform === 'linux') {
+      const r = run('xdotool', ['key', 'Escape']);
+      return r.code === 0;
+    }
+    if (process.platform === 'darwin') {
+      // cliclick -k 27 = Escape 键码
+      const r = run('cliclick', ['-k', '27']);
+      return r.code === 0;
+    }
+    if (process.platform === 'win32') {
+      // PowerShell SendKeys {ESC}（Node spawn 不受「禁从 Bash 直调 powershell」限制）
+      const r = run('powershell.exe', ['-NoProfile', '-Command', '$ws = New-Object -ComObject WScript.Shell; $ws.SendKeys(\'{ESC}\')']);
+      return r.code === 0;
+    }
+  } catch (_) {}
+  return false;
+}
+
+module.exports = { osClick, osRightClick: (x, y) => osClick(x, y, 'right'), osLeftClick: (x, y) => osClick(x, y, 'left'), osMouseSupported, osPressEscape };
