@@ -198,10 +198,24 @@ async function tryRightClickTranslate(page) {
   // 标题栏+工具栏偏移（HuaYoung 分身浏览器若为嵌入式 webview 则≈0；若点击偏，用 RC_MENU_TOOLBAR_PX 校准）
   const TB = Number(process.env.RC_MENU_TOOLBAR_PX || 0);
   const ratioNow = () => page.evaluate(() => {
-    const t = (document.body ? document.body.innerText : '');
+    // 2026-10-17：测量时排除注入的右键靶点（#__e2e_rc_target）——它是测试脚手架的中文文本，
+    // 会被算进 CJK 占比污染判定（run#39002051868 arm64：翻译成功但 CJK 残留 15.6%）。
+    // innerText 尊重渲染树：display:none 即从结果中消失，测量后恢复。
+    const el = document.getElementById('__e2e_rc_target');
+    let t;
+    if (el) {
+      const prev = el.style.display;
+      el.style.display = 'none';
+      t = document.body ? document.body.innerText : '';
+      el.style.display = prev;
+    } else {
+      t = document.body ? document.body.innerText : '';
+    }
     const cjk = (t.match(/[一-鿿]/g) || []).length;
     return cjk / Math.max(t.length, 1);
   }).catch(() => 0);
+  // 基线：注入靶点/右键前测（与后续轮询同口径）
+  const baseRatio = await ratioNow();
   // 2026-10-14 用户铁律：永远不用 CDP 合成事件；OS 鼠标工具缺失就不测（直接 fail）。
   const { osRightClick, osLeftClick, osMouseSupported } = require('./include/osmouse');
   const vpToScreen = (vx, vy) => ({
@@ -297,14 +311,16 @@ async function tryRightClickTranslate(page) {
       } catch (_) {}
       // 判定：页面主语言是否翻转到目标语言（不再单向要求 CJK↑，兼容两种方向，修复 mac no-op 误判）
       //   targetZh：基线英文页 → 翻译后 CJK 占比应 >10%
-      //   targetEn：基线中文页 → 翻译后 CJK 占比应 <10%（页面变英文）
+      //   targetEn：基线中文页 → 翻译后 CJK 占比应 <10%，**或**相对基线下降 ≥60%
+      //   （2026-10-17 run#39002051868 arm64：翻译真实发生——页面头已英文、htmlLang=en——
+      //    但页脚/导航残留中文致 CJK 15.6%>10% 绝对线。相对判定跨页面稳健：人民网基线 80%，翻译后 15.6% = 降 80%。）
       for (let i = 1; i <= 8 && !triggered; i++) {
         await sleep(2500);
         ratio = await ratioNow();
         if (targetZh && ratio > 0.1) triggered = true;
-        else if (targetEn && ratio < 0.1) triggered = true;
+        else if (targetEn && (ratio < 0.1 || ratio <= baseRatio * 0.4)) triggered = true;
         else if (!targetZh && !targetEn && ratio > 0.1) triggered = true;
-        if (!triggered) log(`[translate-poll ${i}/8] 点击后 ${(i * 2.5).toFixed(1)}s CJK=${(ratio * 100).toFixed(1)}% 方向=${targetZh ? '→中文' : targetEn ? '→英文' : '?'}`);
+        if (!triggered) log(`[translate-poll ${i}/8] 点击后 ${(i * 2.5).toFixed(1)}s CJK=${(ratio * 100).toFixed(1)}%（基线 ${(baseRatio * 100).toFixed(1)}%）方向=${targetZh ? '→中文' : targetEn ? '→英文' : '?'}`);
       }
       if (!triggered) {
         const t = await page.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 200)).catch(() => '');
