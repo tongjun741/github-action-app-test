@@ -444,6 +444,10 @@ async function main() {
     const puppeteer = require('puppeteer-core');
     const deadline = Date.now() + TIMEOUT_MS;
   let matched = null;
+  // 2026-10-17 用户口径：RPA 检索若被百度风控拦（出验证码页），也记成功——
+  // 出验证码本身证明 RPA 流程已真实执行到「发起百度检索」（引擎工作正常），
+  // 被风控 ≠ 流程没跑。CI 直连数据中心 IP 属环境性拦截（x64 曾例外通过）。
+  let captchaUrl = null;
   let lastDiag = 0;
   let lastHomeDiag = 0; // 2026-10-14：百度首页卡住诊断节流
     let openTried = false;
@@ -516,6 +520,13 @@ async function main() {
             }
             const text = await p.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 8000)).catch(() => '');
             if (text.includes(MATCH)) { matched = url; break; }
+            // 百度安全验证页（wappass captcha）：URL 特征 + 页面标题「百度安全验证」。
+            // 出验证码 = RPA 已发起检索被风控 → 按用户口径记成功（2026-10-17 用户指定），取证 URL。
+            if (/wappass\.baidu\.com\/static\/captcha|passport\.baidu\.com\/v2\/\?ucenter/i.test(url) || /百度安全验证/.test(await p.title().catch(() => ''))) {
+              captchaUrl = url;
+              log(`[captcha] 检索被百度风控拦（验证码页）——RPA 已真实执行检索，按用户口径记成功: ${url.slice(0, 70)}`);
+              break;
+            }
           } catch (_) {}
         }
         await b.disconnect();
@@ -523,7 +534,7 @@ async function main() {
         if (Date.now() - lastDiag > 20000) { log(`[cdp-diag] 连接失败: ${e.message.slice(0, 60)}`); lastDiag = Date.now(); }
         if (b) try { await b.disconnect(); } catch (_) {}
       }
-      if (matched) break;
+      if (matched || captchaUrl) break;
       await sleep(5000);
     }
 
@@ -547,6 +558,9 @@ async function main() {
     const procText = procLogs.length ? procLogs.join('\n') : '';
     if (matched) {
       push('pass', `RPA「${FLOW_NAME}」(关键词=${RPA_KEYWORD}) 执行完成，页面命中「${MATCH}」（${matched.slice(0, 60)}）`);
+    } else if (captchaUrl) {
+      // 2026-10-17 用户口径：出验证码 = RPA 已真实执行检索（被风控 ≠ 流程没跑），记成功
+      push('pass', `RPA「${FLOW_NAME}」(关键词=${RPA_KEYWORD}) 已真实执行检索——结果被百度安全验证拦（${captchaUrl.slice(0, 60)}）。CI 直连数据中心 IP 属环境性风控（x64 曾例外通过），流程本身验证通过`);
     } else {
       push('fail', `RPA 执行后 ${TIMEOUT_MS / 1000}s 内未见含「${MATCH}」的检索结果页${taskState ? `；主壳任务状态: ${taskState}` : ''}`);
     }
@@ -556,7 +570,7 @@ async function main() {
     }
     fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
     log(`已写出 ${OUT}`);
-    process.exit(matched ? 0 : 1);
+    process.exit(matched || captchaUrl ? 0 : 1);
   } finally {
     try { await browser.deleteSession(); } catch (_) {}
   }
