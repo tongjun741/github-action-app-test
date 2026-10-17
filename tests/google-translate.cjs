@@ -121,7 +121,9 @@ async function ocrFindTranslateItem(fullPngBuf, screenCssW, clickScreen) {
     L.items.push(w);
   }
   for (const L of lines) L.items.sort((a, b) => a.bbox.x0 - b.bbox.x0);
-  const RE = /(翻译|译|translate)/i;
+  // 2026-10-17 OCR 容错（run#39002051868 Ubuntu 重试轮实锤）：OCR 把「Translate」误读成
+  // 「Tanslate」（丢 r）→ 精确正则不匹配 → miss。改 t\w*late 模式容忍丢/误读字母。
+  const RE = /(翻译|译|t\w*late)/i;
   const hitLine = lines.find((L) => RE.test(L.items.map((i) => i.text).join('')));
   if (!hitLine) return null;
   const kw = hitLine.items.find((i) => RE.test(i.text)) || hitLine.items[0];
