@@ -142,10 +142,6 @@ async function tryRightClickTranslate(page) {
   const findTargetInViewport = () => page.evaluate(() => {
     const cands = ['article p', 'main p', 'p', 'h1', 'h2', 'section', 'div'];
     const vh = window.innerHeight;
-    // 2026-10-17 第5层（run#38997128285）：人民网列表项全是 <a> 包裹——点中链接/图片区域时右键菜单
-    // 会插入大量链接项（Open link in new tab / Save link as / Open image...），把「Translate」
-    // 顶出 ROI 窗口。两道防线：① 优先选**非链接内**的纯文本块（closest('a') 为空）；
-    // ② ROI 高度扩到 1000px（见 ocrFindTranslateItem 的 padB）。
     for (const pass of [0, 1]) { // pass 0=非链接块，pass 1=放宽（兜底接受链接内块）
       for (const s of cands) {
         const els = document.querySelectorAll(s);
@@ -164,6 +160,29 @@ async function tryRightClickTranslate(page) {
     return null;
   }).catch(() => null);
   let target = await findTargetInViewport();
+  // 2026-10-17 第6层（run#38998852049 三平台实锤）：人民网首页**所有**文本块都在 <a> 内
+  // （pass 0 恒空 → 兜底选回链接块，坐标纹丝不动），链接+图片菜单项 15+ 把 Translate
+  // 物理顶出屏幕。釜底抽薪：**注入纯文本 div 作右键靶点**（fixed/非链接/非图片）——
+  // 菜单只含基础项（Back/Reload/Save/Print/Translate/Inspect），Translate 必然可见。
+  // 翻译判定不受影响（翻译作用域是整页 body 文本）。
+  try {
+    const t = await page.evaluate(() => {
+      let el = document.getElementById('__e2e_rc_target');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = '__e2e_rc_target';
+        el.textContent = '这是浏览器右键翻译验证用的简体中文文本段落，包含足够长度的正文内容以便右键菜单识别为普通文本区域，此段落本身不是链接也不是图片。';
+        el.style.cssText = 'position:fixed;left:120px;top:220px;width:360px;padding:14px;background:#ffffff;border:1px solid #cccccc;z-index:2147483647;font-size:16px;line-height:1.7;color:#333333;';
+        (document.body || document.documentElement).appendChild(el);
+      }
+      const r = el.getBoundingClientRect();
+      return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + Math.min(r.height / 2, 120)) };
+    });
+    if (t && Number.isFinite(t.x) && Number.isFinite(t.y)) {
+      target = t;
+      console.log('[gtranslate] 已注入纯文本右键靶点（菜单将只含基础项）');
+    }
+  } catch (_) { /* 注入失败则沿用页面选块 */ }
   if (!target) {
     // 视口内没有 → 滚到页面 40% 处再找一轮（首屏全是图片/头图的站点正文在中部）
     try { await page.evaluate(() => window.scrollTo(0, Math.round(document.body.scrollHeight * 0.4))); await new Promise((r) => setTimeout(r, 800)); } catch (_) {}
