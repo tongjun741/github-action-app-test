@@ -359,6 +359,22 @@ async function main() {
             await mc.setValue(MATCH);
             log(`步骤2 已填匹配内容=${MATCH}（#matching）`);
           }
+          // 2026-10-17 run#38990702151 Ubuntu 实锤：setValue 后 ~200ms 就点「下一步」，
+          // React 受控输入 onChange 未 flush → 表单提交的是流程默认参数（引擎用默认词
+          // 「相爱的人应该都差不多」检索）。修：等待 600ms + 回读校验，值未生效则清空重填。
+          await sleep(600);
+          let kwVal = '';
+          try { kwVal = String(await kw.getValue() || ''); } catch (_) {}
+          if (kwVal !== RPA_KEYWORD) {
+            log(`步骤2 关键词校验失败（读到 "${kwVal.slice(0, 30)}" ≠ ${RPA_KEYWORD}）——清空重填`);
+            try { await kw.clearValue(); } catch (_) {}
+            await kw.setValue(RPA_KEYWORD);
+            await sleep(600);
+            try { kwVal = String(await kw.getValue() || ''); } catch (_) {}
+            if (kwVal !== RPA_KEYWORD) log(`步骤2 关键词二次校验仍不符（"${kwVal.slice(0, 30)}"）——继续提交，后果以检索结果为准`);
+          } else {
+            log(`步骤2 关键词回读校验通过（${RPA_KEYWORD}）`);
+          }
           filledVar = true;
         } catch (_) {
           // 兜底：placeholder/label 定位（结构变化时）
