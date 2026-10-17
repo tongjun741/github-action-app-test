@@ -39,11 +39,16 @@ const OUT = process.env.OUT || 'results-GTranslate.json';
 // 平台相关目标页：浏览器 UI 语言决定右键菜单给出的「翻译方向」（run#38859682117 根因）。
 //   Windows runner 客户端 UI=中文 → 菜单「翻译成中文(简体)」→ 需英文源页，翻译后页面变中文(CJK↑)。
 //   macOS/Ubuntu runner 客户端 UI=英文 → 菜单「Translate to English」→ 需中文源页，翻译后页面变英文(CJK↓)。
-//   若中文源页 + 英文 UI 仍用英文源页，「Translate to English」对英文页是 no-op，CJK 恒 0% → 误判失败。
+// 2026-10-17 二换源页（run#38990702151/38992918628 双轮实锤）：
+//   tiktok `?lang=zh` 给的是 zh-Hant 繁体 + **无 html lang 声明**（gt-diag htmlLang=""）——
+//   Chrome 翻译引擎无法判定源语言 → 点击「Translate to English」后 no-op（CJK 恒 63%）。
+//   且 tiktok 页会触发「Open xdg-open?」原生对话框偷焦点（Ubuntu 右键菜单根本不弹）。
+//   改用人民网 `https://www.people.com.cn/`：lang="zh-CN" 简体 + 明确声明 + 无 app 唤起弹窗，
+//   翻成英文后 CJK 占比大幅下降，双向判定均可靠。
 const IS_ZH_UI = /windows/i.test(PLATFORM);
 const URL_TARGET = IS_ZH_UI
   ? 'https://www.tiktok.com/support?lang=en'
-  : 'https://www.tiktok.com/support?lang=zh';
+  : 'https://www.people.com.cn/';
 
 const log = (...a) => console.log('[gtranslate]', ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -395,7 +400,7 @@ async function main() {
         return cjk / Math.max(t.length, 1);
       };
       const baseText = await page.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 6000)).catch(() => '');
-      log(`基线页面 CJK 占比 ${(cjkRatio(baseText) * 100).toFixed(1)}%（英文页应接近 0）`);
+      log(`基线页面 CJK 占比 ${(cjkRatio(baseText) * 100).toFixed(1)}%（${IS_ZH_UI ? '英文源页应接近 0' : '中文源页应 >40%，翻译后应 <10%'}）`);
 
       // G2 (2026-10-13)：用户要求「右键翻译只使用 OCR，不要降级」。
       // 仅真鼠标右键 → OCR 识别「翻译」项 → CDP 点击；命中即 pass，未命中即 fail（不回退 API/bubble/widget）。
