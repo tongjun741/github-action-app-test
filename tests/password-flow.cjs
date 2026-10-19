@@ -571,12 +571,28 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       log(onDetail ? '确认已在 UA152 详情页（网站密码面板可见）' : `未检出详情页特征，面板片段: ${panelDump.slice(200, 400)}`);
       let found = /wdku\.net/i.test(panelDump) || /^[1-9]\d*站点/.test(pwText || '');
       log(`网站密码面板计数(首查): ${pwText || '(未解析到)'}（Cookie: ${(panelDump.match(/\d+站点[，,]\d+cookies?/) || [''])[0]}）`);
+      // 2026-10-19 用户点破关键盲区：重查只是 execute() 重读**内存中的旧 DOM**——若面板计数
+      // 是服务端数据一次性渲染（React 不重拉就不变），读 100 次也是旧值 → 假阴性。
+      // （实证矛盾：Win10 B2 代填 value=true webkitAutofill=true = 密码真实已存，A4 面板却 0。）
+      // 修：每次重查前先**刷新主壳页面**（navigate 到当前 URL），重等详情页特征后再读计数。
       for (let retry = 1; retry <= 2 && !found; retry++) {
-        log(`面板仍为 0，等 10s 重查(${retry}/2)——详情页文本可能异步刷新`);
-        await sleep(10000);
-        ({ dump: panelDump, pw: pwText } = await readPanel());
+        log(`面板仍为 0，刷新主壳页面后重查(${retry}/2)——强制重拉详情数据（旧逻辑只重读未刷新的 DOM）`);
+        try {
+          const curUrl = await wdioBrowser.getUrl();
+          await wdioBrowser.url(curUrl === 'data:,' ? 'http://szdamai.local/' : curUrl);
+          // 重等详情页特征（面板可能异步渲染）
+          for (let w = 0; w < 10; w++) {
+            await sleep(1500);
+            ({ dump: panelDump, pw: pwText } = await readPanel());
+            if (/网站密码/.test(panelDump) && /打开浏览器|正在访问/.test(panelDump)) break;
+          }
+        } catch (e) {
+          log(`刷新失败（继续读当前 DOM）: ${String(e && e.message).slice(0, 60)}`);
+          await sleep(1500);
+          ({ dump: panelDump, pw: pwText } = await readPanel());
+        }
         found = /wdku\.net/i.test(panelDump) || /^[1-9]\d*站点/.test(pwText || '');
-        log(`网站密码面板计数(重查${retry}): ${pwText || '(未解析到)'}`);
+        log(`网站密码面板计数(刷新后重查${retry}): ${pwText || '(未解析到)'}`);
       }
       saveStatus = found ? 'pass' : 'fail';
       saveDetail = found
