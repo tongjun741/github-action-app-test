@@ -174,7 +174,7 @@ async function buildReport(platformFiles, outPath) {
   headerRow.height = 30;
 
   // 测试版本行（原表 R2）：从 meta.testVersion 取；缺省给固定生产版本号
-  const FIXED_VER = { 'Windows 10': '12.9.1042', 'macOS arm64': '12.9.949', 'macOS x64': '12.9.949', 'Ubuntu 22': '12.9.911', 'Windows 7': '12.9.905' };
+  const FIXED_VER = { 'Windows 10': '12.9.1043', 'macOS arm64': '12.9.950', 'macOS x64': '12.9.950', 'Ubuntu 22': '12.9.912', 'Windows 7': '12.9.906' };
   const verRow = ws.addRow({ name: '测试版本' });
   verRow.getCell('name').font = { bold: true };
   for (const p of S1_PLATFORMS) {

@@ -6,7 +6,7 @@ on:
       software_download_url:
         description: 'Download url'
         required: true
-        default: 'https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_12.9.905_zh_setup.exe'
+        default: 'https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_12.9.906_zh_setup.exe'
       private_deployment:
         description: '是否从固定 OSS 地址加载 Docker 镜像和 Windows 7 ISO'
         required: true
@@ -68,7 +68,7 @@ jobs:
       - name: 下载客户端
         run: |
           if [ -z "${{ inputs.software_download_url }}" ]; then
-            download_url="https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_12.9.905_zh_setup.exe"
+            download_url="https://dl.szdamai.com/downloads/win7_app_zh/HuaYoungApp_Win7_12.9.906_zh_setup.exe"
           else
             download_url="${{ inputs.software_download_url }}"
           fi

@@ -57,8 +57,8 @@ jobs:
           try {
             # 检查是否提供了下载 URL
             if ( -not "${{ github.event.inputs.software_download_url }}" ) {
-              # 2026-10-12 用户指定：固定客户端版本（Win10 12.9.1042，不再动态读 static.config.json）
-              $downloadUrl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_12.9.1042_zh_setup.exe"
+              # 2026-10-12 用户指定：固定客户端版本（2026-10-19 用户更新：Win10 12.9.1043，不再动态读 static.config.json）
+              $downloadUrl = "https://dl.szdamai.com/downloads/win10_app_zh/HuaYoungApp_Win10_12.9.1043_zh_setup.exe"
               Write-Host "Fixed download URL: $downloadUrl"
             } else {
               # 使用提供的下载 URL

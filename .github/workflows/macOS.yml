@@ -9,7 +9,7 @@ on:
       software_download_url:
         description: 'Download url'
         required: true
-        default: 'https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_12.9.949_zh_setup.dmg'
+        default: 'https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_12.9.950_zh_setup.dmg'
       in_dev:
         description: '是否是测试环境'
         default: 'false'
@@ -47,7 +47,7 @@ jobs:
           set -e  # 遇到错误立即退出
 
           if [ -z "${{ inputs.software_download_url }}" ]; then
-            download_url="https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_12.9.949_zh_setup.dmg"
+            download_url="https://dl.szdamai.com/downloads/mac_arm64_app_zh/HuaYoungApp_Mac_arm64_12.9.950_zh_setup.dmg"
           else
             download_url="${{ inputs.software_download_url }}"
           fi
