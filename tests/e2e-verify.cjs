@@ -681,6 +681,10 @@ async function main() {
         return !!(s('password_save') && s('password_save').ignored) && !!(s('password_autofill') && s('password_autofill').ignored);
       } catch (_) { return false; }
     })();
+    // 2026-10-20 用户确认（依据 生产环境-12.8-146内核.xlsx）：macOS 的「普通会话能否保存密码」
+    // /「普通会话能否代填密码」标注为 不支持(/)，属不适用项 → 标记 N/A，不执行密码流程、不计入红/绿。
+    // 判定：运行时在 macOS（process.platform=darwin）或 E2E_PLATFORM 以 macOS 开头 —— 双条件 OR 最稳。
+    const isMacPlatform = process.platform === 'darwin' || /^macOS/i.test(process.env.E2E_PLATFORM || '');
     if (pwIgnored) {
       log('密码保存/代填 按矩阵 ignored 跳过（用户要求忽略，不执行、不计入红/绿）');
       try {
@@ -694,6 +698,17 @@ async function main() {
       } catch (e) { log(`写 ignored 占位失败: ${e.message}`); }
     } else if (OPEN_ONLY) {
       log('OPEN_CLONE_ONLY=1 → 跳过密码流程');
+    } else if (isMacPlatform) {
+      log('macOS 平台：密码保存/代填 标记 N/A（依据 生产环境-12.8-146内核.xlsx：macOS 普通会话密码保存/代填标注"不支持"/不适用，不测试）');
+      try {
+        const j = JSON.parse(fs.readFileSync(OUT, 'utf8'));
+        j.results = (j.results || []).filter((x) => !['password_save', 'password_autofill'].includes(x.caseId));
+        j.results.push(
+          { caseId: 'password_save', name: '普通会话能否保存密码', type: 'client_password_save', status: 'na', detail: 'macOS 不适用（依据 生产环境-12.8-146内核.xlsx：macOS 普通会话保存/代填密码标注"不支持"/不适用，不测试）', criteria: '（脚本化）' },
+          { caseId: 'password_autofill', name: '普通会话能否代填密码', type: 'client_password_autofill', status: 'na', detail: 'macOS 不适用（依据 生产环境-12.8-146内核.xlsx：macOS 普通会话保存/代填密码标注"不支持"/不适用，不测试）', criteria: '（脚本化）' },
+        );
+        fs.writeFileSync(OUT, JSON.stringify(j, null, 2));
+      } catch (e) { log(`写 na 占位失败: ${e.message}`); }
     } else {
       const { runPasswordFlow } = require('./password-flow.cjs');
       const hasMatrixCred = (() => {
