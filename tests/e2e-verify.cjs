@@ -630,10 +630,40 @@ async function main() {
       }
     } catch (e) { log(`[auth] 导出 jwt 异常(忽略): ${e.message.slice(0, 60)}`); }
 
+    // 2026-10-22 用户要求：首页未渲染（.icon-shouye_24 60s）/分身列表未渲染（(0)空）定性为网络问题——
+    // openClone 重试前先关掉客户端进程再重新打开（进程级重启）。纯 sleep 原会话重试对卡死主界面无效
+    // （run#39408700873 Win10/arm64「分身列表(0)空」、Ubuntu「.icon-shouye_24 60s」三平台 fatal 实证）。
+    const killClientProcesses = () => {
+      const exeName = path.basename(binary);
+      const stem = exeName.replace(/\.exe$/i, '');
+      try {
+        if (process.platform === 'win32') {
+          // Win 安装名可能为 花漾客户端.exe（现行）或旧版 HuaYoungApp.exe，双杀兜底
+          require('node:child_process').execSync(`taskkill /F /IM "${exeName}" /T 2>nul || true`);
+          require('node:child_process').execSync('taskkill /F /IM HuaYoungApp.exe /T 2>nul || true');
+        } else {
+          // mac: /Applications/花漾客户端.app/Contents/MacOS/花漾客户端；ubuntu: /opt/花漾客户端/huayoung
+          require('node:child_process').execSync(`pkill -f "${stem}" 2>/dev/null; pkill -f "花漾" 2>/dev/null; true`);
+        }
+      } catch (_) {}
+    };
+    // 进程级重启会话：删旧 session → 杀客户端 → 重新 remote() 附着主壳 → 重新登录
+    const restartClientSession = async (oldBrowser) => {
+      try { if (oldBrowser) await oldBrowser.deleteSession(); } catch (_) {}
+      killClientProcesses();
+      await sleep(3000);
+      const nb = await remote({ capabilities: caps, logLevel: 'warn' });
+      log(`[restart] 客户端已重新启动并附着主壳（CDP=${CDP}）`);
+      await login(config, password, nb);
+      log('[restart] 重新登录完成');
+      return nb;
+    };
+
     try {
       // 2026-10-16 run#38841601029 Win10 实证：fresh-clone 创建后 openClone 偶发
       // 「.icon-shouye_24 60s not existing」（主界面卡加载），而 rpa-flow 重登后又能打开——纯时序抖动。
-      // 有界重试 2 次（共 3 次尝试），重试前等 5s 让客户端缓过来。
+      // 有界重试 2 次（共 3 次尝试）。
+      // 2026-10-22 用户要求升级：第 2/3 次重试前先杀客户端进程并重新启动+登录（进程级重启）。
       let lastErr = null;
       let opened = false;
       for (let att = 1; att <= 3 && !opened; att++) {
@@ -642,7 +672,15 @@ async function main() {
           opened = true;
         } catch (e) {
           lastErr = e;
-          if (att < 3) { log(`[openClone] 第 ${att} 次失败（${String(e.message).slice(0, 60)}），5s 后重试`); await sleep(5000); }
+          if (att < 3) {
+            log(`[openClone] 第 ${att} 次失败（${String(e.message).slice(0, 60)}），执行客户端进程级重启后重试`);
+            try {
+              browser = await restartClientSession(browser);
+            } catch (re) {
+              log(`[restart] 第 ${att} 次重启失败（${String(re && re.message).slice(0, 60)}），沿用旧会话继续重试`);
+            }
+            await sleep(5000);
+          }
         }
       }
       if (!opened) throw lastErr;
