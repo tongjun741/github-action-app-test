@@ -227,6 +227,33 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       // 固定 sleep 12s 再截图时气泡已消失/未弹（arm64 截图 OCR 全文=wdku 首页，无气泡）。
       // 改为「气泡轮询窗口」：登录跳转后 30s 内每 2s 截一次 OS 全屏，OCR/几何找气泡，
       // 找到即点（点击逻辑复用下方既有策略 A/B）；超时才走原 ocr-none 流程。
+      // 2026-10-23 Ubuntu 气泡不弹修复：run#39749138260 实证 Xvfb 无 WM 焦点时
+      // 花漾自实现 DOM 气泡不渲染（Ubuntu 30s×15 拍 OCR 全为 wdku 工具页无气泡；
+      // Win10 同代码第 1 拍即命中 y218「要保存密码吗」）。气泡渲染疑似依赖窗口
+      // 前台/焦点。linux 用 xdotool windowactivate 激活分身浏览器窗口。
+      // win 实证第 1 拍即弹（不动）；mac 密码用例本就 na（不动）。
+      try {
+        if (process.platform === 'linux') {
+          const { execSync } = require('node:child_process');
+          // 分身浏览器窗口标题 = 分身名（fresh-clone 或 UA152）；找不到则激活当前活动窗口兜底
+          let wid = '';
+          try {
+            const wn = process.env.CLONE_NAME || '花漾';
+            wid = execSync(`xdotool search --onlyvisible --name "${wn}" | head -1`,
+              { timeout: 8000 }).toString().trim();
+          } catch (_) {}
+          if (wid) {
+            execSync(`xdotool windowactivate --sync ${wid}`, { timeout: 8000 });
+            log(`[bubble] linux 已激活分身浏览器窗口 wid=${wid}（标题含 ${process.env.CLONE_NAME || '花漾'}）`);
+          } else {
+            try {
+              execSync('xdotool windowactivate $(xdotool getactivewindow)', { timeout: 8000 });
+              log('[bubble] linux 未按名找到分身窗口，已激活当前活动窗口兜底');
+            } catch (_) { log('[bubble] linux xdotool 激活兜底失败（继续原流程）'); }
+          }
+          await sleep(1000);
+        }
+      } catch (e) { log(`[bubble] 窗口激活跳过(${String(e && e.message).slice(0, 50)})——不影响后续轮询`); }
       await sleep(12000); // 密码管理器落库宽限（保留：气泡出现前密码先落内核）
       const url = page.url();
       log(`提交后 URL: ${url}`);

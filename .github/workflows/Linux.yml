@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@v6
       
       - name: Install libnotify4
-        run: sudo apt-get update && sudo apt-get install -y libnotify4 xvfb desktop-file-utils
+        run: sudo apt-get update && sudo apt-get install -y libnotify4 xvfb desktop-file-utils xdotool
 
       - name: Download file with curl (retry + validate)
         run: |
