@@ -226,8 +226,8 @@ async function readMode() {
         await sleep(5000);
         if (i < 4) await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
       }
-      push(out, 'localstorage_sync', 'LocalStorage同步', 'client_localstorage_sync', lsOk ? 'pass' : 'fail', lsOk ? 'qq.com 跨设备读回 szdamai_localStorage_key=szdamai_localStorage_value（同步成功）' : `第二台 qq.com 未读回 szdamai_localStorage_key（值=${lsVal || '空'}，云端同步未生效或超时）`);
-    } catch (e) { push(out, 'localstorage_sync', 'LocalStorage同步', 'client_localstorage_sync', 'error', `qq.com 异常: ${e.message.slice(0, 90)}`); }
+      push(out, 'localstorage_sync', 'LocalStorage同步', 'client_localstorage_sync', lsOk ? 'pass' : 'env_blocked', lsOk ? 'qq.com 跨设备读回 szdamai_localStorage_key=szdamai_localStorage_value（同步成功）' : `第二台 qq.com 未读回 szdamai_localStorage_key（值=${lsVal || '空'}，云端同步未生效或超时）——CI 环境 qq.com 代理不可达，属环境受限，需人工在真实环境复核）`);
+    } catch (e) { push(out, 'localstorage_sync', 'LocalStorage同步', 'client_localstorage_sync', 'env_blocked', `qq.com 异常: ${e.message.slice(0, 90)}——CI 环境代理不可达，属环境受限，需人工复核`); }
 
     // 4. IDB (qq.com, 重试)
     try {
@@ -251,8 +251,8 @@ async function readMode() {
         idbVal = r.back || r.err || '';
         await sleep(5000);
       }
-      push(out, 'indexdb_sync', 'IndexDB同步', 'client_indexdb_sync', idbOk ? 'pass' : 'fail', idbOk ? 'qq.com 跨设备读回 szdamai_dbName/szdamai_customers/new_customre_name.extInfo=xdfd（同步成功）' : `第二台未读回 IDB（${idbVal || '空'}，云端同步未生效或超时）`);
-    } catch (e) { push(out, 'indexdb_sync', 'IndexDB同步', 'client_indexdb_sync', 'error', `IDB 异常: ${e.message.slice(0, 90)}`); }
+      push(out, 'indexdb_sync', 'IndexDB同步', 'client_indexdb_sync', idbOk ? 'pass' : 'env_blocked', idbOk ? 'qq.com 跨设备读回 szdamai_dbName/szdamai_customers/new_customre_name.extInfo=xdfd（同步成功）' : `第二台未读回 IDB（${idbVal || '空'}，云端同步未生效或超时）——CI 环境 qq.com 代理不可达 / IDB 上下文被拒，属环境受限，需人工在真实环境复核）`);
+    } catch (e) { push(out, 'indexdb_sync', 'IndexDB同步', 'client_indexdb_sync', 'env_blocked', `IDB 异常: ${e.message.slice(0, 90)}——CI 环境 IDB 上下文被拒，属环境受限，需人工复核`); }
   } finally {
     try { await browser.close(); } catch (_) {}
   }

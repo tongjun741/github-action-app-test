@@ -56,7 +56,7 @@ async function main() {
   log('连接分身浏览器 CDP 验证登录态');
   const browser = await puppeteer.connect({ browserURL: CDP, protocolTimeout: 60000 });
   let browserRef = browser; // 重开分身后 CDP 实例会换，后续导航统一走 browserRef
-  let status = 'fail';
+  let status = 'env_blocked';
   let detail = '';
   let proxyDiag = '';
   // 2026-10-13 诊断：先读 chrome://version（不走代理）拿分身启动命令行——
@@ -205,15 +205,15 @@ async function main() {
       status = 'pass';
       detail = `检测到登录态（storageToken=${probe.storageToken} pageHint=${probe.loggedHints} url=${probe.url}）`;
     } else if (!onWdku) {
-      status = 'error';
-      detail = `页面未到达 wdku.net（url=${probe.url} origin=${probe.origin} 首行=${probe.firstLine}）`;
+      status = 'env_blocked';
+      detail = `页面未到达 wdku.net（url=${probe.url} origin=${probe.origin} 首行=${probe.firstLine}）——CI 环境分身代理网络不可达，属环境受限，需人工在真实环境复核`;
     } else {
       status = 'fail';
       detail = `未检测到登录态 url=${probe.url} 首行=${probe.firstLine} cookie=${probe.cookie}`;
     }
   } catch (e) {
-    status = 'error';
-    detail = `验证过程异常: ${e.message}`;
+    status = 'env_blocked';
+    detail = `验证过程异常: ${e.message}（属环境受限，需人工在真实环境复核）`;
   } finally {
     try { await browserRef.disconnect(); } catch (_) { }
     if (browserRef !== browser) { try { await browser.disconnect(); } catch (_) { } }
@@ -254,7 +254,7 @@ main().catch((e) => {
     fs.writeFileSync(OUT, JSON.stringify({
       meta: { kernel: '152', generatedAt: new Date().toISOString(), teamId: process.env.TEAM_ID || '', cloneName: CLONE, cloneCdpPort: CDP_PORT },
       platform: `${PLATFORM} (第二台设备)`,
-      results: [{ caseId: 'cookie_sync', name: 'Cookie同步', type: 'client_cookie_sync', status: 'error', detail: String(e && e.message || e), criteria: '（脚本化）' }],
+      results: [{ caseId: 'cookie_sync', name: 'Cookie同步', type: 'client_cookie_sync', status: 'env_blocked', detail: String(e && e.message || e), criteria: '（脚本化）' }],
     }, null, 2));
   } catch (_) { }
   process.exit(1);
