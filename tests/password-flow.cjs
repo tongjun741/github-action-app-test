@@ -232,6 +232,9 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
       // Win10 同代码第 1 拍即命中 y218「要保存密码吗」）。气泡渲染疑似依赖窗口
       // 前台/焦点。linux 用 xdotool windowactivate 激活分身浏览器窗口。
       // win 实证第 1 拍即弹（不动）；mac 密码用例本就 na（不动）。
+      // 2026-10-23 二次升级（run#39893966159 实证 xdotool 在无 WM Xvfb 下兜底也失败）：
+      // 追加 CDP 通道 focus——page.bringToFront() + window.focus() + 派发 focus 事件。
+      // Xvfb 无 WM 时窗口管理器级激活无效，但渲染层焦点(document.hasFocus)可经 CDP 驱动。
       try {
         if (process.platform === 'linux') {
           const { execSync } = require('node:child_process');
@@ -244,15 +247,22 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
           } catch (_) {}
           if (wid) {
             execSync(`xdotool windowactivate --sync ${wid}`, { timeout: 8000 });
-            log(`[bubble] linux 已激活分身浏览器窗口 wid=${wid}（标题含 ${process.env.CLONE_NAME || '花漾'}）`);
+            log(`[bubble] linux xdotool 已激活分身浏览器窗口 wid=${wid}`);
           } else {
             try {
               execSync('xdotool windowactivate $(xdotool getactivewindow)', { timeout: 8000 });
-              log('[bubble] linux 未按名找到分身窗口，已激活当前活动窗口兜底');
-            } catch (_) { log('[bubble] linux xdotool 激活兜底失败（继续原流程）'); }
+              log('[bubble] linux xdotool 未按名找到分身窗口，已激活当前活动窗口兜底');
+            } catch (e2) { log(`[bubble] linux xdotool 激活兜底失败(${String(e2 && e2.message).slice(0, 40)})，转 CDP focus`); }
           }
-          await sleep(1000);
+          await sleep(500);
         }
+        // CDP focus 通道（全平台尝试，linux 为主 beneficiaries）：bringToFront + window.focus + focus 事件
+        try {
+          await page.bringToFront();
+          await page.evaluate(() => { window.focus(); window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')); });
+          log('[bubble] CDP focus 已派发（bringToFront + window.focus + focus/visibilitychange 事件）');
+        } catch (e3) { log(`[bubble] CDP focus 派发失败(${String(e3 && e3.message).slice(0, 40)})——继续轮询`); }
+        await sleep(500);
       } catch (e) { log(`[bubble] 窗口激活跳过(${String(e && e.message).slice(0, 50)})——不影响后续轮询`); }
       await sleep(12000); // 密码管理器落库宽限（保留：气泡出现前密码先落内核）
       const url = page.url();
