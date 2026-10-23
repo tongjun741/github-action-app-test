@@ -755,9 +755,13 @@ jobs:
         # 每 60s 回显 start.log 尾部：start.log 里每步都有 [时间] 打点，可据此判断
         #   ① 只见表头且时间戳不变 ⇒ VM 内脚本卡住（卡在哪行看最后一条打点）
         #   ② 出现多条表头 ⇒ VM 反复重启（再去 boots.log 数开机次数）
-        timeout-minutes: 45
+        # 2026-10-23：43→75 分钟。run#39898638320 实证 e2e-verify 全量 14 项在
+        # Win7 嵌套虚拟化（无 KVM）上 43 分钟跑不完（start.log 显示 4:22 已进入
+        # e2e-verify，非前半段卡死；独立 workflow 15 分钟成功跑的是旧链路仅验
+        # 打开会话，新链路跑全项网络用例每项最多 120s+重试，慢环境需更长时间）。
+        timeout-minutes: 80
         run: |
-          for i in $(seq 1 43); do
+          for i in $(seq 1 75); do
             [ -f "win7/shared/done.log" ] && break
             sleep 60
             echo "----- [第 ${i} 分钟] start.log 尾部 -----"

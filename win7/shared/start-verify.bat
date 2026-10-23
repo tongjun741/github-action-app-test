@@ -122,10 +122,24 @@ if not exist c:\work\node_modules\webdriverio (
 )
 
 REM ---- WDIO 驱动主壳：登录 -> 打开目标分身 -> 连分身内核 9221 跑验证 ----
+REM 2026-10-23 盲区根治：原同步执行 e2e-verify 时共享 start.log 只靠 logsync 同步
+REM （run#39898638320 实证 logsync 早夭 → e2e 全程 40 分钟宿主看不到任何进展，
+REM 无法区分「还在跑」与「卡死」）。改为：后台启动 e2e-verify + 主脚本每 30s
+REM 轮询 node 存活并把 LLOG 直写共享 start.log（直写已在 boot/关键节点实证可靠）。
 echo [%TIME%] == start e2e-verify == >> %LLOG%
 copy /y %LLOG% %SHARE%\start.log >nul 2>&1
-c:\node\node c:\work\tests\e2e-verify.cjs >> %LLOG% 2>&1
-echo [%TIME%] e2e-verify 退出码=%errorlevel% >> %LLOG%
+start "" /b "c:\node\node.exe" "c:\work\tests\e2e-verify.cjs" >> %LLOG% 2>&1
+set /a _EW=0
+:WaitE2E
+tasklist /FI "IMAGENAME eq node.exe" 2>nul | find /I "node.exe" >nul
+if errorlevel 1 goto E2EDone
+set /a _EW+=1
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
+ping -n 31 127.0.0.1 >nul
+goto WaitE2E
+:E2EDone
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
+echo [%TIME%] e2e-verify 结束(轮询 %_EW% 次) >> %LLOG%
 copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 
 REM ---- 收尾：立即同步 + done.log（直写共享，宿主靠它结束等待） ----
