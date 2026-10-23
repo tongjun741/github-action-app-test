@@ -453,16 +453,42 @@ async function main() {
     let page = await pptr.newPage();
     page.setDefaultTimeout(60000);
     try {
-      // 英文页基线
-      await page.goto(URL_TARGET, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch((e) => log(`导航警告: ${e.message.slice(0, 80)}`));
-      await sleep(5000);
+      // 2026-10-23 网络性导航失败修复（run#39749138260 arm64/x64 实证）：
+      // mac 分身代理间歇 ERR_PROXY_CONNECTION_FAILED → people.com.cn 打不开 →
+      // 错误页上 Chrome 菜单本就无 Translate 项 → OCR 5 连拍必 miss（词表只有
+      // Back/Reload/Save/Print/Inspect）→ 误报「OCR 未命中」掩盖真因网络。
+      // 修：goto 后校验「导航成功 + 基线 CJK 符合预期」，不符则关页重开重导航，
+      // 有界 3 次（沿用用户 10-22「网络问题重试前先关掉再打开」策略，页面级）。
       const cjkRatio = (t) => {
         if (!t) return 0;
         const cjk = (t.match(/[一-鿿]/g) || []).length;
         return cjk / Math.max(t.length, 1);
       };
-      const baseText = await page.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 6000)).catch(() => '');
-      log(`基线页面 CJK 占比 ${(cjkRatio(baseText) * 100).toFixed(1)}%（${IS_ZH_UI ? '英文源页应接近 0' : '中文源页应 >40%，翻译后应 <10%'}）`);
+      let baseText = '';
+      let navOk = false;
+      for (let att = 1; att <= 3 && !navOk; att++) {
+        try { await page.close(); } catch (_) {}
+        page = await pptr.newPage();
+        page.setDefaultTimeout(60000);
+        const warn = await page.goto(URL_TARGET, { waitUntil: 'domcontentloaded', timeout: 60000 })
+          .then(() => '')
+          .catch((e) => e.message.slice(0, 90));
+        await sleep(5000);
+        baseText = await page.evaluate(() => (document.body ? document.body.innerText : '').slice(0, 6000)).catch(() => '');
+        const ratio = cjkRatio(baseText);
+        // 中文源页(mac/ubuntu)：成功基线 CJK 应 >40%；英文源页(win)：应 <10%
+        const expectZh = !IS_ZH_UI;
+        navOk = !warn && (expectZh ? ratio > 0.4 : ratio < 0.1);
+        log(`导航尝试 ${att}/3：${warn ? '导航异常[' + warn + ']' : '导航OK'}，基线 CJK ${(ratio * 100).toFixed(1)}%${navOk ? '（符合预期，进入右键翻译）' : '（不符，关页重开重试）'}`);
+        if (!navOk && att < 3) await sleep(5000);
+      }
+      if (!navOk) {
+        push('fail', `目标页 3 次尝试均未就绪（最后基线 CJK ${(cjkRatio(baseText) * 100).toFixed(1)}%，${IS_ZH_UI ? '英文源页' : '中文源页'}预期${IS_ZH_UI ? '<10%' : '>40%'}）——疑似分身代理网络不可达（ERR_PROXY_CONNECTION_FAILED），本轮无法验证右键翻译`);
+        fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
+        log(`已写出 ${OUT}（导航未就绪）`);
+        try { await pptr.disconnect(); } catch (_) {}
+        process.exit(1);
+      }
 
       // G2 (2026-10-13)：用户要求「右键翻译只使用 OCR，不要降级」。
       // 仅真鼠标右键 → OCR 识别「翻译」项 → CDP 点击；命中即 pass，未命中即 fail（不回退 API/bubble/widget）。
