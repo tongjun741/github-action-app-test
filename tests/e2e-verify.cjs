@@ -418,6 +418,37 @@ async function pollCloneNames(browser, ms) {
 }
 
 /** 进入分身列表并打开目标分身（复用 origin e2eTest 的 UI 路径与选择器） */
+// 2026-10-23 修复：Win7 因 e2e 以 `start /b` 后台启动，客户端窗口非前台，
+// WebDriver 原生 element.click() 对「打开浏览器/继续访问」报 element not interactable。
+// 降级为 scrollIntoView + JS 原生 click（document.evaluate 直派 click 事件），
+// 不依赖窗口前台/元素是否被认为可交互。前台平台（Win10/mac/Ubuntu）原路径不变。
+async function robustClick(browser, selector, label) {
+  const el = browser.$(selector);
+  try {
+    await el.scrollIntoView({ block: 'center' }).catch(() => {});
+    await el.click();
+    return;
+  } catch (e) {
+    const msg = String(e && e.message || e);
+    if (/not interactable|not clickable|obscured|is not clickable/i.test(msg)) {
+      log(`[robustClick] 原生点击失败(${label || selector})，降级 JS click：${msg.slice(0, 90)}`);
+      try {
+        await browser.execute((sel) => {
+          const node = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+          if (!node) throw new Error('JS click: 元素未找到 ' + sel);
+          if (node.scrollIntoView) node.scrollIntoView({ block: 'center' });
+          node.click();
+        }, selector);
+        return;
+      } catch (e2) {
+        log(`[robustClick] JS click 也失败：${String(e2 && e2.message || e2).slice(0, 90)}`);
+        throw e;
+      }
+    }
+    throw e;
+  }
+}
+
 async function openClone(browser, cloneName) {
   const CLONE_TO_OPEN = cloneName || CLONE;
   log('进入首页');
@@ -507,7 +538,7 @@ async function openClone(browser, cloneName) {
     if (!vis.length) break;
     try { await vis[vis.length - 1].click(); log(`已关闭遮挡弹窗（第 ${mc + 1} 个 X）`); await sleep(800); } catch (_) { break; }
   }
-  await browser.$(openBtn).click();
+  await robustClick(browser, openBtn, '打开浏览器');
 
   log('处理「继续访问」并等待「正在访问」');
   let n = 0;
@@ -519,7 +550,7 @@ async function openClone(browser, cloneName) {
 
     try {
       await browser.$('//span[text()="继续访问"]').waitForExist({ timeout: 5 * 1000 });
-      await browser.$('//span[text()="继续访问"]').click();
+      await robustClick(browser, '//span[text()="继续访问"]', '继续访问');
       // 「继续访问」可能弹 Ant Design 确认框，不点会阻塞
       try {
         const confirm = browser.$('.ant-modal-confirm .ant-btn-primary');
