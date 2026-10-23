@@ -598,29 +598,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: 启动 Win7 Docker 虚拟机 (dockurr-windows)
-        env:
-          PRIVATE_DEPLOYMENT: ${{ inputs.private_deployment }}
-          PRIVATE_DOWNLOAD_DIR: ${{ runner.temp }}/dockurr-windows
-        run: |
-          # 调试需要：给 VM 加 CDP 端口映射（宿主 9221 -> VM 9221），失败不阻断（无 /dev/kvm 时照样跑）
-          if grep -q "9221:9221" win7/docker-compose.yml; then
-            echo "9221 映射已存在"
-          else
-            sed -i 's/- 8006:8006/- 8006:8006\n      - 9221:9221/' win7/docker-compose.yml || true
-            echo "已追加 9221 端口映射"
-          fi
-          cd win7
-          bash ./start-docker.sh
-
-      # ---------- Win7 调试隧道（不猜测，实时看 VM 桌面 + 分身 CDP）----------
-      # noVNC(8006)：浏览器直接看/操作 VM 桌面——start.bat 卡死时可实时看到 VM 里发生了什么
-      # CDP(9221)：分身浏览器远程调试（需 modifyMain 注入的 0.0.0.0 监听生效）
-      - name: 开 Win7 调试隧道 (noVNC + CDP)
-        continue-on-error: true
-        run: |
-          bash tools/debug-tunnel.sh 8006 win7-novnc
-          bash tools/debug-tunnel.sh 9221 win7-cdp
+      # ⚠️ 2026-10-22 根因修复：Docker VM 启动必须在「共享目录装配完成之后」。
+      # 旧顺序（启动 VM → 下载客户端 → rsync → npm → cp node/msu/start-verify）与
+      # VM 内 OEM install.bat 赛跑：run#39749138260 实证 VM 在宿主 cp 完成前就跑到
+      # OEM 阶段 → xcopy node 落空 + wusa KB3080149 返回 2(文件不存在) + 启动目录
+      # 拷走旧版 start.bat → 重启后 "The system cannot find the path specified."。
+      # 现改为：先装配完共享目录（客户端/rsync/npm/node/msu/start-verify/e2e-env）
+      # 再启动 VM，从根上消除竞态。以下步骤顺序即新顺序。
 
       - name: 下载 Win7 客户端
         run: |
@@ -661,6 +645,8 @@ jobs:
           cp -r ../tools/node-v18.20.3-win-x64 ./shared/node
           cp ../installer.exe ./shared/work
           cp ../win7/shared/start-verify.bat ./shared/start.bat
+          # 装配完成哨兵：install.bat 会轮询等待该文件出现（双保险，防 VM 抢跑）
+          echo "$(date -u +%FT%TZ) host-assembly-complete" > ./shared/.assembly-done
 
       - name: 写入 VM 内验证配置 (e2e-env.txt，含登录信息，仅存在于本次 runner 工作区)
         run: |
@@ -680,6 +666,30 @@ jobs:
           EOF
           echo "--- e2e-env.txt (密码已脱敏) ---"
           sed 's/^PRODUCT_WDIO_PASSWORD=.*/PRODUCT_WDIO_PASSWORD=***/' win7/shared/work/e2e-env.txt
+
+      - name: 启动 Win7 Docker 虚拟机 (dockurr-windows)
+        env:
+          PRIVATE_DEPLOYMENT: ${{ inputs.private_deployment }}
+          PRIVATE_DOWNLOAD_DIR: ${{ runner.temp }}/dockurr-windows
+        run: |
+          # 调试需要：给 VM 加 CDP 端口映射（宿主 9221 -> VM 9221），失败不阻断（无 /dev/kvm 时照样跑）
+          if grep -q "9221:9221" win7/docker-compose.yml; then
+            echo "9221 映射已存在"
+          else
+            sed -i 's/- 8006:8006/- 8006:8006\n      - 9221:9221/' win7/docker-compose.yml || true
+            echo "已追加 9221 端口映射"
+          fi
+          cd win7
+          bash ./start-docker.sh
+
+      # ---------- Win7 调试隧道（不猜测，实时看 VM 桌面 + 分身 CDP）----------
+      # noVNC(8006)：浏览器直接看/操作 VM 桌面——start.bat 卡死时可实时看到 VM 里发生了什么
+      # CDP(9221)：分身浏览器远程调试（需 modifyMain 注入的 0.0.0.0 监听生效）
+      - name: 开 Win7 调试隧道 (noVNC + CDP)
+        continue-on-error: true
+        run: |
+          bash tools/debug-tunnel.sh 8006 win7-novnc
+          bash tools/debug-tunnel.sh 9221 win7-cdp
 
       - name: 启动 frpc (可选, 调试用)
         continue-on-error: true

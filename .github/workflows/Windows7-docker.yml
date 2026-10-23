@@ -25,14 +25,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-        
-      - name: 启动docker
-        env:
-          PRIVATE_DEPLOYMENT: ${{ inputs.private_deployment }}
-          PRIVATE_DOWNLOAD_DIR: ${{ runner.temp }}/dockurr-windows
-        run: |
-          cd win7
-          bash ./start-docker.sh
+
+      # ⚠️ 2026-10-22 竞态修复：docker 启动挪到装配完成后（原在第一步，VM OOBE 会
+      # 抢在宿主 cp node/msu/start.bat 之前跑 OEM install.bat → 拷走半成品 →
+      # "The system cannot find the path specified."，与主 workflow 同根因）。
+      # 本 workflow 保留已验证的旧链路（cmd.js + passwd.json，2026-10-17 run
+      # 39014289656 成功实证），仅消除竞态。
 
       - name: 保存密码
         env:
@@ -103,6 +101,16 @@ jobs:
           cp -r ../tools/node-v18.20.3-win-x64 ./shared/node
           cp ../installer.exe ./shared/work
           cp ../passwd.json ./shared/work
+          # 装配完成哨兵：install.bat 轮询等待它出现再 xcopy（防 VM 抢跑，双保险）
+          echo "$(date -u +%FT%TZ) host-assembly-complete" > ./shared/.assembly-done
+
+      - name: 启动docker
+        env:
+          PRIVATE_DEPLOYMENT: ${{ inputs.private_deployment }}
+          PRIVATE_DOWNLOAD_DIR: ${{ runner.temp }}/dockurr-windows
+        run: |
+          cd win7
+          bash ./start-docker.sh
 
       - name: 启动frpc
         run: |

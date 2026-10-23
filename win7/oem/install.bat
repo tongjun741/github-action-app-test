@@ -8,6 +8,23 @@ set LOG=\\host.lan\Data\oem.log
 
 echo [OEM] install.bat 开始 >> %LOG%
 
+REM ===== 2026-10-22 竞态修复：等待宿主装配完成哨兵（最多 10 分钟）=====
+REM 根因：VM OOBE 可能比宿主装配（下载客户端/rsync/npm/cp）先到，此时 xcopy
+REM 会拷走半成品（node 缺失、msu 未就位、start.bat 是旧版）。宿主装配完成后
+REM 会写 \\host.lan\Data\.assembly-done，此处轮询等它出现再往下走。
+set /a _AS=0
+:WaitAssembly
+if exist "\\host.lan\Data\.assembly-done" goto AssemblyReady
+set /a _AS+=1
+echo [OEM] 等待宿主装配哨兵(第 %_AS% 次，10s 后重试) >> %LOG%
+if %_AS% LSS 60 (
+  ping -n 11 127.0.0.1 >nul
+  goto WaitAssembly
+)
+echo [OEM] 警告: 10 分钟未等到哨兵，按现状继续（可能缺文件） >> %LOG%
+:AssemblyReady
+echo [OEM] 宿主装配已就绪(等待 %_AS% 次) >> %LOG%
+
 echo Disabling automatic time synchronization...
 reg add "HKLM\SYSTEM\CurrentControlSet\Services\W32Time\TimeProviders\NtpClient" /v "Enabled" /t REG_DWORD /d 0 /f
 net stop w32time
