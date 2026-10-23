@@ -55,6 +55,10 @@ echo [%TIME%] 共享 %SHARE% 可用 >> %LLOG%
 REM ---- 开机脚印（本地 + 共享双写） ----
 echo [boot] %DATE% %TIME% >> %LLOG%
 echo [boot] %DATE% %TIME% >> %SHARE%\boots.log
+REM 2026-10-23 盲区修复：run#39893966159 实证 boots.log 有脚印但 start.log 40 分钟
+REM 未出现——logsync 后台同步一次都没成功，宿主完全看不到 VM 内进展。
+REM 修：关键节点直写共享（copy 单文件，短操作，SMB 挂起风险可控），logsync 保留兜底。
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 
 REM ---- 读取宿主写入的验证配置（KEY=VALUE，避免把登录信息写进仓库文件） ----
 if exist c:\work\e2e-env.txt (
@@ -72,6 +76,7 @@ if not exist "%HD%" set "HD=C:\Program Files\HuaYoung"
 set "FILTER=uninst setup update crashpad report repair"
 call :FindCli
 echo [%TIME%] exe 定位结束 CLI=[%CLI%] >> %LLOG%
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 
 REM ---- 安装客户端（若未安装；标签全部在顶层，绝不放进括号块） ----
 if defined CLI goto CliReady
@@ -93,6 +98,7 @@ taskkill /F /IM installer.exe >nul 2>&1
 :InstDone
 call :FindCli
 echo [%TIME%] 安装后 CLI=[%CLI%] (轮询 %_IW% 次) >> %LLOG%
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 if defined CLI goto CliReady
 echo [%TIME%] 致命：安装后仍无客户端 exe，放弃本轮 >> %LLOG%
 copy /y %LLOG% %SHARE%\start.log >nul 2>&1
@@ -100,6 +106,7 @@ echo "verify-win7 fatal: no client exe" >> %SHARE%\done.log
 exit /b 1
 :CliReady
 echo [%TIME%] 客户端就绪 CLI=[%CLI%] >> %LLOG%
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 
 REM ---- 给客户端 main.js 注入 remoteDebugPort + 假媒体开关 ----
 echo [%TIME%] 开始 modifyMain.js（注入 remoteDebugPort=%REMOTE_DEBUG_PORT%） >> %LLOG%
@@ -116,8 +123,10 @@ if not exist c:\work\node_modules\webdriverio (
 
 REM ---- WDIO 驱动主壳：登录 -> 打开目标分身 -> 连分身内核 9221 跑验证 ----
 echo [%TIME%] == start e2e-verify == >> %LLOG%
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 c:\node\node c:\work\tests\e2e-verify.cjs >> %LLOG% 2>&1
 echo [%TIME%] e2e-verify 退出码=%errorlevel% >> %LLOG%
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 
 REM ---- 收尾：立即同步 + done.log（直写共享，宿主靠它结束等待） ----
 copy /y %LLOG% %SHARE%\start.log >nul 2>&1
