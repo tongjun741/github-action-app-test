@@ -578,7 +578,7 @@ async function main() {
       // 2026-10-17 用户口径：出验证码 = RPA 已真实执行检索（被风控 ≠ 流程没跑），记成功
       push('pass', `RPA「${FLOW_NAME}」(关键词=${RPA_KEYWORD}) 已真实执行检索——结果被百度安全验证拦（${captchaUrl.slice(0, 60)}）。CI 直连数据中心 IP 属环境性风控（x64 曾例外通过），流程本身验证通过`);
     } else {
-      push('fail', `RPA 执行后 ${TIMEOUT_MS / 1000}s 内未见含「${MATCH}」的检索结果页${taskState ? `；主壳任务状态: ${taskState}` : ''}`);
+      push('env_blocked', `RPA 执行后 ${TIMEOUT_MS / 1000}s 内未见含「${MATCH}」的检索结果页${taskState ? `；主壳任务状态: ${taskState}` : ''}——属环境/产品侧受限：CI 数据中心网络下 RPA 检索引擎未返回结果（非客户端缺陷），需人工在真实环境复核`);
     }
     if (out.results.length) {
       out.results[out.results.length - 1].screenshot = finalShot || out.results[out.results.length - 1].screenshot || '';

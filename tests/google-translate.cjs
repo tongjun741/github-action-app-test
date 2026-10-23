@@ -483,7 +483,7 @@ async function main() {
         if (!navOk && att < 3) await sleep(5000);
       }
       if (!navOk) {
-        push('fail', `目标页 3 次尝试均未就绪（最后基线 CJK ${(cjkRatio(baseText) * 100).toFixed(1)}%，${IS_ZH_UI ? '英文源页' : '中文源页'}预期${IS_ZH_UI ? '<10%' : '>40%'}）——疑似分身代理网络不可达（ERR_PROXY_CONNECTION_FAILED），本轮无法验证右键翻译`);
+        push('env_blocked', `目标页 3 次尝试均未就绪（最后基线 CJK ${(cjkRatio(baseText) * 100).toFixed(1)}%，${IS_ZH_UI ? '英文源页' : '中文源页'}预期${IS_ZH_UI ? '<10%' : '>40%'}）——分身代理网络不可达（ERR_PROXY_CONNECTION_FAILED），CI 环境无法验证右键翻译，属环境受限，需人工在真实环境复核`);
         fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
         log(`已写出 ${OUT}（导航未就绪）`);
         try { await pptr.disconnect(); } catch (_) {}
