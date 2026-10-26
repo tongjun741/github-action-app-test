@@ -741,8 +741,49 @@ async function main() {
       }
       if (!opened) throw lastErr;
     } catch (e) {
+      // 2026-10-26 用户要求：单项失败不许中断整个任务——openClone 失败时降级落盘
+      // 完整结果（open_session=error + CDP 依赖项=error + 独立步骤项=manual 占位），
+      // 让后续步骤（RPA/翻译/Cookie 同步，各自 continue-on-error）照常跑，失败项留档。
       await saveShot(browser, SHOT);
-      throw e;
+      log(`[openClone] 3 次尝试全部失败——降级落盘结果（不中断后续步骤）: ${String(e && e.message).slice(0, 100)}`);
+      const isWin7 = /Windows 7/i.test(PLATFORM);
+      const isMac = process.platform === 'darwin' || /^macOS/i.test(PLATFORM);
+      const reason = String(e && e.message || e).slice(0, 200);
+      const out = { meta: { kernel: '152', generatedAt: new Date().toISOString(), teamId: process.env.TEAM_ID || '', cloneName: newCloneName || CLONE, cloneCdpPort: CDP_PORT }, platform: PLATFORM, results: [] };
+      const push = (caseId, name, type, status, detail) => out.results.push({ caseId, name, type, status, detail, criteria: '（见明细）', ts: new Date().toISOString() });
+      push('open_session', '打开会话是否成功', 'navigation', 'error', `打开会话失败（3 次尝试均超时）: ${reason}——后续 CDP 依赖项均未能执行`);
+      if (!isWin7) {
+        // CDP 依赖的 10 项（需分身内核在线）
+        push('kernel_version', '内核版本', 'kernel_version', 'error', `因打开会话失败未执行: ${reason}`);
+        for (const [cid, name] of [['pixelscan', 'https://pixelscan.net/'], ['iphey', 'https://iphey.com/'], ['browserleaks_ip', 'https://browserleaks.com/ip'], ['whoer', 'https://whoer.net/'], ['ipbinding', 'https://iphey.com/'], ['nopecha', 'NopeCHA 验证码'], ['fingerprint_scan', 'https://fingerprint-scan.com/'], ['devtools_detector', 'https://www.browserscan.net/'], ['plugins_load', '插件列表']]) {
+          push(cid, name, `fingerprint_${cid}`, 'error', `因打开会话失败未执行: ${reason}`);
+        }
+        // 密码 2 项：mac=na；其他=error（未执行）
+        if (isMac) {
+          push('password_save', '普通会话能否保存密码', 'client_password_save', 'na', 'macOS 不适用');
+          push('password_autofill', '普通会话能否代填密码', 'client_password_autofill', 'na', 'macOS 不适用');
+        } else {
+          push('password_save', '普通会话能否保存密码', 'client_password_save', 'error', `因打开会话失败未执行: ${reason}`);
+          push('password_autofill', '普通会话能否代填密码', 'client_password_autofill', 'error', `因打开会话失败未执行: ${reason}`);
+        }
+        // 独立步骤 6 项（rpa/google_translate 由独立脚本跑、cookie_sync 由第二台 job 跑、
+        // localstorage/indexdb/history/bookmark 由 sync-flows 写源+第二台验证）——
+        // 写 manual 占位保住网格完整；report.mjs 合并时占位会被真结果覆盖（不预写真结果防占位盖真）。
+        push('rpa_flow', '执行RPA流程', 'client_rpa_flow', 'manual', '占位：由独立脚本 rpa-flow.cjs 执行（若其因会话失败亦会如实报 error）');
+        push('google_translate', '右键Google翻译', 'client_google_translate', 'manual', '占位：由独立脚本 google-translate.cjs 执行（若其因会话失败亦会如实报 error）');
+        push('cookie_sync', 'Cookie同步', 'client_cookie_sync', 'manual', '占位：由第二台设备 verify-cookie-sync job 执行');
+        push('localstorage_sync', 'LocalStorage同步', 'client_localstorage_sync', 'manual', '占位：由 sync-flows（写源）+第二台验证执行');
+        push('indexdb_sync', 'IndexDB同步', 'client_indexdb_sync', 'manual', '占位：由 sync-flows（写源）+第二台验证执行');
+        push('history_sync', '历史记录同步', 'client_history_sync', 'manual', '占位：由 sync-flows（写源）+第二台验证执行');
+        push('bookmark_sync', '收藏夹同步', 'client_bookmark_sync', 'manual', '占位：由 sync-flows（写源）+第二台验证执行');
+      }
+      fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
+      log(`[openClone] 已降级写出 ${OUT}（${out.results.length} 项）——继续后续步骤（RPA/翻译各自 continue-on-error）`);
+      // GitHub Actions 注解
+      try {
+        console.error(`::error title=打开会话失败(${PLATFORM})::${reason.replace(/\r?\n/g, ' ')}`);
+      } catch (_) {}
+      process.exit(1); // 置红：job 红 ≠ 数据丢；后续步骤 if:always() 照常跑
     }
 
     if (OPEN_ONLY) {
