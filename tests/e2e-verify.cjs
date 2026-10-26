@@ -541,11 +541,25 @@ async function openClone(browser, cloneName) {
   await robustClick(browser, openBtn, '打开浏览器');
 
   log('处理「继续访问」并等待「正在访问」');
+  // Run#39928606998 教训（password-flow Run#42 同源）：按钮文字滞后不可信——Win7 慢
+  // VM 上「正在访问」可能迟迟不渲染，但分身内核 CDP 已实际起来了。每轮先探 CDP
+  // /json/version：活着=真开着（直接判定成功），死了才继续等按钮文字。
+  const cdpProbe = async () => {
+    try {
+      const res = await fetch(`${CDP}/json/version`, { signal: AbortSignal.timeout(3000) });
+      return res.ok;
+    } catch (_) { return false; }
+  };
   let n = 0;
   for (;;) {
     if (++n > 100) {
       await saveShot(browser, SHOT);
       throw new Error('等待打开会话超时（未出现「正在访问」）');
+    }
+
+    if (n % 5 === 0 && await cdpProbe()) {
+      log(`分身内核 CDP ${CDP}/json/version 在线——分身实际已打开（按钮文字滞后），第 ${n} 轮探活命中`);
+      return;
     }
 
     try {
@@ -612,7 +626,8 @@ async function main() {
       startupErr = e;
       log(`[startup] 第 ${att} 次启动/登录失败（${String(e && e.message).slice(0, 80)}）${att < 3 ? '，5s 后重试' : ''}`);
       if (process.platform === 'win32') {
-        try { require('node:child_process').execSync('taskkill /F /IM HuaYoungApp.exe /T 2>nul || true'); } catch (_) {}
+        // cmd.exe 无 || 语法——之前 bash 风格泄漏会报 "'true' is not recognized"
+        try { require('node:child_process').execSync('taskkill /F /IM HuaYoungApp.exe /T'); } catch (_) {}
         await sleep(2000);
       }
       if (att < 3) await sleep(5000);

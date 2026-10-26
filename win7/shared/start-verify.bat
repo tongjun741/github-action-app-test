@@ -142,6 +142,17 @@ copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 echo [%TIME%] e2e-verify 结束(轮询 %_EW% 次) >> %LLOG%
 copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 
+REM ---- 回传产物到共享（run#39928606998 破案：c:\work 是 OEM xcopy 的本地副本， ----
+REM ---- results/shots 写在 VM 本地宿主永远看不到。e2e 结束后显式 copy 回共享。----
+echo [%TIME%] 回传产物: results/screenshot/shots - >> %LLOG%
+if exist "c:\work\results-Windows_7.json" copy /y "c:\work\results-Windows_7.json" %SHARE%\work\ >nul 2>&1
+if exist "c:\work\screenshot-Windows_7.png" copy /y "c:\work\screenshot-Windows_7.png" %SHARE%\work\ >nul 2>&1
+if exist "c:\work\iphey-*.png" copy /y "c:\work\iphey-*.png" %SHARE%\work\ >nul 2>&1
+if exist "c:\work\shots" xcopy /y /e /i "c:\work\shots" "%SHARE%\work\shots" >nul 2>&1
+echo [%TIME%] 回传完成: %SHARE%\work\ 内容: >> %LLOG%
+dir /b %SHARE%\work\ 2>nul >> %LLOG%
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
+
 REM ---- 收尾：立即同步 + done.log（直写共享，宿主靠它结束等待） ----
 copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 echo "verify-win7 done" >> %SHARE%\done.log
