@@ -102,6 +102,9 @@ async function run() {
   console.log(`[runner] 验证目标分身: team=${teamId || '(未指定)'} clone=${cloneName || '(未指定)'} (CDP=${matrix.meta.cloneCdpPort || 9221}) engine=${engine}`);
 
   const resultsByPlatform = {};
+  // page 是平台循环内的块级变量，循环结束即销毁（且会被 close）。
+  // 分辨率回退需要的 window.screen 必须在 page 存活时采回，缓存到外层（修「page is not defined」）。
+  let screenFromBrowser = '';
   for (const platform of scope) {
     if (!allPlatforms.includes(platform)) {
       console.warn(`[runner] 跳过未知平台: ${platform}`);
@@ -127,6 +130,12 @@ async function run() {
         } else {
           context = await browser.newContext();
           page = await context.newPage();
+        }
+        // page 存活时顺手采 window.screen（Linux 下 xdpyinfo 缺失时的分辨率回退数据源）
+        if (page) {
+          try {
+            screenFromBrowser = await page.evaluate(() => `${window.screen.width}x${window.screen.height}${devicePixelRatio > 1 ? `@${devicePixelRatio}x` : ''}`);
+          } catch (_) { /* 页面未就绪则留空，走兜底文案 */ }
         }
       } catch (e) {
         console.error(`[runner] 创建页面/上下文失败，降级为无浏览器模式: ${e.message}`);
@@ -243,11 +252,9 @@ async function run() {
       try {
         displayResolution = execSync('xdpyinfo 2>/dev/null | grep dimensions | sed "s/.*: //;s/ pixels.*//" | head -1', { timeout: 15000, shell: '/bin/bash' }).toString().trim();
       } catch (_) { displayResolution = ''; }
-      if (!displayResolution && browser && page) {
-        try {
-          const scr = await page.evaluate(() => `${window.screen.width}x${window.screen.height}${devicePixelRatio > 1 ? `@${devicePixelRatio}x` : ''}`);
-          displayResolution = `${scr}(via window.screen)`;
-        } catch (_) { /* 浏览器不可用 */ }
+      // xdpyinfo 缺失时用循环前缓存的 window.screen 实测值（原实现引用已销毁的 page → ReferenceError）
+      if (!displayResolution && screenFromBrowser) {
+        displayResolution = `${screenFromBrowser}(via window.screen)`;
       }
       if (!displayResolution) displayResolution = process.env.DISPLAY ? `(DISPLAY=${process.env.DISPLAY}, 实测不可用)` : '(xdpyinfo/window.screen 均不可用)';
     }
