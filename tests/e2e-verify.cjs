@@ -551,15 +551,25 @@ async function openClone(browser, cloneName) {
     } catch (_) { return false; }
   };
   let n = 0;
+  let lastCdpProbe = false;
+  const t0 = Date.now();
   for (;;) {
     if (++n > 100) {
       await saveShot(browser, SHOT);
-      throw new Error('等待打开会话超时（未出现「正在访问」）');
+      throw new Error(`等待打开会话超时（未出现「正在访问」）——100 轮约${Math.round((Date.now() - t0) / 60000)}分钟，CDP 探活末次=${lastCdpProbe ? '在线' : '离线'}`);
     }
 
-    if (n % 5 === 0 && await cdpProbe()) {
-      log(`分身内核 CDP ${CDP}/json/version 在线——分身实际已打开（按钮文字滞后），第 ${n} 轮探活命中`);
-      return;
+    if (n % 5 === 0) {
+      lastCdpProbe = await cdpProbe();
+      if (lastCdpProbe) {
+        log(`分身内核 CDP ${CDP}/json/version 在线——分身实际已打开（按钮文字滞后），第 ${n} 轮探活命中`);
+        return;
+      }
+      // 2026-10-26 run#40279717971 Win7 盲区：100 轮×~11s≈18 分钟全程无一条日志（3 次重试共
+      // ~54 分钟黑盒，宿主 43 分钟先超时）。每 10 轮（约 2 分钟）打一条进度，区分「还在等」与「卡死」。
+      if (n % 10 === 0) {
+        log(`[openClone] 等待中（第 ${n}/100 轮，已 ${Math.round((Date.now() - t0) / 1000)}s，CDP 末次探活=离线，按钮未变「正在访问」）`);
+      }
     }
 
     try {
