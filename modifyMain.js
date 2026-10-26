@@ -160,13 +160,20 @@ async function main() {
     // --remote-allow-origins=* 放行 WebSocket 跨源（DevTools/工具直连需要）。
     const bsPattern = /(\.\.\.this\.browserSwitches\.split\(["'][^"']*["']\)\))/;
     if (bsPattern.test(fileContent)) {
+      // 2026-10-26 Win7 根治：客户端自身 browserSwitches 逻辑为 `i&&!isLinuxPlatform()||s.push("--no-sandbox")`
+      // （i=sandbox 开关，diag 实测 sysPres.sandbox=true）→ Windows 上 sandbox=true 时「短路」不推 --no-sandbox，
+      // 分身内核浏览器以 sandbox 启动。Win10 真实 runner 会话里 sandbox 能初始化（打开会话正常）；
+      // 但 Win7 跑在 QEMU/dockurr 嵌套虚拟化 VM、会话 0 式非交互桌面，chrome sandbox 初始化失败 →
+      // `[BROWSER] launch error` → 分身内核起不来 → 9221 CDP 全程离线 → 打开会话 19min 超时（run#40292275931 实证）。
+      // 修复：Windows 平台强制补 --no-sandbox（CI 验证环境无安全顾虑；Win10 加它亦无害，属业界常态）。
+      const noSandbox = os.platform() === 'win32' ? ';s.push("--no-sandbox")' : '';
       fileContent = fileContent.replace(
         bsPattern,
         // 注：--password-store=basic / --enable-automatic-password-saving 已按用户要求移除
         //（2026-10-10：密码保存必须模拟人工点击气泡，不得改浏览器启动参数绕过）
-        '$1;s.push("--use-fake-ui-for-media-stream");s.push("--use-fake-device-for-media-stream");s.push("--remote-debugging-address=0.0.0.0");s.push("--remote-allow-origins=*")'
+        '$1;s.push("--use-fake-ui-for-media-stream");s.push("--use-fake-device-for-media-stream");s.push("--remote-debugging-address=0.0.0.0");s.push("--remote-allow-origins=*")' + noSandbox
       );
-      console.log('✓ 已向 browserSwitches 注入 假媒体+CDP外网 开关（不含密码相关参数，按用户要求）');
+      console.log('✓ 已向 browserSwitches 注入 假媒体+CDP外网 开关（不含密码相关参数，按用户要求）' + (noSandbox ? ' + --no-sandbox(Windows)' : ''));
     } else {
       console.warn('⚠ 未在 browserSwitches 找到注入点，[diag] 上方已打印真实上下文');
     }

@@ -157,6 +157,14 @@ if exist "c:\work\results-Windows_7.json" copy /y "c:\work\results-Windows_7.jso
 if exist "c:\work\screenshot-Windows_7.png" copy /y "c:\work\screenshot-Windows_7.png" %SHARE%\work\ >nul 2>&1
 if exist "c:\work\iphey-*.png" copy /y "c:\work\iphey-*.png" %SHARE%\work\ >nul 2>&1
 if exist "c:\work\shots" xcopy /y /e /i "c:\work\shots" "%SHARE%\work\shots" >nul 2>&1
+REM ---- 2026-10-26 Win7 调试：回传客户端运行时日志（含 [BROWSER] launch error） ----
+REM 客户端的 console.log/内部 logger 落盘在 %APPDATA%/%LOCALAPPDATA%\HuaYoung；分身内核
+REM 启动失败的根因（沙箱/缺依赖）只在这里有迹，e2e 的 CDP 探活只能看到「离线」结果。
+set "CLLOG=%SHARE%\work\client-logs"
+if exist "%APPDATA%\HuaYoung" xcopy /y /e /i "%APPDATA%\HuaYoung" "%CLLOG%\appdata" >nul 2>&1
+if exist "%LOCALAPPDATA%\HuaYoung" xcopy /y /e /i "%LOCALAPPDATA%\HuaYoung" "%CLLOG%\localappdata" >nul 2>&1
+echo [%TIME%] 客户端日志回传: %CLLOG% >> %LLOG%
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 echo [%TIME%] 回传完成: %SHARE%\work\ 内容: >> %LLOG%
 dir /b %SHARE%\work\ 2>nul >> %LLOG%
 copy /y %LLOG% %SHARE%\start.log >nul 2>&1

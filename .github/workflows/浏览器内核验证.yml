@@ -475,7 +475,7 @@ jobs:
     needs: verify          # 必须等第一台机器登录完成，Cookie 才有同步源（Ubuntu 新分身名经 needs.verify.outputs 传入）
     # 2026-10-13 调试增强：debug_verify/debug_sync 时也跑（覆盖 Group2 sync4+Cookie 调试）；
     # 仅 debug_hold 纯挂起不跑验证时跳过。普通全量轮(input 全 false)照常跑。
-    if: ${{ !cancelled() && inputs.debug_hold != true && inputs.debug_sync_mode != 'write' }}
+    if: ${{ !cancelled() && inputs.debug_hold != true && inputs.debug_sync_mode != 'write' && inputs.debug_platform != 'win7' }}
     runs-on: ubuntu-22.04  # 与 verify 的 Ubuntu job 物理不同机（GitHub 每次分配新 runner）
     env:
       CLIENT_BINARY: /opt/花漾客户端/huayoung
@@ -589,7 +589,8 @@ jobs:
       cancel-in-progress: false
     # Win7 无 GitHub 托管 runner，用 Docker/VM 方案。
     # 2026-10-10 用户指令：Win7 搁置（skip_win7 输入默认 true；要跑时手动 dispatch 填 false）
-    if: inputs.skip_win7 != true && inputs.debug_hold != true && inputs.debug_verify != true
+    # 2026-10-26 调试增强：debug_verify + debug_platform=win7 时也跑（单平台调试 Win7，不触发全量）
+    if: (inputs.skip_win7 != true && inputs.debug_hold != true && inputs.debug_verify != true) || (inputs.debug_verify == true && inputs.debug_platform == 'win7')
     runs-on: ubuntu-24.04  # 2026-10-16 pin：ubuntu-latest 将随 22.04 退役潮告警/漂移，固定 24.04（第二设备验证与报告合并均为纯 node 任务，无 22.04 依赖）
     env:
       TEAM_ID: ${{ github.event.inputs.team_id || '213505445724246' }}
