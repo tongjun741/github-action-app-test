@@ -827,6 +827,8 @@ async function main() {
       } else {
         try {
           const pwResults = await runPasswordFlow(browser, { outPath: OUT });
+          // 2026-10-26 与 env_blocked 重分类对齐：密码气泡/代填在 CI（headless/Xvfb 无 WM）不可
+          // 验证属环境受限（报告「环境受限」列）——仅真 fail/error 置红退出码。
           if (pwResults.some((x) => x.status === 'fail' || x.status === 'error')) pwFail = 1;
         } catch (e) {
           log(`密码流程整体失败: ${e.message}`);

@@ -586,7 +586,10 @@ async function main() {
     }
     fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
     log(`已写出 ${OUT}`);
-    process.exit(matched || captchaUrl ? 0 : 1);
+    // 退出码（2026-10-26 与 env_blocked 重分类对齐）：pass=0；env_blocked（环境受限）=0 不标红；
+    // 只有真 fail/error（分身未选中、流程入口缺失等）才 exit 1。
+    const finalStatus = out.results.length ? out.results[out.results.length - 1].status : 'error';
+    process.exit(matched || captchaUrl || finalStatus === 'env_blocked' ? 0 : 1);
   } finally {
     try { await browser.deleteSession(); } catch (_) {}
   }

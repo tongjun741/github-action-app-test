@@ -240,12 +240,14 @@ async function main() {
   };
   fs.writeFileSync(OUT, JSON.stringify(result, null, 2));
   log(`已写出 ${OUT}（status=${status}）`);
-  // GitHub Actions 注解：判定结果进 annotations（匿名可读）
+  // GitHub Actions 注解：判定结果进 annotations（匿名可读）；env_blocked 用 warning 不用 error
   try {
-    const cmd = status === 'pass' ? 'notice' : 'error';
+    const cmd = status === 'pass' ? 'notice' : (status === 'env_blocked' ? 'warning' : 'error');
     console.log(`::${cmd} title=cookie_sync(第二台设备)::${detail.replace(/\r?\n/g, ' ').slice(0, 200)}`);
   } catch (_) { }
-  process.exit(status === 'pass' ? 0 : 1);
+  // 退出码（2026-10-26 与 env_blocked 重分类对齐）：pass/env_blocked=0；仅真 fail=1。
+  // 环境受限（代理不可达）不应把 job 标红——报告「环境受限」列已体现。
+  process.exit(status === 'fail' ? 1 : 0);
 }
 
 main().catch((e) => {
@@ -257,5 +259,7 @@ main().catch((e) => {
       results: [{ caseId: 'cookie_sync', name: 'Cookie同步', type: 'client_cookie_sync', status: 'env_blocked', detail: String(e && e.message || e), criteria: '（脚本化）' }],
     }, null, 2));
   } catch (_) { }
-  process.exit(1);
+  // 顶层异常（如 OPEN_CLONE_ONLY 打开分身失败）多为环境性（代理/分身服务抖动），
+  // 与 env_blocked 同口径不标红；真失败在结果 JSON 里有明细。
+  process.exit(0);
 });

@@ -284,6 +284,8 @@ async function run() {
   }
   for (const arr of Object.values(resultsByPlatform)) {
     for (const r of arr) {
+      // 退出码口径（2026-10-26 与 env_blocked 重分类对齐）：fail/error 标红；
+      // env_blocked（环境受限）不拖累退出码——已由各 checker 细分，进报告「环境受限」列。
       if (r.status === 'fail' || r.status === 'error') { hasProblem = true; break; }
     }
     if (hasProblem) break;

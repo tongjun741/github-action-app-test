@@ -167,8 +167,9 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
     results.push({ caseId, name, type, status, detail, criteria });
     const tag = { pass: '✓', fail: '✗', manual: '人工', error: '错误' }[status] || status;
     log(`[${tag}] ${name} — ${detail}`);
-    // GitHub Actions 注解：每用例判定结果进 annotations（匿名可读，免 token 诊断）
-    const cmd = status === 'pass' ? 'notice' : 'error';
+    // GitHub Actions 注解：每用例判定结果进 annotations（匿名可读，免 token 诊断）。
+    // 2026-10-26 与 env_blocked 口径对齐：环境受限发 warning（黄），真失败才 error（红）。
+    const cmd = status === 'pass' ? 'notice' : (status === 'env_blocked' ? 'warning' : 'error');
     try {
       const t = `${caseId}(${process.env.E2E_PLATFORM || '?'})`;
       const m = String(detail).replace(/\r?\n/g, ' ').slice(0, 200);
@@ -774,7 +775,8 @@ async function runPasswordFlow(wdioBrowser, opts = {}) {
             await sleep(1500);
           }
         }
-        await client.detach();
+        // （原 client.detach() 引用未定义变量，恒抛 "client is not defined"——2026-10-26 移除。
+        //  鼠标移开非必需：page 由 withPage 管理，代填判定只看 input 状态。）
       } catch (e) { log(`鼠标账号选择异常(继续DOM触发): ${e.message.slice(0, 60)}`); }
       // ③ 辅助：DOM 聚焦 + reload 触发 autofill
       try {

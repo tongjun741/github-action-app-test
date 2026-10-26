@@ -485,9 +485,9 @@ async function main() {
       if (!navOk) {
         push('env_blocked', `目标页 3 次尝试均未就绪（最后基线 CJK ${(cjkRatio(baseText) * 100).toFixed(1)}%，${IS_ZH_UI ? '英文源页' : '中文源页'}预期${IS_ZH_UI ? '<10%' : '>40%'}）——分身代理网络不可达（ERR_PROXY_CONNECTION_FAILED），CI 环境无法验证右键翻译，属环境受限，需人工在真实环境复核`);
         fs.writeFileSync(OUT, JSON.stringify(out, null, 2));
-        log(`已写出 ${OUT}（导航未就绪）`);
+        log(`已写出 ${OUT}（导航未就绪，env_blocked 不标红）`);
         try { await pptr.disconnect(); } catch (_) {}
-        process.exit(1);
+        process.exit(0); // 2026-10-26：env_blocked 与退出码口径对齐——环境受限不拖累 job 结论
       }
 
       // G2 (2026-10-13)：用户要求「右键翻译只使用 OCR，不要降级」。
