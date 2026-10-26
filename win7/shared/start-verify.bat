@@ -108,6 +108,14 @@ exit /b 1
 echo [%TIME%] 客户端就绪 CLI=[%CLI%] >> %LLOG%
 copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 
+REM ---- 关闭 Windows 防火墙（run#40279717971 破案：OOBE 后防火墙弹窗拦截 ----
+REM ---- 客户端/分身浏览器联网 → 打开会话卡网络层 3 轮 19min 超时。截图 OCR ----
+REM ---- 实锤满屏 "Windows Firewall has blocked some features"。    ----
+REM ---- 无人值守 VM 无法点弹窗；netsh 关闭三 profile 一劳永逸。   ----
+netsh advfirewall set allprofiles state off >nul 2>&1
+echo [%TIME%] 防火墙已关闭(errorlevel=%errorlevel%) >> %LLOG%
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
+
 REM ---- 给客户端 main.js 注入 remoteDebugPort + 假媒体开关 ----
 echo [%TIME%] 开始 modifyMain.js（注入 remoteDebugPort=%REMOTE_DEBUG_PORT%） >> %LLOG%
 c:\node\node c:\work\modifyMain.js >> %LLOG% 2>&1
