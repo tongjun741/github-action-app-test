@@ -550,12 +550,22 @@ async function openClone(browser, cloneName) {
       return res.ok;
     } catch (_) { return false; }
   };
+  // 2026-10-27 run#40307091958 教训：waitForExist 静默 catch 的「零日志等待」让 19min×3
+  // 轮超时无从定位（继续访问到底有没有出现？页面停在哪个状态？）。每 20 轮把主壳页面
+  // innerText 首段 + 一张全屏截图落盘，把「黑盒等待」变成「可回放现场」。
+  const dumpPageState = async (tag) => {
+    try {
+      const txt = await browser.execute(() => (document.body && document.body.innerText || '').slice(0, 400));
+      log(`[openClone][diag] ${tag} 主壳 innerText 首段: ${JSON.stringify(txt)}`);
+    } catch (e) { log(`[openClone][diag] ${tag} innerText 读取失败: ${e.message.slice(0, 60)}`); }
+    await saveShot(browser, `${SHOT.replace(/\.png$/, '')}-openwait-${tag}`);
+  };
   let n = 0;
   let lastCdpProbe = false;
   const t0 = Date.now();
   for (;;) {
     if (++n > 100) {
-      await saveShot(browser, SHOT);
+      await dumpPageState('timeout');
       throw new Error(`等待打开会话超时（未出现「正在访问」）——100 轮约${Math.round((Date.now() - t0) / 60000)}分钟，CDP 探活末次=${lastCdpProbe ? '在线' : '离线'}`);
     }
 
@@ -567,14 +577,14 @@ async function openClone(browser, cloneName) {
       }
       // 2026-10-26 run#40279717971 Win7 盲区：100 轮×~11s≈18 分钟全程无一条日志（3 次重试共
       // ~54 分钟黑盒，宿主 43 分钟先超时）。每 10 轮（约 2 分钟）打一条进度，区分「还在等」与「卡死」。
-      if (n % 10 === 0) {
-        log(`[openClone] 等待中（第 ${n}/100 轮，已 ${Math.round((Date.now() - t0) / 1000)}s，CDP 末次探活=离线，按钮未变「正在访问」）`);
-      }
+      if (n % 20 === 0) await dumpPageState(`round${n}`);
     }
 
     try {
       await browser.$('//span[text()="继续访问"]').waitForExist({ timeout: 5 * 1000 });
+      await saveShot(browser, `${SHOT.replace(/\.png$/, '')}-continue-visit-seen`);
       await robustClick(browser, '//span[text()="继续访问"]', '继续访问');
+      log('已点击「继续访问」（robustClick）');
       // 「继续访问」可能弹 Ant Design 确认框，不点会阻塞
       try {
         const confirm = browser.$('.ant-modal-confirm .ant-btn-primary');
@@ -695,8 +705,10 @@ async function main() {
       try {
         if (process.platform === 'win32') {
           // Win 安装名可能为 花漾客户端.exe（现行）或旧版 HuaYoungApp.exe，双杀兜底
-          require('node:child_process').execSync(`taskkill /F /IM "${exeName}" /T 2>nul || true`);
-          require('node:child_process').execSync('taskkill /F /IM HuaYoungApp.exe /T 2>nul || true');
+          // （2026-10-27 修正：execSync 走 cmd.exe，bash 风格 `2>nul || true` 会报
+          //  'true' is not recognized——去掉 || true，taskkill 非零退出码由 try/catch 吞掉）
+          try { require('node:child_process').execSync(`taskkill /F /IM "${exeName}" /T`); } catch (_) {}
+          try { require('node:child_process').execSync('taskkill /F /IM HuaYoungApp.exe /T'); } catch (_) {}
         } else {
           // mac: /Applications/花漾客户端.app/Contents/MacOS/花漾客户端；ubuntu: /opt/花漾客户端/huayoung
           require('node:child_process').execSync(`pkill -f "${stem}" 2>/dev/null; pkill -f "花漾" 2>/dev/null; true`);

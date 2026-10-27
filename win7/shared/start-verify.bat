@@ -114,6 +114,17 @@ REM ---- 实锤满屏 "Windows Firewall has blocked some features"。    ----
 REM ---- 无人值守 VM 无法点弹窗；netsh 关闭三 profile 一劳永逸。   ----
 netsh advfirewall set allprofiles state off >nul 2>&1
 echo [%TIME%] 防火墙已关闭(errorlevel=%errorlevel%) >> %LLOG%
+
+REM ---- 2026-10-27 run#40307091958 破案：满屏 Windows Script Host 编译错误弹窗 ----
+REM ---- （截图 OCR 实锤：ScriptHost 引擎试图把 c:\work\cmd.js 当 JScript 执行，   ----
+REM ---- 第 1 行 const 即语法错误 → 刷屏弹窗盖住桌面）。源头=老链路遗留 cmd.js     ----
+REM ----（rsync 全仓文件到 c:\work 时带入）。处置：改名 .legacy 使任何自启/关联    ----
+REM ---- 启动都找不到它；并把 .js 默认引擎强制为 CScript（静默、无 GUI 弹窗）。    ----
+if exist "c:\work\cmd.js" ren "c:\work\cmd.js" "cmd.js.legacy" >nul 2>&1
+cscript //B //H:CScript >nul 2>&1
+echo [%TIME%] 老链路 cmd.js 已改名(.legacy)+CScript 静默模式已设 >> %LLOG%
+copy /y %LLOG% %SHARE%\start.log >nul 2>&1
+
 copy /y %LLOG% %SHARE%\start.log >nul 2>&1
 
 REM ---- 给客户端 main.js 注入 remoteDebugPort + 假媒体开关 ----

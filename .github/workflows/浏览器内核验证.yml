@@ -71,7 +71,7 @@ on:
         default: false
         type: boolean
       debug_platform:
-        description: '调试验证的目标平台（默认 win10；可选 ubuntu）。debug_hold/debug_verify 时其它平台全跳过。'
+        description: '调试验证的目标平台（默认 win10；可选 ubuntu/mac-arm64/mac-x64/win7——win7 单跑 verify-win7 Docker job）。debug_hold/debug_verify 时其它平台全跳过。'
         required: false
         default: 'win10'
         type: string
@@ -406,7 +406,9 @@ jobs:
       # 每 5 分钟重发隧道 URL notice（Agent 轮询 annotations 即可拿到最新链接），到时自动结束。
       - name: 调试挂起 (保持隧道在线, Agent 自动探测)
         # debug_sync 模式不挂起：让 verify-cookie-sync job 能紧接着跑跨设备读取（不被 300min 挂起阻塞）
-        if: (inputs.debug_hold == true || inputs.debug_verify == true) && inputs.debug_sync != true
+        # 2026-10-27 修正：debug 模式仅目标平台挂起（此前 4 平台 job 全跑此步 → 找不到
+        # 隧道日志 → 白白 failure，run#40307091958 实证 4 job 全红非目标平台）
+        if: (inputs.debug_hold == true || inputs.debug_verify == true) && inputs.debug_sync != true && (matrix.install == inputs.debug_platform || inputs.debug_platform == 'win7')
         # 2026-10-15 轮#5 实锤：Win 默认 pwsh 跑 bash 语法报 ParserError（[ "$MINS" -gt 300 ]）→ 显式 bash
         shell: bash
         run: |
@@ -799,6 +801,7 @@ jobs:
             win7/shared/oem.log
             win7/shared/start.log
             win7/shared/done.log
+            win7/shared/work/client-logs/
           if-no-files-found: ignore
 
       - name: 取回 Win7 验证结果
